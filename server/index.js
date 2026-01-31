@@ -1,0 +1,142 @@
+import express from 'express'
+import cors from 'cors'
+import dotenv from 'dotenv'
+import { EventEmitter } from 'events'
+dotenv.config({ override: true })
+import cookieParser from 'cookie-parser'
+import morgan from 'morgan'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
+import mongoSanitize from 'express-mongo-sanitize'
+import xss from 'xss-clean'
+import hpp from 'hpp'
+import connectDB from './config/connectDB.js';
+import authRouter from './routes/auth.route.js';
+import clientRouter from './routes/client.route.js';
+import adminRouter from './routes/admin.route.js';
+import userRouter from './routes/user.route.js';
+import aiRouter from './routes/ai.route.js';
+import { seedRoles } from './utils/roleSeeder.js';
+import { initAuditCron } from './cron/auditCron.js';
+import logger from './utils/logger.js';
+
+const app = express()
+const realtimeEmitter = new EventEmitter()
+app.set('realtimeEmitter', realtimeEmitter)
+const allowedOriginsRaw = process.env.FRONTEND_URL || "";
+logger.info(`Allowed Origins Raw: ${allowedOriginsRaw}`);
+const allowedOrigins = allowedOriginsRaw
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
+logger.info(`Allowed Origins Parsed: ${JSON.stringify(allowedOrigins)}`);
+app.use(cors({
+    credentials: true,
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        // Hardcoded allowed origins for debugging/safety
+        const hardcodedAllowed = [
+            'http://localhost:5254',
+            'http://localhost:8284',
+            'http://localhost:8285',
+            'http://localhost:8080',
+            'http://127.0.0.1:8080',
+            'http://192.168.5.172:5254',
+            'http://192.168.5.172:8080'
+        ];
+        
+        if (hardcodedAllowed.includes(origin)) return callback(null, true);
+
+        if (allowedOrigins.length === 0) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        
+        logger.warn(`DEBUG CORS FAIL: Origin = ${origin}`);
+        logger.error(`Blocked by CORS: ${origin}`); 
+        return callback(new Error(`CORS: Origin ${origin} not allowed`));
+    }
+}))
+app.use(express.json({ limit: '10mb' }))
+app.use(cookieParser())
+app.use(morgan('dev'))
+app.use(helmet({
+	crossOriginResourcePolicy : false
+}))
+
+// Data sanitization against NoSQL query injection
+// Custom middleware to avoid Express 5 req.query getter issue
+app.use((req, res, next) => {
+    const sanitize = (obj) => {
+        if (obj instanceof Object) {
+            for (const key in obj) {
+                if (/^\$/.test(key)) {
+                    delete obj[key];
+                } else {
+                    sanitize(obj[key]);
+                }
+            }
+        }
+    };
+    
+    if (req.body) sanitize(req.body);
+    if (req.params) sanitize(req.params);
+    if (req.query) sanitize(req.query);
+    next();
+});
+
+// app.use(mongoSanitize());
+
+// Data sanitization against XSS
+// app.use(xss());
+
+// Prevent parameter pollution
+// app.use(hpp());
+
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000, // Limit each IP to 1000 requests per windowMs
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    message: 'Too many requests from this IP, please try again after 15 minutes'
+})
+app.use(limiter)
+
+app.use('/uploads', express.static('uploads'));
+
+const PORT = process.env.PORT || 8080;
+
+app.get("/",(request,response)=>{
+	response.json({
+		message : "Server is running " + PORT
+	})
+})
+
+app.use('/api/auth', authRouter);
+app.use('/api/client', clientRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/user', userRouter);
+app.use('/api/ai', aiRouter);
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    logger.error(err.stack);
+    const statusCode = err.statusCode || 500;
+    const message = err.message || 'Internal Server Error';
+    
+    res.status(statusCode).json({
+        success: false,
+        error: true,
+        message: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : message,
+        stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
+    });
+});
+
+connectDB().then(async ()=>{
+    await seedRoles();
+    initAuditCron();
+    app.listen(PORT, '0.0.0.0', ()=>{
+        logger.info(`Server is running ${PORT}`)
+    })
+})
