@@ -3,7 +3,7 @@ services:
   - type: web
     name: eprkavach-backend
     env: node
-    root: server
+    rootDir: server
     plan: free
     buildCommand: npm install
     startCommand: npm start
@@ -22,7 +22,7 @@ services:
   - type: web
     name: eprkavach-frontend
     env: node
-    root: client-react
+    rootDir: client-react
     plan: free
     # Build the app (VITE_API_URL will be injected here)
     buildCommand: npm install && npm run build
