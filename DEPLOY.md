@@ -1,132 +1,71 @@
-# Deployment Guide for EPRKAVACH
+# Deployment Guide for Render
 
-This project consists of a **React Frontend** and a **Node.js/Express Backend**. We recommend deploying them separately for the best performance and scalability.
+This guide explains how to deploy the EPRKAVACH application (Frontend + Backend) to [Render](https://render.com) using the provided `render.yaml` Blueprint.
 
-## 1. Backend Deployment (Render / Railway / Heroku)
-We recommend **Render** (free tier available) or **Railway**.
+## Prerequisites
 
-### Option A: Deploy on Render.com (Recommended)
-You can deploy manually or use the `render.yaml` Blueprint I created for you.
+1.  **GitHub Account**: You need a GitHub account.
+2.  **Render Account**: Sign up at [dashboard.render.com](https://dashboard.render.com/).
+3.  **MongoDB Database**: You need a MongoDB connection string (URI).
+    *   You can use [MongoDB Atlas](https://www.mongodb.com/atlas/database) (Free Tier).
+    *   Get the connection string (e.g., `mongodb+srv://<username>:<password>@cluster.mongodb.net/eprkavach?retryWrites=true&w=majority`).
 
-#### Method 1: Using Blueprint (Easiest)
-1.  Push your code to GitHub.
-2.  Log in to [Render](https://render.com/).
-3.  Click **New +** -> **Blueprint**.
-4.  Connect your repository.
-5.  Render will automatically detect `render.yaml` and ask you to fill in the environment variables (`MONGODB_URI`, etc.).
-6.  Click **Apply**.
+## Step 1: Push Code to GitHub
 
-#### Method 2: Manual Setup
-1.  Push your code to a **GitHub repository**.
-2.  Log in to [Render](https://render.com/).
-3.  Click **New +** -> **Web Service**.
-4.  Connect your GitHub repository.
-5.  **Configure the service**:
-    *   **Root Directory**: `server`
-    *   **Environment**: `Node`
-    *   **Build Command**: `npm install`
-    *   **Start Command**: `npm start`
-6.  **Environment Variables** (Advanced):
-    Add the following keys (copy from your local `.env` or set new ones):
-    *   `MONGODB_URI`: Your MongoDB connection string (e.g., from MongoDB Atlas).
-    *   `SECRET_KEY_ACCESS_TOKEN`: A long random string.
-    *   `SECRET_KEY_REFRESH_TOKEN`: Another long random string.
-    *   `FRONTEND_URL`: The URL where your frontend will be deployed (e.g., `https://your-app.vercel.app`). *You can update this later after deploying the frontend.*
-    *   `MAIL_USER` / `MAIL_PASS`: For email functionality.
-7.  Click **Create Web Service**.
-8.  **Copy the Backend URL** (e.g., `https://eprkavach-api.onrender.com`) once it's live.
+Ensure your latest code is pushed to your GitHub repository:
+[https://github.com/kamleshz/KAVACH](https://github.com/kamleshz/KAVACH)
 
-## 2. Frontend Deployment (Vercel)
-Vercel is the best place to host Vite/React apps.
+(We have already done this in the previous steps).
 
-1.  Log in to [Vercel](https://vercel.com/).
-2.  Click **Add New...** -> **Project**.
-3.  Import your GitHub repository.
-4.  **Configure the project**:
-    *   **Root Directory**: Click `Edit` and select `client-react`.
-    *   **Framework Preset**: Vite (should be auto-detected).
-    *   **Build Command**: `npm run build` (default).
-    *   **Output Directory**: `dist` (default).
-5.  **Environment Variables**:
-    *   Key: `VITE_API_URL`
-    *   Value: The **Backend URL** you got from Step 1 (e.g., `https://eprkavach-api.onrender.com`).
-    *   *Note: Do NOT add a trailing slash `/` at the end.*
-6.  Click **Deploy**.
+## Step 2: Create a New Blueprint on Render
 
-## 3. Final Connection
-1.  Once the Frontend is deployed, copy its URL (e.g., `https://eprkavach-frontend.vercel.app`).
-2.  Go back to your **Backend Dashboard** (Render).
-3.  Update the `FRONTEND_URL` environment variable to match your new Frontend URL.
-4.  **Redeploy** the backend (usually automatic on Render when env vars change).
+1.  Log in to your [Render Dashboard](https://dashboard.render.com/).
+2.  Click the **"New +"** button and select **"Blueprint"**.
+3.  Connect your GitHub account if you haven't already.
+4.  Search for and select your repository: `KAVACH`.
+5.  Render will automatically detect the `render.yaml` file.
 
-## 4. Google Cloud Platform (Cloud Run)
-If you prefer Google Cloud, we have configured the project for **Cloud Run**, which is a serverless container platform.
+## Step 3: Configure Environment Variables
 
-### Prerequisites
-1.  Install the **Google Cloud SDK** (`gcloud` CLI).
-2.  Enable **Cloud Run API** and **Container Registry API** (or Artifact Registry) in your GCP Console.
-3.  Authenticate: `gcloud auth login` and `gcloud config set project YOUR_PROJECT_ID`.
+Render will ask you to provide values for the environment variables defined in `render.yaml`.
 
-### Step 1: Deploy Backend (Server)
-1.  Navigate to the server directory:
-    ```bash
-    cd server
-    ```
-2.  Build and submit the image to Google Container Registry (GCR):
-    ```bash
-    gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/eprkavach-server
-    ```
-3.  Deploy to Cloud Run:
-    ```bash
-    gcloud run deploy eprkavach-server \
-      --image gcr.io/YOUR_PROJECT_ID/eprkavach-server \
-      --platform managed \
-      --region us-central1 \
-      --allow-unauthenticated \
-      --set-env-vars="MONGODB_URI=your_mongo_uri,SECRET_KEY_ACCESS_TOKEN=secret1,SECRET_KEY_REFRESH_TOKEN=secret2,FRONTEND_URL=*"
-    ```
-    *Replace `your_mongo_uri` etc. with actual values. Initially set `FRONTEND_URL=*` or a placeholder, then update it after deploying the frontend.*
-4.  Copy the **Service URL** (e.g., `https://eprkavach-server-xyz.a.run.app`).
+*   **Service Group**: You can give it a name like `eprkavach`.
+*   **MONGODB_URI**: Paste your MongoDB Connection String here.
+    *   *Important*: Ensure your IP Access List in MongoDB Atlas allows access from anywhere (`0.0.0.0/0`) or configure Render's static IPs (requires paid plan). For the free tier, allow `0.0.0.0/0`.
+*   **SECRET_KEY_ACCESS_TOKEN**: Render will verify this (it will auto-generate if we didn't specify value, but `render.yaml` says `generateValue: true`, so it might just show it). If it asks, you can type a random long string.
+*   **SECRET_KEY_REFRESH_TOKEN**: Same as above.
 
-### Step 2: Deploy Frontend (Client)
-1.  Navigate to the client directory:
-    ```bash
-    cd ../client-react
-    ```
-2.  Build and submit the image (pass the backend URL as a build arg if needed, or better, configure it at runtime via window.env, but for simplicity we'll bake it in or use a relative path proxy):
-    *   *Note: Vite Environment variables are baked in at build time.*
-    *   Open `client-react/Dockerfile` and ensure you can pass the argument or create a `.env.production` file before building.
-    *   Simplest way: Create `.env.production` locally with `VITE_API_URL=https://eprkavach-server-xyz.a.run.app` before running the build command.
-    ```bash
-    # Create temp env file
-    echo "VITE_API_URL=https://eprkavach-server-xyz.a.run.app" > .env.production
-    
-    # Build image
-    gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/eprkavach-client
-    ```
-3.  Deploy to Cloud Run:
-    ```bash
-    gcloud run deploy eprkavach-client \
-      --image gcr.io/YOUR_PROJECT_ID/eprkavach-client \
-      --platform managed \
-      --region us-central1 \
-      --allow-unauthenticated
-    ```
-4.  Copy the **Frontend URL**.
+## Step 4: Apply Blueprint
 
-### Step 3: Final Link
-1.  Go back to your Server Cloud Run service.
-2.  Update the `FRONTEND_URL` environment variable to match the new Frontend URL.
+1.  Click **"Apply Blueprint"**.
+2.  Render will start deploying both the Backend and Frontend services.
+3.  You can watch the logs for both services.
 
-## 5. Database (MongoDB Atlas)
-If you are currently using a local MongoDB (`mongodb://localhost:27017/...`), you **MUST** switch to a cloud database.
-1.  Go to [MongoDB Atlas](https://www.mongodb.com/atlas).
-2.  Create a free cluster.
-3.  Get the connection string (Choose "Connect your application").
-4.  Replace `<password>` with your database user password.
-5.  Use this string as the `MONGODB_URI` in your Backend Environment Variables.
+## Step 5: Final Configuration (CORS)
+
+Once deployed, you need to tell the Backend to allow requests from your new Frontend URL.
+
+1.  Wait for the **Frontend** deployment to finish.
+2.  Copy the Frontend URL (e.g., `https://eprkavach-frontend.onrender.com`).
+3.  Go to the **Dashboard**, click on your **Backend Service** (`eprkavach-backend`).
+4.  Go to **Environment**.
+5.  Add a new Environment Variable:
+    *   **Key**: `FRONTEND_URL`
+    *   **Value**: Paste your Frontend URL (e.g., `https://eprkavach-frontend.onrender.com`).
+6.  Render will automatically restart the backend.
 
 ## Troubleshooting
-*   **CORS Errors**: Ensure `FRONTEND_URL` in the backend matches the actual frontend URL exactly (https vs http, no trailing slash).
-*   **White Screen on Refresh**: We added `vercel.json` to handle this. If it happens on another host, ensure all requests rewrite to `index.html`.
-*   **API Connection Fail**: Check the Network tab. If requests go to `localhost` or `undefined`, check your `VITE_API_URL` variable in Vercel.
+
+*   **Build Failures**: Check the logs. If `npm install` fails, it might be a dependency issue.
+*   **White Screen on Frontend**: Open the browser console (F12). If you see 404 errors for assets, ensure `vercel.json` or rewrite rules are working (Render uses the `routes` rule in `render.yaml`).
+*   **API Errors (Network Error)**:
+    *   Check if `VITE_API_URL` is correctly set in the Frontend Environment (it should be auto-linked via `render.yaml`).
+    *   Check Backend logs for CORS errors. Ensure `FRONTEND_URL` is set correctly.
+
+## Deployment to Vercel (Alternative for Frontend)
+
+If you prefer Vercel for the frontend:
+1.  Import the repo in Vercel.
+2.  Set Root Directory to `client-react`.
+3.  Add Environment Variable: `VITE_API_URL` = Your Render Backend URL.
+4.  Deploy.
