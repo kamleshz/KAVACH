@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPR KAVACH - Complete Project Diagram</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            flowchart: {
+                curve: 'basis'
+            }
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .subtitle {
+            color: #a0a0a0;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.2em;
+        }
+        .diagram-section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .diagram-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #4CAF50;
+        }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 2px solid;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EPR KAVACH - Complete Project Diagram</h1>
+        <p class="subtitle">Environmental Compliance Management System</p>
+
+        <!-- Section 1: High-Level Architecture -->
+        <div class="diagram-section">
+            <h2>High-Level System Architecture</h2>
+            <div class="mermaid">
+flowchart TB
+    subgraph Users ["Users"]
+        Admin[("Admin")]
+        User[("User")]
+    end
+
+    subgraph Frontend ["Frontend (React 18 + Vite)"]
+        WebApp[("Web App")]
+        UI["UI (Ant Design + Tailwind)"]
+        State["Redux Toolkit"]
+        Router["React Router"]
+        API["Axios API Client"]
+    end
+
+    subgraph Backend ["Backend (Express.js 5)"]
+        ExpressServer[("Express Server")]
+        AuthMW["Auth Middleware"]
+        UploadMW["Upload Middleware"]
+        Controllers["Controllers"]
+        Routes["API Routes"]
+    end
+
+    subgraph Database ["Database"]
+        MongoDB[("MongoDB")]
+    end
+
+    subgraph External ["External Services"]
+        Cloudinary["Cloudinary"]
+        Firebase["Firebase"]
+        Email["Email Service"]
+    end
+
+    Users -- HTTPS --> WebApp
+    WebApp -- REST API --> ExpressServer
+    ExpressServer -- ODM --> MongoDB
+    ExpressServer --> Cloudinary
+    ExpressServer --> Email
+    ExpressServer --> Firebase
+            </div>
+        </div>
+
+        <!-- Section 2: API Endpoints -->
+        <div class="diagram-section">
+            <h2>API Endpoints Overview</h2>
+            <div class="mermaid">
+flowchart LR
+    subgraph Auth ["Auth Routes"]
+        A1["POST /api/auth/register"]
+        A2["POST /api/auth/login"]
+        A3["POST /api/auth/logout"]
+        A4["POST /api/auth/verify-otp"]
+        A5["POST /api/auth/forgot-password"]
+    end
+
+    subgraph Client ["Client Routes"]
+        C1["GET /api/client"]
+        C2["POST /api/client"]
+        C3["PUT /api/client/:id"]
+        C4["DELETE /api/client/:id"]
+        C5["GET /api/client/:id"]
+        C6["POST /api/client/validate"]
+    end
+
+    subgraph User ["User Routes"]
+        U1["GET /api/user"]
+        U2["POST /api/user"]
+        U3["PUT /api/user/:id"]
+        U4["DELETE /api/user/:id"]
+    end
+
+    subgraph Admin ["Admin Routes"]
+        M1["GET /api/admin/users"]
+        M2["PUT /api/admin/approve"]
+        M3["GET /api/admin/stats"]
+    end
+
+    subgraph AI ["AI Routes"]
+        I1["POST /api/ai/analyze"]
+        I2["POST /api/ai/compliance-check"]
+    end
+
+    classDef auth fill:#e3f2fd,stroke:#1976d2
+    classDef client fill:#e8f5e9,stroke:#388e3c
+    classDef user fill:#fff3e0,stroke:#f57c00
+    classDef admin fill:#fce4ec,stroke:#c2185b
+    classDef ai fill:#f3e5f5,stroke:#7b1fa2
+    
+    class A1,A2,A3,A4,A5 auth
+    class C1,C2,C3,C4,C5,C6 client
+    class U1,U2,U3,U4 user
+    class M1,M2,M3 admin
+    class I1,I2 ai
+            </div>
+        </div>
+
+        <!-- Section 3: Database Models -->
+        <div class="diagram-section">
+            <h2>Database Models</h2>
+            <div class="mermaid">
+flowchart TB
+    subgraph Models ["Mongoose Models"]
+        UserModel["User Model<br/>- email, password, role<br/>- isVerified, createdAt"]
+        
+        ClientModel["Client Model<br/>- companyName, contactInfo<br/>- address, documents<br/>- status, complianceData"]
+        
+        ProcurementModel["Procurement Model<br/>- clientId, wasteType<br/>- quantity, date<br/>- documents"]
+        
+        ComplianceModel["ProductCompliance<br/>- clientId, productName<br/>- complianceStatus<br/>- expiryDate"]
+        
+        SKUCompliance["SKU Compliance<br/>- skuDetails, brand<br/>- complianceDocs<br/>- status"]
+        
+        SUPModel["SingleUsePlastic<br/>- clientId, productType<br/>- plasticWeight<br/>- alternatives"]
+        
+        PWPModel["PWP Model<br/>- clientId, productType<br/>- wasteQuantity<br/>- disposalMethod"]
+        
+        LoginLogModel["LoginLog Model<br/>- userId, ipAddress<br/>- timestamp, status"]
+    end
+
+    classDef model fill:#e8f5e9,stroke:#2e7d32
+    class UserModel,ClientModel,ProcurementModel,ComplianceModel,SKUCompliance,SUPModel,PWPModel,LoginLogModel model
+            </div>
+        </div>
+
+        <!-- Section 4: User Flow -->
+        <div class="diagram-section">
+            <h2>User Workflow</h2>
+            <div class="mermaid">
+flowchart TB
+    Start([User Login]) --> AuthCheck{JWT Valid?}
+    AuthCheck -->|No| RedirectLogin["Redirect to Login"]
+    RedirectLogin --> Start
+    AuthCheck -->|Yes| ShowDashboard["Show Dashboard"]
+    
+    ShowDashboard --> UserAction
+    
+    subgraph ClientManagement ["Client Management"]
+        UserAction --> ViewClients["View Clients"]
+        ViewClients --> AddNewClient["Add New Client"]
+        AddNewClient --> UploadDocs["Upload Documents"]
+        UploadDocs --> SubmitValidation["Submit for Validation"]
+    end
+    
+    subgraph AuditProcess ["Audit Process"]
+        SubmitValidation --> AuditReview["Audit Review"]
+        AuditReview --> PreValidation["Pre Validation"]
+        PreValidation --> AuditSteps["Audit Steps"]
+        AuditSteps --> PostAudit["Post Audit Check"]
+        PostAudit --> FinalApproval["Final Approval"]
+    end
+    
+    subgraph Compliance ["Compliance Tracking"]
+        FinalApproval --> ComplianceCheck["Compliance Check"]
+        ComplianceCheck --> GenerateReport["Generate Report"]
+        GenerateReport --> ComplianceStatus[("Compliance Status")]
+    end
+    
+    ClientManagement --> AuditProcess
+    AuditProcess --> Compliance
+    
+    classDef process fill:#e3f2fd,stroke:#1565c0
+    classDef decision fill:#fff3e0,stroke:#ef6c00
+    classDef startend fill:#c8e6c9,stroke:#2e7d32
+    
+    class Start,ComplianceStatus startend
+    class AuthCheck decision
+    class ShowDashboard,ViewClients,AddNewClient,UploadDocs,SubmitValidation,AuditReview,PreValidation,AuditSteps,PostAudit,FinalApproval,ComplianceCheck,GenerateReport process
+            </div>
+        </div>
+
+        <!-- Section 5: Technology Stack -->
+        <div class="diagram-section">
+            <h2>Technology Stack</h2>
+            <div class="mermaid">
+flowchart TB
+    subgraph FrontendTech ["Frontend"]
+        F1["React 18"]
+        F2["Vite"]
+        F3["Redux Toolkit"]
+        F4["React Router"]
+        F5["Ant Design"]
+        F6["Tailwind CSS"]
+        F7["Axios"]
+        F8["Firebase"]
+    end
+
+    subgraph BackendTech ["Backend"]
+        B1["Node.js"]
+        B2["Express.js 5"]
+        B3["MongoDB"]
+        B4["Mongoose"]
+        B5["JWT"]
+        B6["Nodemailer"]
+        B7["Multer"]
+        B8["Cloudinary"]
+    end
+
+    subgraph DevTools ["Development"]
+        D1["Git"]
+        D2["npm/yarn"]
+        D3["Vercel"]
+        D4["nodemon"]
+    end
+
+    classDef fe fill:#e3f2fd,stroke:#1976d2
+    classDef be fill:#fff3e0,stroke:#f57c00
+    classDef dev fill:#f3e5f5,stroke:#7b1fa2
+    
+    class F1,F2,F3,F4,F5,F6,F7,F8 fe
+    class B1,B2,B3,B4,B5,B6,B7,B8 be
+    class D1,D2,D3,D4 dev
+            </div>
+        </div>
+
+        <!-- Section 6: Security Features -->
+        <div class="diagram-section">
+            <h2>Security Features</h2>
+            <div class="mermaid">
+flowchart TB
+    subgraph Security ["Security Layers"]
+        S1["JWT Authentication<br/>- Access Token (6h)<br/>- Refresh Token (7d)"]
+        S2["HTTP-Only Cookies<br/>- Token Storage<br/>- XSS Protection"]
+        S3["Role-Based Access<br/>- Admin (Full Access)<br/>- User (Limited)"]
+        S4["Input Validation<br/>- Server-side<br/>- Sanitization"]
+        S5["Rate Limiting<br/>- API Protection<br/>- DoS Prevention"]
+        S6["File Upload Security<br/>- Type Validation<br/>- Size Limits (10MB)"]
+        S7["CORS Configuration<br/>- Allowed Origins<br/>- HTTP Methods"]
+    end
+
+    classDef security fill:#ffebee,stroke:#c62828
+    class S1,S2,S3,S4,S5,S6,S7 security
+            </div>
+        </div>
+    </div>
+</body>
+</html>

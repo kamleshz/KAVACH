@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: eprkavach-backend
+    env: node
+    root: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: SECRET_KEY_ACCESS_TOKEN
+        generateValue: true
+      - key: SECRET_KEY_REFRESH_TOKEN
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: PORT
+        value: 8080

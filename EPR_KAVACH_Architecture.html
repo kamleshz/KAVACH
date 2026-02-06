@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPR KAVACH System Architecture</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 95%;
+            max-width: 1600px;
+            overflow: auto;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .download-hint {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EPR KAVACH - System Architecture Diagram</h1>
+        <div class="mermaid">
+flowchart TD
+    %% Actors
+    User((User/Admin))
+
+    %% Frontend Cluster
+    subgraph Frontend_Application ["Frontend Application (Client)"]
+        direction TB
+        WebApp[("Web Application<br/>React 18 + Vite")]
+        
+        UI_Layer["User Interface<br/>(Ant Design + Tailwind)"]
+        
+        State_Mgmt["State Management<br/>(Redux Toolkit)"]
+        
+        API_Client["API Client<br/>(Axios)"]
+
+        WebApp --> UI_Layer
+        WebApp --> State_Mgmt
+        WebApp --> API_Client
+    end
+
+    %% Backend Cluster
+    subgraph Backend_Services ["Backend Services (Server)"]
+        direction TB
+        APIServer[("API Server<br/>Node.js + Express")]
+        
+        Logic_Layer["Business Logic<br/>(Controllers)"]
+        
+        Auth_Layer["Auth & Security<br/>(JWT + Middleware)"]
+        
+        DAL["Data Access Layer<br/>(Mongoose ODM)"]
+
+        APIServer --> Logic_Layer
+        APIServer --> Auth_Layer
+        APIServer --> DAL
+    end
+
+    %% Database
+    subgraph Database_Layer ["Data Management"]
+        MongoDB[("MongoDB Database<br/>(Cluster)")]
+    end
+
+    %% Cloud Services
+    subgraph Cloud_Infrastructure ["External Cloud Services"]
+        Cloudinary["Cloudinary<br/>(File/PDF Storage)"]
+        
+        Firebase["Firebase<br/>(Push Notifications)"]
+        
+        EmailSvc["Email Service<br/>(Nodemailer/SMTP)"]
+    end
+
+    %% Connections
+    User -- HTTPS --> WebApp
+    API_Client -- "REST API / JSON" --> APIServer
+    DAL -- "TCP/IP" --> MongoDB
+    Logic_Layer -- "Upload API" --> Cloudinary
+    Logic_Layer -- "SMTP" --> EmailSvc
+    Logic_Layer -- "FCM" --> Firebase
+
+    %% Core Modules (Bottom Strip equivalent)
+    subgraph Core_Modules ["Core Modules"]
+        direction LR
+        M1[Client Management]
+        M2[Procurement System]
+        M3[Compliance/Audit]
+        M4[Plant Processing]
+        M5[User Management]
+        M6[Reporting/Dashboard]
+    end
+
+    %% Security Features (Bottom Strip equivalent)
+    subgraph Security_Features ["Security Features"]
+        direction LR
+        S1[JWT Authentication]
+        S2[Role-Based Access]
+        S3[Input Validation]
+        S4[CORS Protection]
+        S5[Secure Headers (Helmet)]
+    end
+
+    %% Styling
+    classDef frontend fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef backend fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef database fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px;
+    classDef cloud fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef modules fill:#fce4ec,stroke:#880e4f,stroke-width:1px;
+    
+    class WebApp,UI_Layer,State_Mgmt,API_Client frontend;
+    class APIServer,Logic_Layer,Auth_Layer,DAL backend;
+    class MongoDB database;
+    class Cloudinary,Firebase,EmailSvc cloud;
+    class M1,M2,M3,M4,M5,M6,S1,S2,S3,S4,S5 modules;
+        </div>
+        <div class="download-hint">
+            <p>You can save this diagram by taking a screenshot or using your browser's "Print to PDF" feature.</p>
+        </div>
+    </div>
+</body>
+</html>

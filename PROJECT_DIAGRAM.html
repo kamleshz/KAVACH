@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPR KAVACH - Project Architecture Diagram</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            flowchart: {
+                curve: 'basis',
+                useMaxWidth: true
+            },
+            er: {
+                useMaxWidth: true
+            }
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .subtitle {
+            color: #a0a0a0;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.2em;
+        }
+        .diagram-section {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+        }
+        .diagram-section:hover {
+            transform: translateY(-5px);
+        }
+        .diagram-section h2 {
+            color: #1a1a2e;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 4px solid #4CAF50;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+            padding: 20px 0;
+        }
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+        .nav {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        .nav a {
+            display: block;
+            color: #1a1a2e;
+            text-decoration: none;
+            padding: 5px 10px;
+            margin: 2px 0;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        .nav a:hover {
+            background: #e3f2fd;
+        }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 25px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+            border-radius: 10px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        .legend-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            border: 2px solid;
+        }
+        @media print {
+            body {
+                background: white;
+            }
+            .diagram-section {
+                box-shadow: none;
+                border: 1px solid #ddd;
+                page-break-inside: avoid;
+            }
+            .nav {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <strong>Quick Navigation</strong>
+        <a href="#architecture">High-Level Architecture</a>
+        <a href="#frontend">Frontend Architecture</a>
+        <a href="#backend">Backend Architecture</a>
+        <a href="#database">Database Schema</a>
+        <a href="#api">API Flow</a>
+        <a href="#workflow">User Workflow</a>
+        <a href="#security">Security</a>
+        <a href="#techstack">Tech Stack</a>
+    </nav>
+
+    <div class="container">
+        <h1>🏭 EPR KAVACH</h1>
+        <p class="subtitle">Environmental Compliance Management System - Complete Architecture</p>
+
+        <!-- High-Level Architecture -->
+        <div class="diagram-section" id="architecture">
+            <h2>📊 High-Level System Architecture</h2>
+            <div class="mermaid">
+flowchart TB
+    subgraph Users ["Users & Clients"]
+        direction TB
+        Admin[("👤 Admin")]
+        User[("👤 Users")]
+        Client[("🏢 Clients")]
+    end
+
+    subgraph Frontend ["Frontend (React 18 + Vite)"]
+        direction TB
+        WebApp[("🌐 Web Application")]
+        
+        subgraph FrontendLayers ["Frontend Components"]
+            direction LR
+            UI["🎨 UI Layer<br/>(Ant Design + Tailwind)"]
+            State["📦 State Management<br/>(Redux Toolkit)"]
+            Router["🔀 Routing<br/>(React Router)"]
+            API["🌐 API Client<br/>(Axios)"]
+        end
+        
+        subgraph Pages ["Pages"]
+            direction TB
+            AuthPages["Login/Register<br/>ForgotPassword"]
+            Dashboard["Dashboard<br/>KPIDashboard"]
+            ClientPages["Clients<br/>AddClient<br/>EditClient<br/>ViewClient"]
+            AuditPages["ClientAudit<br/>ClientValidation"]
+            ProcessPages["PlantProcess<br/>ProductCompliance"]
+            AdminPages["AdminPanel<br/>CompanyManagement"]
+        end
+        
+        WebApp --> FrontendLayers
+        FrontendLayers --> Pages
+    end
+
+    subgraph Backend ["Backend (Express.js 5)"]
+        direction TB
+        ExpressServer[("⚡ Express Server")]
+        
+        subgraph Middleware ["Middleware"]
+            direction LR
+            AuthMW["🔐 Auth Middleware<br/>(JWT Verification)"]
+            UploadMW["📤 Upload Middleware<br/>(Multer)"]
+            RateMW["🛡️ Rate Limiter"]
+            ValidateMW["✅ Input Validation"]
+        end
+        
+        subgraph Controllers ["Controllers"]
+            direction TB
+            AuthCtrl["Auth Controller<br/>(Login/Register/OTP)"]
+            ClientCtrl["Client Controller<br/>(CRUD Operations)"]
+            UserCtrl["User Controller<br/>(User Management)"]
+            AdminCtrl["Admin Controller<br/>(Admin Functions)"]
+            AICtrl["AI Controller<br/>(Smart Analysis)"]
+        end
+        
+        subgraph Routes ["Routes"]
+            direction LR
+            AuthRoute["/api/auth"]
+            ClientRoute["/api/client"]
+            UserRoute["/api/user"]
+            AdminRoute["/api/admin"]
+            AIRoute["/api/ai"]
+        end
+        
+        ExpressServer --> Middleware
+        Middleware --> Controllers
+        Controllers --> Routes
+    end
+
+    subgraph Database ["Database (MongoDB)"]
+        direction TB
+        MongoDB[("🗄️ MongoDB")]
+        
+        subgraph Models ["Mongoose Models"]
+            direction LR
+            UserModel["User Model"]
+            ClientModel["Client Model"]
+            ProcurementModel["Procurement Model"]
+            ComplianceModel["ProductCompliance Model"]
+            SKUGModel["SKUCompliance Model"]
+            SUPModel["SingleUsePlastic Model"]
+            PWPModel["PWP Model"]
+            LoginLogModel["LoginLog Model"]
+        end
+    end
+
+    subgraph ExternalServices ["External Services"]
+        direction TB
+        Cloudinary[("☁️ Cloudinary<br/>(File Storage)")]
+        Firebase[("🔥 Firebase Admin<br/>(Push Notifications)")]
+        Email[("📧 Email Service<br/>(Nodemailer/Gmail)")]
+    end
+
+    %% Connections
+    Users -- HTTPS --> WebApp
+    WebApp -- REST API --> ExpressServer
+    ExpressServer -- ODM --> MongoDB
+    ExpressServer -- File Upload --> Cloudinary
+    ExpressServer -- Email --> Email
+    ExpressServer -- Push --> Firebase
+
+    %% Styling
+    classDef users fill:#ffeb3b,stroke:#f57f17,stroke-width:2px
+    classDef frontend fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef backend fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef database fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef external fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    
+    class Admin,User,Client users
+    class WebApp,UI,State,Router,API,AuthPages,Dashboard,ClientPages,AuditPages,ProcessPages,AdminPages frontend
+    class ExpressServer,AuthMW,UploadMW,RateMW,ValidateMW,AuthCtrl,ClientCtrl,UserCtrl,AdminCtrl,AICtrl,AuthRoute,ClientRoute,UserRoute,AdminRoute,AIRoute backend
+    class MongoDB,UserModel,ClientModel,ProcurementModel,ComplianceModel,SKUGModel,SUPModel,PWPModel,LoginLogModel database
+    class Cloudinary,Firebase,Email external
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="legend-color" style="background:#ffeb3b;border-color:#f57f17"></div>Users</div>
+                <div class="legend-item"><div class="legend-color" style="background:#e3f2fd;border-color:#1565c0"></div>Frontend</div>
+                <div class="legend-item"><div class="legend-color" style="background:#fff3e0;border-color:#e65100"></div>Backend</div>
+                <div class="legend-item"><div class="legend-color" style="background:#e8f5e9;border-color:#1b5e20"></div>Database</div>
+                <div class="legend-item"><div class="legend-color" style="background:#f3e5f5;border-color:#4a148c"></div>External Services</div>
+            </div>
+        </div>
+
+        <!-- Frontend Architecture -->
+        <div class="diagram-section" id="frontend">
+            <h2>🖥️ Frontend Architecture</h2>
+            <div class="mermaid">
+flowchart TB
+    subgraph App ["App.jsx"]
+        Router["React Router<br/>└── Routes"]
+    end
+    
+    subgraph Layouts ["Layouts"]
+        DashboardLayout["DashboardLayout<br/>├── Sidebar<br/>├── Header<br/>└── Content"]
+    end
+    
+    subgraph Components ["Components"]
+        subgraph Shared ["Shared Components"]
+            PrivateRoute["PrivateRoute"]
+            Pagination["Pagination"]
+            Sidebar["Sidebar"]
+            AuditStepper["AuditStepper"]
+        end
+        
+        subgraph AddClientSteps ["AddClientSteps"]
+            PreValidation["PreValidation"]
+            ClientBasicInfo["ClientBasicInfo"]
+            CompanyAddress["CompanyAddress"]
+            CompanyDocument["CompanyDocument"]
+            CteCtoCca["CteCtoCca"]
+            Audit["Audit"]
+            PostAuditCheck["PostAuditCheck"]
+        end
+        
+        subgraph PlantProcessSteps ["PlantProcessSteps"]
+            ConsentVerification["ConsentVerification"]
+            ProductCompliance["ProductCompliance"]
+            SingleUsePlastic["SingleUsePlastic"]
+            SummaryReport["SummaryReport"]
+        end
+    end
+    
+    subgraph Pages ["Pages"]
+        subgraph Auth ["Auth Pages"]
+            Login["Login"]
+            Register["Register"]
+            ForgotPassword["ForgotPassword"]
+        end
+        
+        subgraph ClientMgmt ["Client Management"]
+            Clients["Clients"]
+            AddClient["AddClient"]
+            ViewClient["ViewClient"]
+            EditClient["EditClient"]
+            ClientDetail["ClientDetail"]
+            ClientGroupSearch["ClientGroupSearch"]
+        end
+        
+        subgraph Audit ["Audit Pages"]
+            ClientAudit["ClientAudit"]
+            ClientValidation["ClientValidation"]
+            ValidatedClients["ValidatedClients"]
+        end
+        
+        subgraph Process ["Process Pages"]
+            PlantProcess["PlantProcess"]
+            EWasteCategorySelection["EWasteCategorySelection"]
+            WasteTypeSelection["WasteTypeSelection"]
+            ClientTypeSelection["ClientTypeSelection"]
+        end
+        
+        subgraph Admin ["Admin Pages"]
+            AdminPanel["AdminPanel"]
+            CompanyManagement["CompanyManagement"]
+            KPIDashboard["KPIDashboard"]
+            LoginLogs["LoginLogs"]
+        end
+        
+        subgraph Dashboard ["Dashboard"]
+            DashboardHome["DashboardHome"]
+            DocumentViewer["DocumentViewer"]
+        end
+    end
+    
+    subgraph State ["State Management"]
+        AuthSlice["Auth Slice"]
+        Store["Redux Store"]
+    end
+    
+    subgraph Services ["Services"]
+        API["API Service"]
+        APIEndpoints["API Endpoints"]
+    end
+    
+    subgraph Context ["Context"]
+        AuthContext["AuthContext"]
+        ClientContext["ClientContext"]
+    end
+    
+    App --> Router
+    Router --> Layouts
+    Router --> Pages
+    Router --> Auth
+    Router --> ClientMgmt
+    Router --> Audit
+    Router --> Process
+    Router --> Admin
+    Router --> Dashboard
+    
+    Pages --> Components
+    Components --> Shared
+    Components --> AddClientSteps
+    Components --> PlantProcessSteps
+    
+    State --> Store
+    Store --> AuthSlice
+    Services --> API
+    Services --> APIEndpoints
+    Context --> AuthContext
+    Context --> ClientContext
+            </div>
+        </div>
+
+        <!-- Backend Architecture -->
+        <div class="diagram-section" id="backend">
+            <h2>⚡ Backend Architecture</h2>
+            <div class="mermaid">
+flowchart TB
+    subgraph Entry ["Entry Point"]
+        IndexJS["index.js<br/>Express Server"]
+    end
+    
+    subgraph Config ["Configuration"]
+        ConnectDB["connectDB.js<br/>(MongoDB Connection)"]
+        FirebaseConfig["firebase.js<br/>(Firebase Admin)"]
+        SendEmail["sendEmail.js<br/>(Nodemailer)"]
+    end
+    
+    subgraph Middleware ["Middleware Layer"]
+        AuthMW["auth.js<br/>(JWT Verification)"]
+        UploadMW["upload.js<br/>(Multer)"]
+        RateMW["rateLimiter.js"]
+        ValidateMW["validate.js"]
+    end
+    
+    subgraph Controllers ["Controllers"]
+        AuthCtrl["auth.controller.js"]
+        ClientCtrl["client.controller.js"]
+        UserCtrl["user.controller.js"]
+        AdminCtrl["admin.controller.js"]
+        AICtrl["ai.controller.js"]
+        SupChecklistCtrl["supChecklist.controller.js"]
+    end
+    
+    subgraph Routes ["Routes"]
+        AuthRoute["auth.route.js"]
+        ClientRoute["client.route.js"]
+        UserRoute["user.route.js"]
+        AdminRoute["admin.route.js"]
+        AIRoute["ai.route.js"]
+    end
+    
+    subgraph Models ["Models"]
+        UserModel["user.model.js"]
+        ClientModel["client.model.js"]
+        ProcurementModel["procurement.model.js"]
+        ComplianceModel["productCompliance.model.js"]
+        SKUModel["skuCompliance.model.js"]
+        SUPModel["SingleUsePlasticChecklist.model.js"]
+        PWPModel["pwp.model.js"]
+        LoginLogModel["loginLog.model.js"]
+    end
+    
+    subgraph Utils ["Utilities"]
+        AsyncHandler["asyncHandler.js"]
+        GenerateToken["generateToken.js"]
+        GenerateOtp["generateOtp.js"]
+        Logger["logger.js"]
+        RoleSeeder["roleSeeder.js"]
+    end
+    
+    subgraph Validators ["Validators"]
+        AuthValidator["auth.validator.js"]
+    end
+    
+    subgraph Cron ["Cron Jobs"]
+        AuditCron["auditCron.js"]
+    end
+    
+    IndexJS --> Config
+    IndexJS --> Routes
+    
+    Routes --> Middleware
+    Middleware --> Controllers
+    Controllers --> Models
+    
+    Utils --> Controllers
+    Validators --> Middleware
+    Cron --> IndexJS
+            </div>
+        </div>
+
+        <!-- Database Schema -->
+        <div class="diagram-section" id="database">
+            <h2>🗄️ Database Schema</h2>
+            <div class="mermaid">
+erDiagram
+    USER ||--o{ LOGIN_LOG : "has"
+    USER ||--o{ CLIENT : "manages"
+    USER ||--o{ LOGIN_ACTIVITY : "generates"
+    
+    CLIENT ||--o{ PROCUREMENT : "has"
+    CLIENT ||--o{ PRODUCT_COMPLIANCE : "has"
+    CLIENT ||--o{ SKU_COMPLIANCE : "has"
+    CLIENT ||--o{ SINGLE_USE_PLASTIC : "has"
+    CLIENT ||--o{ PWP : "has"
+    
+    USER {
+        string email PK
+        string password
+        string role
+        boolean isVerified
+        datetime createdAt
+        datetime updatedAt
+    }
+    
+    CLIENT {
+        string _id PK
+        string companyName
+        object contactInfo
+        object address
+        array documents
+        string status
+        object complianceData
+        string userId FK
+        datetime createdAt
+        datetime updatedAt
+    }
+    
+    PROCUREMENT {
+        string _id PK
+        string clientId FK
+        string wasteType
+        number quantity
+        date date
+        array documents
+    }
+    
+    PRODUCT_COMPLIANCE {
+        string _id PK
+        string clientId FK
+        string productName
+        string complianceStatus
+        date expiryDate
+        array documents
+    }
+    
+    SKU_COMPLIANCE {
+        string _id PK
+        string clientId FK
+        object skuDetails
+        string brand
+        array complianceDocs
+        string status
+    }
+    
+    SINGLE_USE_PLASTIC {
+        string _id PK
+        string clientId FK
+        string productType
+        number plasticWeight
+        string alternatives
+    }
+    
+    PWP {
+        string _id PK
+        string clientId FK
+        string productType
+        number wasteQuantity
+        string disposalMethod
+    }
+    
+    LOGIN_LOG {
+        string _id PK
+        string userId FK
+        string ipAddress
+        timestamp timestamp
+        string status
+    }
+    
+    LOGIN_ACTIVITY {
+        string _id PK
+        string userId FK
+        string action
+        timestamp timestamp
+    }
+            </div>
+        </div>
+
+        <!-- API Flow -->
+        <div class="diagram-section" id="api">
+            <h2>🌐 API Flow</h2>
+            <div class="mermaid">
+flowchart LR
+    subgraph Client ["Client (Browser)"]
+        Browser["🌐 Browser<br/>(React App)"]
+    end
+    
+    subgraph API ["API Gateway"]
+        Express["⚡ Express Server"]
+    end
+    
+    subgraph Auth ["Authentication"]
+        JWT["🔐 JWT Tokens<br/>(Access + Refresh)"]
+        Cookie["🍪 HTTP-Only Cookies"]
+    end
+    
+    subgraph Routes ["API Routes"]
+        subgraph AuthRoutes ["Auth Routes"]
+            POSTAuth["POST /api/auth/login<br/>POST /api/auth/register<br/>POST /api/auth/logout<br/>POST /api/auth/verify-otp"]
+        end
+        
+        subgraph ClientRoutes ["Client Routes"]
+            GETClient["GET /api/client<br/>GET /api/client/:id<br/>POST /api/client<br/>PUT /api/client/:id<br/>DELETE /api/client/:id"]
+        end
+        
+        subgraph UserRoutes ["User Routes"]
+            GETUser["GET /api/user<br/>POST /api/user<br/>PUT /api/user/:id"]
+        end
+        
+        subgraph AdminRoutes ["Admin Routes"]
+            GETAdmin["GET /api/admin/users<br/>PUT /api/admin/approve<br/>GET /api/admin/stats"]
+        end
+        
+        subgraph AIRoutes ["AI Routes"]
+            POSTAI["POST /api/ai/analyze<br/>POST /api/ai/compliance-check"]
+        end
+    end
+    
+    subgraph Database ["Database"]
+        MongoDB["🗄️ MongoDB"]
+    end
+    
+    Browser -- HTTPS --> Express
+    Express --> Auth
+    Auth --> Cookie
+    Express --> AuthRoutes
+    Express --> ClientRoutes
+    Express --> UserRoutes
+    Express --> AdminRoutes
+    Express --> AIRoutes
+    Express --> MongoDB
+            </div>
+        </div>
+
+        <!-- User Workflow -->
+        <div class="diagram-section" id="workflow">
+            <h2>👤 User Workflow</h2>
+            <div class="mermaid">
+flowchart TB
+    Start([User Login]) --> AuthCheck{JWT Valid?}
+    AuthCheck -->|No| RedirectLogin["Redirect to Login"]
+    RedirectLogin --> Start
+    AuthCheck -->|Yes| ShowDashboard["Show Dashboard"]
+    
+    ShowDashboard --> UserAction
+    
+    subgraph ClientManagement ["Client Management"]
+        UserAction --> ViewClients["View Clients List"]
+        ViewClients --> AddNewClient["Add New Client"]
+        AddNewClient --> ClientType["Select Client Type"]
+        ClientType --> WasteType["Select Waste Type"]
+        WasteType --> EWasteCat["Select E-Waste Category"]
+        EWasteCat --> ClientBasicInfo["Fill Client Basic Info"]
+        ClientBasicInfo --> CompanyAddress["Fill Company Address"]
+        CompanyAddress --> UploadDocs["Upload Documents"]
+        UploadDocs --> CTE_CTO["Upload CTE/CTO/CCA"]
+        CTE_CTO --> SubmitValidation["Submit for Validation"]
+    end
+    
+    subgraph AuditProcess ["Audit Process"]
+        SubmitValidation --> ValidationReview["Validation Review"]
+        ValidationReview --> PreValidation["Pre Validation"]
+        PreValidation --> AuditSteps["Audit Steps"]
+        AuditSteps --> AuditChecklist["Audit Checklist"]
+        AuditChecklist --> PostAudit["Post Audit Check"]
+        PostAudit --> FinalApproval["Final Approval"]
+    end
+    
+    subgraph PlantProcessing ["Plant Processing"]
+        FinalApproval --> PlantProc["Plant Process"]
+        PlantProc --> ConsentVerify["Consent Verification"]
+        ConsentVerify --> ProductCompliance["Product Compliance"]
+        ProductCompliance --> SingleUsePlastic["Single Use Plastic Check"]
+        SingleUsePlastic --> SummaryRpt["Generate Summary Report"]
+    end
+    
+    subgraph ComplianceTracking ["Compliance Tracking"]
+        SummaryRpt --> ComplianceStatus["Check Compliance Status"]
+        ComplianceStatus --> GenerateReport["Generate Compliance Report"]
+        GenerateReport --> ExportPDF["Export PDF"]
+        ExportPDF --> TrackExpiry["Track Certificate Expiry"]
+    end
+    
+    subgraph AdminFeatures ["Admin Features"]
+        UserAction --> AdminPanel["Admin Panel"]
+        AdminPanel --> UserMgmt["User Management"]
+        UserMgmt --> KPI["View KPIs"]
+        KPI --> LoginLogs["View Login Logs"]
+        LoginLogs --> CompanyMgmt["Company Management"]
+    end
+    
+    ClientManagement --> AuditProcess
+    AuditProcess --> PlantProcessing
+    PlantProcessing --> ComplianceTracking
+    ShowDashboard --> AdminFeatures
+            </div>
+        </div>
+
+        <!-- Security Architecture -->
+        <div class="diagram-section" id="security">
+            <h2>🔒 Security Architecture</h2>
+            <div class="mermaid">
+flowchart TB
+    subgraph SecurityLayers ["Security Layers"]
+        
+        subgraph Layer1 ["Layer 1: Network Security"]
+            CORS["🌐 CORS Configuration<br/>- Allowed Origins<br/>- HTTP Methods<br/>- Headers"]
+            RateLimit["🛡️ Rate Limiting<br/>- API Protection<br/>- DoS Prevention"]
+            SSL["🔒 SSL/TLS<br/>- HTTPS Only<br/>- Certificate"]
+        end
+        
+        subgraph Layer2 ["Layer 2: Authentication"]
+            JWT["🔐 JWT Tokens<br/>- Access Token (6h expiry)<br/>- Refresh Token (7d expiry)"]
+            Cookie["🍪 HTTP-Only Cookies<br/>- XSS Protection<br/>- Secure Flag"]
+            OTP["📱 OTP Verification<br/>- 10 minute expiry<br/>- Email/SMS"]
+        end
+        
+        subgraph Layer3 ["Layer 3: Authorization"]
+            RBAC["👥 Role-Based Access<br/>- Admin (Full Access)<br/>- User (Limited)<br/>- Client (Read Only)"]
+            Middleware["🔒 Auth Middleware<br/>- Token Verification<br/>- Role Check"]
+        end
+        
+        subgraph Layer4 ["Layer 4: Data Security"]
+            Validation["✅ Input Validation<br/>- Server-side<br/>- Sanitization"]
+            Encryption["🔢 Encryption<br/>- Password Hashing<br/>- Sensitive Data"]
+            UploadSec["📤 File Upload Security<br/>- Type Validation<br/>- Size Limit (10MB)<br/>- Malware Scan"]
+        end
+    end
+            </div>
+        </div>
+
+        <!-- Technology Stack -->
+        <div class="diagram-section" id="techstack">
+            <h2>🛠️ Technology Stack</h2>
+            <div class="mermaid">
+flowchart TB
+    subgraph Frontend ["Frontend Technologies"]
+        F1["⚛️ React 18"]
+        F2["🚀 Vite"]
+        F3["📦 Redux Toolkit"]
+        F4["🔀 React Router"]
+        F5["🎨 Ant Design"]
+        F6["🌊 Tailwind CSS"]
+        F7["🌐 Axios"]
+        F8["🔥 Firebase"]
+    end
+    
+    subgraph Backend ["Backend Technologies"]
+        B1["🟢 Node.js"]
+        B2["⚡ Express.js 5"]
+        B3["🗄️ MongoDB"]
+        B4["📋 Mongoose"]
+        B5["🔐 JWT"]
+        B6["📧 Nodemailer"]
+        B7["📤 Multer"]
+        B8["☁️ Cloudinary"]
+    end
+    
+    subgraph DevOps ["DevOps & Tools"]
+        D1["📝 Git"]
+        D2["📦 npm/yarn"]
+        D3["🚀 Vercel"]
+        D4["🔄 nodemon"]
+        D5["📊 MongoDB Atlas"]
+    end
+    
+    classDef tech fill:#e3f2fd,stroke:#1976d2
+    class F1,F2,F3,F4,F5,F6,F7,F8 tech
+    class B1,B2,B3,B4,B5,B6,B7,B8 tech
+    class D1,D2,D3,D4,D5 tech
+            </div>
+        </div>
+
+        <!-- Directory Structure -->
+        <div class="diagram-section">
+            <h2>📁 Project Directory Structure</h2>
+            <div class="mermaid">
+flowchart TB
+    subgraph Project ["Project Root"]
+        RootFiles["📄 package.json<br/>📄 README.md<br/>📄 AGENTS.md<br/>📄 vercel.json<br/>📄 logo.png"]
+    end
+    
+    subgraph ClientReact ["client-react/"]
+        ClientFiles["📄 package.json<br/>📄 vite.config.js<br/>📄 index.html"]
+        
+        subgraph ClientSrc ["src/"]
+            C1["📁 components/"]
+            C2["📁 pages/"]
+            C3["📁 store/"]
+            C4["📁 services/"]
+            C5["📁 context/"]
+            C6["📁 hooks/"]
+            C7["📁 layouts/"]
+            C8["📁 utils/"]
+            C9["📁 constants/"]
+            C10["📄 App.jsx<br/>📄 main.jsx"]
+        end
+    end
+    
+    subgraph Server ["server/"]
+        ServerFiles["📄 package.json<br/>📄 index.js"]
+        
+        subgraph ServerDir ["server/"]
+            S1["📁 config/"]
+            S2["📁 controllers/"]
+            S3["📁 middleware/"]
+            S4["📁 models/"]
+            S5["📁 routes/"]
+            S6["📁 utils/"]
+            S7["📁 validators/"]
+            S8["📁 cron/"]
+        end
+    end
+    
+    Project --> ClientReact
+    Project --> Server
+    
+    ClientReact --> ClientFiles
+    ClientFiles --> ClientSrc
+    
+    Server --> ServerFiles
+    ServerFiles --> ServerDir
+            </div>
+        </div>
+    </div>
+</body>
+</html>

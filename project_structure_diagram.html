@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPR KAVACH - Project Structure Diagram</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#e3f2fd',
+                primaryBorderColor: '#1976d2',
+                primaryTextColor: '#333',
+                lineColor: '#1976d2'
+            }
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        .subtitle {
+            color: #a0a0a0;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .diagram-section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .diagram-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #4CAF50;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EPR KAVACH - Project Structure</h1>
+        <p class="subtitle">Directory Structure Visualization</p>
+
+        <!-- Frontend Structure -->
+        <div class="diagram-section">
+            <h2>Frontend Directory Structure (client-react/)</h2>
+            <div class="mermaid">
+graph TD
+    client-react/ --> "📄 package.json"
+    client-react/ --> "📄 vite.config.js"
+    client-react/ --> "📄 index.html"
+    client-react/ --> "📁 src/"
+    
+    src/ --> "📄 App.jsx"
+    src/ --> "📄 main.jsx"
+    src/ --> "📄 index.css"
+    src/ --> "📁 components/"
+    src/ --> "📁 pages/"
+    src/ --> "📁 store/"
+    src/ --> "📁 services/"
+    src/ --> "📁 context/"
+    src/ --> "📁 hooks/"
+    src/ --> "📁 layouts/"
+    src/ --> "📁 utils/"
+    src/ --> "📁 constants/"
+    
+    components/ --> "AuditStepper.jsx"
+    components/ --> "Pagination.jsx"
+    components/ --> "PrivateRoute.jsx"
+    components/ --> "Sidebar.jsx"
+    components/ --> "📁 AddClientSteps/"
+    components/ --> "📁 PlantProcessSteps/"
+    
+    AddClientSteps/ --> "Audit.jsx"
+    AddClientSteps/ --> "ClientBasicInfo.jsx"
+    AddClientSteps/ --> "CompanyAddress.jsx"
+    AddClientSteps/ --> "CompanyDocument.jsx"
+    AddClientSteps/ --> "CteCtoCca.jsx"
+    AddClientSteps/ --> "PostAuditCheck.jsx"
+    AddClientSteps/ --> "PreValidation.jsx"
+    AddClientSteps/ --> "📁 utils/"
+    
+    PlantProcessSteps/ --> "ConsentVerification.jsx"
+    PlantProcessSteps/ --> "ProductCompliance.jsx"
+    PlantProcessSteps/ --> "SingleUsePlastic.jsx"
+    PlantProcessSteps/ --> "SummaryReport.jsx"
+    
+    pages/ --> "AddClient.jsx"
+    pages/ --> "AdminPanel.jsx"
+    pages/ --> "ClientAudit.jsx"
+    pages/ --> "ClientDetail.jsx"
+    pages/ --> "Clients.jsx"
+    pages/ --> "Dashboard.jsx"
+    pages/ --> "Login.jsx"
+    pages/ --> "PlantProcess.jsx"
+    pages/ --> "Register.jsx"
+    pages/ --> "ValidatedClients.jsx"
+    pages/ --> "ViewClient.jsx"
+    
+    store/ --> "authSlice.js"
+    store/ --> "store.js"
+    
+    services/ --> "api.js"
+    services/ --> "apiEndpoints.js"
+    
+    context/ --> "AuthContext.jsx"
+    context/ --> "ClientContext.jsx"
+    
+    constants/ --> "complianceConstants.js"
+    constants/ --> "indianStatesCities.js"
+    constants/ --> "WasteTypeConfig.js"
+    constants/ --> "wasteTypes.js"
+            </div>
+        </div>
+
+        <!-- Backend Structure -->
+        <div class="diagram-section">
+            <h2>Backend Directory Structure (server/)</h2>
+            <div class="mermaid">
+graph TD
+    server/ --> "📄 package.json"
+    server/ --> "📄 index.js"
+    server/ --> "📁 config/"
+    server/ --> "📁 controllers/"
+    server/ --> "📁 middleware/"
+    server/ --> "📁 models/"
+    server/ --> "📁 routes/"
+    server/ --> "📁 utils/"
+    server/ --> "📁 validators/"
+    server/ --> "📁 cron/"
+    
+    config/ --> "connectDB.js"
+    config/ --> "firebase.js"
+    config/ --> "sendEmail.js"
+    config/ --> "serviceAccountKey.example.json"
+    
+    controllers/ --> "auth.controller.js"
+    controllers/ --> "client.controller.js"
+    controllers/ --> "user.controller.js"
+    controllers/ --> "admin.controller.js"
+    controllers/ --> "ai.controller.js"
+    controllers/ --> "supChecklist.controller.js"
+    
+    middleware/ --> "auth.js"
+    middleware/ --> "upload.js"
+    middleware/ --> "rateLimiter.js"
+    middleware/ --> "validate.js"
+    
+    models/ --> "user.model.js"
+    models/ --> "client.model.js"
+    models/ --> "procurement.model.js"
+    models/ --> "productCompliance.model.js"
+    models/ --> "skuCompliance.model.js"
+    models/ --> "SingleUsePlasticChecklist.model.js"
+    models/ --> "pwp.model.js"
+    models/ --> "role.model.js"
+    models/ --> "loginActivity.model.js"
+    models/ --> "loginLog.model.js"
+    
+    routes/ --> "auth.route.js"
+    routes/ --> "client.route.js"
+    routes/ --> "user.route.js"
+    routes/ --> "admin.route.js"
+    routes/ --> "ai.route.js"
+    
+    utils/ --> "asyncHandler.js"
+    utils/ --> "generateOtp.js"
+    utils/ --> "generateToken.js"
+    utils/ --> "logger.js"
+    utils/ --> "roleSeeder.js"
+    utils/ --> "verifyEmailTemplate.js"
+    
+    validators/ --> "auth.validator.js"
+    
+    cron/ --> "auditCron.js"
+            </div>
+        </div>
+
+        <!-- Root Structure -->
+        <div class="diagram-section">
+            <h2>Root Directory Structure</h2>
+            <div class="mermaid">
+graph TD
+    Root --> "📄 package.json"
+    Root --> "📄 README.md"
+    Root --> "📄 AGENTS.md"
+    Root --> "📄 COMPLETE_SETUP.md"
+    Root --> "📄 PROJECT_OVERVIEW.md"
+    Root --> "📄 QUICK_REFERENCE.md"
+    Root --> "📄 QUICKSTART.md"
+    Root --> "📄 vercel.json"
+    Root --> "📄 .gitignore"
+    Root --> "📄 .vercelignore"
+    Root --> "📄 logo.png"
+    Root --> "📁 client-react/"
+    Root --> "📁 server/"
+    Root --> "📁 docs/"
+    
+    docs/ --> "EPRKAVACH_Project_Flow.drawio"
+            </div>
+        </div>
+    </div>
+</body>
+</html>
