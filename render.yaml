@@ -30,8 +30,5 @@ services:
     startCommand: npx serve -s dist -l $PORT
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: eprkavach-backend
-          property: url
+        sync: false
     autoDeploy: true

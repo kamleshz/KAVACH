@@ -34,32 +34,43 @@ Render will ask you to provide values for the environment variables defined in `
     *   *Important*: Ensure your IP Access List in MongoDB Atlas allows access from anywhere (`0.0.0.0/0`) or configure Render's static IPs (requires paid plan). For the free tier, allow `0.0.0.0/0`.
 *   **SECRET_KEY_ACCESS_TOKEN**: Render will verify this (it will auto-generate if we didn't specify value, but `render.yaml` says `generateValue: true`, so it might just show it). If it asks, you can type a random long string.
 *   **SECRET_KEY_REFRESH_TOKEN**: Same as above.
+*   **VITE_API_URL**: Leave this blank for now (or set it to `https://eprkavach-backend.onrender.com` if you can guess the name). **You must update this after the backend is created.**
 
 ## Step 4: Apply Blueprint
 
 1.  Click **"Apply Blueprint"**.
 2.  Render will start deploying both the Backend and Frontend services.
-3.  You can watch the logs for both services.
 
-## Step 5: Final Configuration (CORS)
+## Step 5: Post-Deployment Configuration (CRITICAL)
 
-Once deployed, you need to tell the Backend to allow requests from your new Frontend URL.
+Since the Frontend needs the Backend URL during the build, you must update the environment variables once the Backend is live.
 
-1.  Wait for the **Frontend** deployment to finish.
-2.  Copy the Frontend URL (e.g., `https://eprkavach-frontend.onrender.com`).
-3.  Go to the **Dashboard**, click on your **Backend Service** (`eprkavach-backend`).
-4.  Go to **Environment**.
-5.  Add a new Environment Variable:
-    *   **Key**: `FRONTEND_URL`
-    *   **Value**: Paste your Frontend URL (e.g., `https://eprkavach-frontend.onrender.com`).
-6.  Render will automatically restart the backend.
+1.  **Get Backend URL**:
+    *   Go to your Render Dashboard.
+    *   Click on the **Backend Service** (`eprkavach-backend`).
+    *   Copy the URL (e.g., `https://eprkavach-backend.onrender.com`).
+
+2.  **Update Frontend Environment**:
+    *   Go to the **Frontend Service** (`eprkavach-frontend`).
+    *   Go to **Environment**.
+    *   Find or Add `VITE_API_URL`.
+    *   Set the value to your Backend URL (e.g., `https://eprkavach-backend.onrender.com`).
+    *   **Save Changes**. This will trigger a new build/deploy for the frontend.
+
+3.  **Update Backend Environment (CORS)**:
+    *   Get the **Frontend URL** (e.g., `https://eprkavach-frontend.onrender.com`).
+    *   Go to the **Backend Service** (`eprkavach-backend`).
+    *   Go to **Environment**.
+    *   Add/Update `FRONTEND_URL`.
+    *   Set the value to your Frontend URL.
+    *   **Save Changes**.
 
 ## Troubleshooting
 
 *   **Build Failures**: Check the logs. If `npm install` fails, it might be a dependency issue.
 *   **White Screen on Frontend**: Open the browser console (F12). If you see 404 errors for assets, ensure `vercel.json` or rewrite rules are working (Render uses the `routes` rule in `render.yaml`).
 *   **API Errors (Network Error)**:
-    *   Check if `VITE_API_URL` is correctly set in the Frontend Environment (it should be auto-linked via `render.yaml`).
+    *   Check if `VITE_API_URL` is correctly set in the Frontend Environment.
     *   Check Backend logs for CORS errors. Ensure `FRONTEND_URL` is set correctly.
 
 ## Deployment to Vercel (Alternative for Frontend)
