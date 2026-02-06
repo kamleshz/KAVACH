@@ -16,6 +16,10 @@ services:
         generateValue: true
       - key: PORT
         value: 8080
+      - key: MAIL_USER
+        sync: false
+      - key: MAIL_PASS
+        sync: false
     autoDeploy: true
 
   # Frontend Service (Using Node/Web instead of Static to avoid "unknown type" error)

@@ -28,6 +28,9 @@ Ensure your latest code is pushed to your GitHub repository: `https://github.com
 *   **MONGODB_URI**: Paste your MongoDB connection string.
 *   **SECRET_KEY_ACCESS_TOKEN**: Type a random secret string.
 *   **SECRET_KEY_REFRESH_TOKEN**: Type a random secret string.
+*   **MAIL_USER**: Your email address (e.g., `user@gmail.com`).
+*   **MAIL_PASS**: Your email app password (NOT your login password).
+    *   For Gmail, go to Google Account -> Security -> 2-Step Verification -> App Passwords.
 *   **VITE_API_URL**: **Leave blank** for now.
 
 ### Step 4: Apply & Configure
