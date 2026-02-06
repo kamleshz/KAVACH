@@ -499,8 +499,8 @@ export const verifyLoginOtpController = async (req, res) => {
 
         const cookieOptions = {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            secure: true, // Always secure for cross-site
+            sameSite: 'none', // Allow cross-site cookies
             maxAge: 7 * 24 * 60 * 60 * 1000
         };
 

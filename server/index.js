@@ -21,6 +21,7 @@ import { initAuditCron } from './cron/auditCron.js';
 import logger from './utils/logger.js';
 
 const app = express()
+app.set('trust proxy', 1); // Trust first proxy (Render/Vercel) for secure cookies
 const realtimeEmitter = new EventEmitter()
 app.set('realtimeEmitter', realtimeEmitter)
 const allowedOriginsRaw = process.env.FRONTEND_URL || "";
@@ -32,6 +33,8 @@ const allowedOrigins = allowedOriginsRaw
 logger.info(`Allowed Origins Parsed: ${JSON.stringify(allowedOrigins)}`);
 app.use(cors({
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
