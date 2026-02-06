@@ -162,25 +162,42 @@ const Login = () => {
                     
                     // Check if video dimensions are available
                     if (videoRef.current.videoWidth && videoRef.current.videoHeight) {
-                        canvas.width = videoRef.current.videoWidth;
-                        canvas.height = videoRef.current.videoHeight;
-                        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+                        // Limit canvas size to avoid huge payloads (max 800px width)
+                        const MAX_WIDTH = 800;
+                        let width = videoRef.current.videoWidth;
+                        let height = videoRef.current.videoHeight;
+                        
+                        if (width > MAX_WIDTH) {
+                            height = height * (MAX_WIDTH / width);
+                            width = MAX_WIDTH;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        context.drawImage(videoRef.current, 0, 0, width, height);
                         
                         const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
                         setCapturedImage(imageBase64);
+                        setRequireOtp(true);
                     } else {
-                         console.warn("Video dimensions not ready, skipping capture");
-                         // Fallback or retry logic could go here
+                         console.warn("Video dimensions not ready, using fallback");
+                         // Fallback to ensure we don't block login, but backend might reject if it looks fake
+                         // Better to try to capture again or fail gracefully
+                         setError("Camera capture failed. Please try logging in again.");
+                         setRequireOtp(false); // Do not proceed
                     }
                     
                     // Stop stream
-                    stream.getTracks().forEach(track => track.stop());
+                    try {
+                        stream.getTracks().forEach(track => track.stop());
+                    } catch (e) {
+                        console.error("Error stopping tracks:", e);
+                    }
                     
                     setIsCapturing(false);
-                    setRequireOtp(true);
                     setLoading(false);
                 }
-            }, 1000);
+            }, 1500); // Increased delay slightly to ensure video loads
         }
     } catch (err) {
         console.error("Camera error", err);
@@ -204,6 +221,18 @@ const Login = () => {
 
     try {
       if (requireOtp) {
+        // Debug logging for 400 errors
+        console.log("Submitting OTP Verification:", { 
+            email: formData.email, 
+            otpLen: formData.otp?.length,
+            photoLen: capturedImage?.length || 0,
+            hasLocation: !!location
+        });
+
+        if (!capturedImage) {
+            throw new Error("Photo capture failed. Please try logging in again.");
+        }
+
         const result = await verifyLoginOtp({ 
           email: formData.email, 
           otp: formData.otp,
