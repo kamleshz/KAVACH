@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Popconfirm, Button, Modal, Select } from 'antd';
 import { FileExcelOutlined, SaveOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
-import api from '../../services/api';
-import { API_ENDPOINTS } from '../../services/apiEndpoints';
+import api from '../../../services/api';
+import { API_ENDPOINTS } from '../../../services/apiEndpoints';
+import { useExcelImport } from '../../../hooks/useExcelImport';
+import BulkUploadControl from '../../../components/common/BulkUploadControl';
+import { ROHS_COMPLIANCE_TEMPLATE } from '../../../constants/excelTemplates';
 
 const PREDEFINED_SUBSTANCES = [
     { substance: 'Lead', symbol: 'Pb', maxLimit: '0.1%' },
@@ -25,6 +28,39 @@ const EWasteROHSCompliance = ({ clientId }) => {
     // Add Product Modal State
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [selectedEeeCode, setSelectedEeeCode] = useState(null);
+    const { importData, downloadTemplate, isLoading } = useExcelImport();
+
+    const handleExcelUpload = (e) => {
+        importData(e, (data) => {
+            const newRows = data.map((row, index) => {
+                const maxLimit = row["Maximum Allowed Limit"] || '';
+                const actual = row["Actual percentage"] || '';
+                let isCompliant = '';
+                
+                if (maxLimit && actual) {
+                    const max = parseFloat(maxLimit.toString().replace('%', ''));
+                    const act = parseFloat(actual.toString().replace('%', ''));
+                    if (!isNaN(max) && !isNaN(act)) {
+                        isCompliant = act <= max ? 'Yes' : 'No';
+                    }
+                }
+
+                return {
+                    id: Date.now() + index,
+                    eeeCode: row["EEE Code"] || '',
+                    productName: row["Product Name"] || '',
+                    listEEE: row["List of EEE"] || '',
+                    substance: row["Substance"] || '',
+                    symbol: row["Symbol"] || '',
+                    maxLimit: maxLimit,
+                    actualPercentage: actual,
+                    isCompliant: isCompliant
+                };
+            });
+            
+            setRows(prev => [...prev, ...newRows]);
+        });
+    };
 
     useEffect(() => {
         fetchComplianceData();
@@ -300,18 +336,12 @@ const EWasteROHSCompliance = ({ clientId }) => {
             <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-bold text-gray-800">ROHS Compliance</h3>
                 <div className="flex gap-2">
-                    <button 
-                        className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                        onClick={() => toast.info('Excel upload not implemented yet')}
-                    >
-                        <FileExcelOutlined /> Upload Excel
-                    </button>
-                    <button 
-                        className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                        onClick={() => toast.info('Template download not implemented yet')}
-                    >
-                        <FileExcelOutlined /> Template
-                    </button>
+                    <BulkUploadControl
+                        onUpload={handleExcelUpload}
+                        onDownloadTemplate={() => downloadTemplate(ROHS_COMPLIANCE_TEMPLATE)}
+                        uploadLabel="Upload Excel"
+                        templateLabel="Template"
+                    />
                     <Popconfirm
                         title="Are you sure you want to delete all rows?"
                         onConfirm={() => setRows([])}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
+import DocumentViewerModal from '../components/DocumentViewerModal';
 
 const EditClient = () => {
   const navigate = useNavigate();
@@ -13,6 +14,12 @@ const EditClient = () => {
   const [success, setSuccess] = useState('');
   const [client, setClient] = useState(null);
   const [allowSubmit, setAllowSubmit] = useState(false);
+  
+  // Document Viewer State
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerName, setViewerName] = useState('');
+
   const [cteRows, setCteRows] = useState([]);
   const [ctoRows, setCtoRows] = useState([]);
   const [isAddingCte, setIsAddingCte] = useState(false);
@@ -59,13 +66,13 @@ const EditClient = () => {
   const [cteProductionRows, setCteProductionRows] = useState([]);
   const [isAddingCteProduction, setIsAddingCteProduction] = useState(false);
   const [editingCteProductionIndex, setEditingCteProductionIndex] = useState(null);
-  const [currentCteProductionRow, setCurrentCteProductionRow] = useState({ plantName: '', productName: '', maxCapacityPerYear: '' });
+  const [currentCteProductionRow, setCurrentCteProductionRow] = useState({ plantName: '', productName: '', maxCapacityPerYear: '', uom: '' });
 
   // CTO Products State
   const [ctoProductRows, setCtoProductRows] = useState([]);
   const [isAddingCtoProduct, setIsAddingCtoProduct] = useState(false);
   const [editingCtoProductIndex, setEditingCtoProductIndex] = useState(null);
-  const [currentCtoProductRow, setCurrentCtoProductRow] = useState({ plantName: '', productName: '', quantity: '' });
+  const [currentCtoProductRow, setCurrentCtoProductRow] = useState({ plantName: '', productName: '', quantity: '', uom: '' });
 
   // MSME State
   const [msmeRows, setMsmeRows] = useState([]);
@@ -382,7 +389,7 @@ const EditClient = () => {
       rows.push(currentCteProductionRow);
     }
     setCteProductionRows(rows);
-    setCurrentCteProductionRow({ plantName: '', productName: '', maxCapacityPerYear: '' });
+    setCurrentCteProductionRow({ plantName: '', productName: '', maxCapacityPerYear: '', uom: '' });
     setEditingCteProductionIndex(null);
     setIsAddingCteProduction(false);
   };
@@ -412,7 +419,7 @@ const EditClient = () => {
       rows.push(currentCtoProductRow);
     }
     setCtoProductRows(rows);
-    setCurrentCtoProductRow({ productName: '', quantity: '' });
+    setCurrentCtoProductRow({ productName: '', quantity: '', uom: '' });
     setEditingCtoProductIndex(null);
     setIsAddingCtoProduct(false);
   };
@@ -718,6 +725,12 @@ const EditClient = () => {
     if (typeof p !== 'string') return '';
     const isAbs = p.startsWith('http://') || p.startsWith('https://');
     return isAbs ? p : `${api.defaults.baseURL}/${p}`;
+  };
+
+  const handleViewDocument = (filePath, docType, docName) => {
+    setViewerUrl(resolveUrl(filePath));
+    setViewerName(docName || docType);
+    setViewerOpen(true);
   };
 
   const formatDateToDdMmYyyy = (dateString) => {
@@ -1059,7 +1072,7 @@ const EditClient = () => {
                            const doc = getLatestDoc(client?.documents, 'GST');
                            if (doc) return (
                              <div className="flex items-center gap-2">
-                               <button type="button" onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: doc.filePath, documentType: 'GST', documentName: 'GST_Certificate' } } })} className="text-xs text-primary-600 hover:text-primary-800 underline">
+                               <button type="button" onClick={() => handleViewDocument(doc.filePath, 'GST', 'GST_Certificate')} className="text-xs text-primary-600 hover:text-primary-800 underline">
                                  <i className="fas fa-eye mr-1"></i> View Current
                                </button>
                                <span className="text-xs text-gray-500">{formatDateToDdMmYyyy(doc.certificateDate)}</span>
@@ -1109,7 +1122,7 @@ const EditClient = () => {
                            const doc = getLatestDoc(client?.documents, 'CIN');
                            if (doc) return (
                              <div className="flex items-center gap-2">
-                               <button type="button" onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: doc.filePath, documentType: 'CIN', documentName: 'CIN_Document' } } })} className="text-xs text-primary-600 hover:text-primary-800 underline">
+                               <button type="button" onClick={() => handleViewDocument(doc.filePath, 'CIN', 'CIN_Document')} className="text-xs text-primary-600 hover:text-primary-800 underline">
                                 <i className="fas fa-eye mr-1"></i> View Current
                               </button>
                                <span className="text-xs text-gray-500">{formatDateToDdMmYyyy(doc.certificateDate)}</span>
@@ -1159,7 +1172,7 @@ const EditClient = () => {
                            const doc = getLatestDoc(client?.documents, 'PAN');
                            if (doc) return (
                              <div className="flex items-center gap-2">
-                               <button type="button" onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: doc.filePath, documentType: 'PAN', documentName: 'PAN_Document' } } })} className="text-xs text-primary-600 hover:text-primary-800 underline">
+                               <button type="button" onClick={() => handleViewDocument(doc.filePath, 'PAN', 'PAN_Document')} className="text-xs text-primary-600 hover:text-primary-800 underline">
                                 <i className="fas fa-eye mr-1"></i> View Current
                               </button>
                                <span className="text-xs text-gray-500">{formatDateToDdMmYyyy(doc.certificateDate)}</span>
@@ -1209,7 +1222,7 @@ const EditClient = () => {
                            const doc = getLatestDoc(client?.documents, 'Factory License');
                            if (doc) return (
                              <div className="flex items-center gap-2">
-                               <button type="button" onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: doc.filePath, documentType: 'Factory License', documentName: 'Factory_License' } } })} className="text-xs text-primary-600 hover:text-primary-800 underline">
+                               <button type="button" onClick={() => handleViewDocument(doc.filePath, 'Factory License', 'Factory_License')} className="text-xs text-primary-600 hover:text-primary-800 underline">
                                 <i className="fas fa-eye mr-1"></i> View Current
                               </button>
                                <span className="text-xs text-gray-500">{formatDateToDdMmYyyy(doc.certificateDate)}</span>
@@ -1259,7 +1272,7 @@ const EditClient = () => {
                            const doc = getLatestDoc(client?.documents, 'EPR Certificate');
                            if (doc) return (
                              <div className="flex items-center gap-2">
-                               <button type="button" onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: doc.filePath, documentType: 'EPR Certificate', documentName: 'EPR_Certificate' } } })} className="text-xs text-primary-600 hover:text-primary-800 underline">
+                               <button type="button" onClick={() => handleViewDocument(doc.filePath, 'EPR Certificate', 'EPR_Certificate')} className="text-xs text-primary-600 hover:text-primary-800 underline">
                                 <i className="fas fa-eye mr-1"></i> View Current
                               </button>
                                <span className="text-xs text-gray-500">{formatDateToDdMmYyyy(doc.certificateDate)}</span>
@@ -1356,7 +1369,7 @@ const EditClient = () => {
                             <td className="p-3">{row.turnover}</td>
                             <td className="p-3">
                               {row.certificateFile ? (
-                                <button type="button" onClick={() => navigate('/document-viewer', { state: { doc: { filePath: row.certificateFile, documentType: 'MSME Certificate', documentName: `MSME_${row.udyamNumber}` } } })} className="text-primary-600 hover:underline">View</button>
+                                <button type="button" onClick={() => handleViewDocument(row.certificateFile, 'MSME Certificate', `MSME_${row.udyamNumber}`)} className="text-primary-600 hover:underline">View</button>
                               ) : (
                                 <span className="text-gray-400">-</span>
                               )}
@@ -1487,7 +1500,7 @@ const EditClient = () => {
                             <div className="flex items-center gap-3">
                               {r.documentFile ? (
                                 typeof r.documentFile === 'string' ? (
-                                  <button type="button" onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: r.documentFile, documentType: 'CTE Document', documentName: `CTE_${r.consentNo}` } } })} className="text-primary-600 hover:underline">View</button>
+                                  <button type="button" onClick={() => handleViewDocument(r.documentFile, 'CTE Document', `CTE_${r.consentNo}`)} className="text-primary-600 hover:underline">View</button>
                                 ) : (
                                   <span className="text-sm text-gray-600 truncate max-w-[100px]" title={r.documentFile.name}>{r.documentFile.name}</span>
                                 )
@@ -1534,6 +1547,7 @@ const EditClient = () => {
                         <th className="p-3 border-b text-sm font-semibold">Plant Name</th>
                         <th className="p-3 border-b text-sm font-semibold">Product Name</th>
                         <th className="p-3 border-b text-sm font-semibold">Max Capacity / Year</th>
+                        <th className="p-3 border-b text-sm font-semibold">UOM</th>
                         <th className="p-3 border-b text-sm font-semibold">Action</th>
                       </tr>
                     </thead>
@@ -1551,6 +1565,14 @@ const EditClient = () => {
                           <td className="p-3 border-b"><input type="text" name="productName" value={currentCteProductionRow.productName} onChange={handleCteProductionInput} className="w-full p-2 border rounded text-sm" placeholder="Product Name" /></td>
                           <td className="p-3 border-b"><input type="text" name="maxCapacityPerYear" value={currentCteProductionRow.maxCapacityPerYear} onChange={handleCteProductionInput} className="w-full p-2 border rounded text-sm" placeholder="Max Capacity" /></td>
                           <td className="p-3 border-b">
+                            <select name="uom" value={currentCteProductionRow.uom} onChange={handleCteProductionInput} className="w-full p-2 border rounded text-sm">
+                                <option value="">Select UOM</option>
+                                <option value="MT/Year">MT/Year</option>
+                                <option value="KG/Year">KG/Year</option>
+                                <option value="Units/Year">Units/Year</option>
+                            </select>
+                          </td>
+                          <td className="p-3 border-b">
                             <div className="flex gap-2">
                               <button type="button" onClick={saveCteProductionRow} className="bg-primary-600 text-white px-3 py-1 rounded text-sm hover:bg-primary-700">Save</button>
                               <button type="button" onClick={() => { setIsAddingCteProduction(false); setEditingCteProductionIndex(null); }} className="bg-gray-400 text-white px-3 py-1 rounded text-sm hover:bg-gray-500">Cancel</button>
@@ -1563,6 +1585,7 @@ const EditClient = () => {
                           <td className="p-3">{r.plantName}</td>
                           <td className="p-3">{r.productName}</td>
                           <td className="p-3">{r.maxCapacityPerYear}</td>
+                          <td className="p-3">{r.uom || '-'}</td>
                           <td className="p-3">
                             <div className="flex items-center gap-3">
                               <button type="button" onClick={() => editCteProductionRow(idx)} className="text-primary-600 hover:text-primary-800 text-sm"><i className="fas fa-edit"></i> Edit</button>
@@ -1572,7 +1595,7 @@ const EditClient = () => {
                         </tr>
                       ))}
                       {cteProductionRows.length === 0 && !isAddingCteProduction && (
-                        <tr><td colSpan="4" className="p-6 text-center text-gray-400">No CTE production details</td></tr>
+                        <tr><td colSpan="5" className="p-6 text-center text-gray-400">No CTE production details</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1679,7 +1702,7 @@ const EditClient = () => {
                             <div className="flex items-center gap-3">
                               {r.documentFile ? (
                                 typeof r.documentFile === 'string' ? (
-                                  <button type="button" onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: r.documentFile, documentType: 'CTO Document', documentName: `CTO_${r.consentOrderNo}` } } })} className="text-primary-600 hover:underline">View</button>
+                                  <button type="button" onClick={() => handleViewDocument(r.documentFile, 'CTO Document', `CTO_${r.consentOrderNo}`)} className="text-primary-600 hover:underline">View</button>
                                 ) : (
                                   <span className="text-sm text-gray-600 truncate max-w-[100px]" title={r.documentFile.name}>{r.documentFile.name}</span>
                                 )
@@ -1725,6 +1748,7 @@ const EditClient = () => {
                         <th className="p-3 border-b text-sm font-semibold">Plant Name</th>
                         <th className="p-3 border-b text-sm font-semibold">Product Name</th>
                         <th className="p-3 border-b text-sm font-semibold">Quantity</th>
+                        <th className="p-3 border-b text-sm font-semibold">UOM</th>
                         <th className="p-3 border-b text-sm font-semibold">Action</th>
                       </tr>
                     </thead>
@@ -1741,6 +1765,14 @@ const EditClient = () => {
                           </td>
                           <td className="p-3 border-b"><input type="text" name="productName" value={currentCtoProductRow.productName} onChange={handleCtoProductInput} className="w-full p-2 border rounded text-sm" placeholder="Product Name" /></td>
                           <td className="p-3 border-b"><input type="text" name="quantity" value={currentCtoProductRow.quantity} onChange={handleCtoProductInput} className="w-full p-2 border rounded text-sm" placeholder="Quantity" /></td>
+                          <td className="p-3 border-b">
+                            <select name="uom" value={currentCtoProductRow.uom} onChange={handleCtoProductInput} className="w-full p-2 border rounded text-sm">
+                                <option value="">Select UOM</option>
+                                <option value="MT">MT</option>
+                                <option value="KG">KG</option>
+                                <option value="Units">Units</option>
+                            </select>
+                          </td>
                           <td className="p-3 border-b">
                             <div className="flex gap-2">
                               <button type="button" onClick={saveCtoProductRow} className="bg-primary-600 text-white px-3 py-1 rounded text-sm hover:bg-primary-700">Save</button>
@@ -1763,7 +1795,7 @@ const EditClient = () => {
                         </tr>
                       ))}
                       {ctoProductRows.length === 0 && !isAddingCtoProduct && (
-                        <tr><td colSpan="4" className="p-6 text-center text-gray-400">No CTO/CCA product details</td></tr>
+                        <tr><td colSpan="5" className="p-6 text-center text-gray-400">No CTO/CCA product details</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1807,6 +1839,13 @@ const EditClient = () => {
           </div>
         </form>
       </div>
+
+      <DocumentViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        documentUrl={viewerUrl}
+        documentName={viewerName}
+      />
     </div>
   );
 };

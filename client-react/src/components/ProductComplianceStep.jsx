@@ -9,6 +9,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Pagination from './Pagination';
 import useAuth from '../hooks/useAuth';
+import DocumentViewerModal from './DocumentViewerModal';
 
 // Helper Functions
 const getCompanyShortName = (name) => {
@@ -71,6 +72,16 @@ const loadImageAsDataUrl = async (url) => {
 };
 
 const ProductComplianceStep = ({ client, refreshData, plantNameFilter }) => {
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <h2 className="text-2xl font-bold text-gray-400 mb-2">Coming Soon</h2>
+            <p className="text-gray-500">This module is currently under development.</p>
+        </div>
+    );
+};
+
+// Original implementation preserved but renamed
+const ProductComplianceStepOriginal = ({ client, refreshData, plantNameFilter }) => {
     const { user } = useAuth();
     const [selectedConsentId, setSelectedConsentId] = useState('');
     const [activeTab, setActiveTab] = useState('productCompliance');
@@ -145,8 +156,8 @@ const ProductComplianceStep = ({ client, refreshData, plantNameFilter }) => {
             {selectedConsent ? (
                 <div className="space-y-6 animate-fadeIn">
                     
-                    <div className="bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="bg-gray-100 p-1.5 rounded-lg mb-6">
+                        <div className="flex flex-wrap gap-2">
                             {[
                                 { id: 'productCompliance', label: 'Product Compliance' },
                                 { id: 'supplierCompliance', label: 'Supplier Compliance' },
@@ -158,13 +169,15 @@ const ProductComplianceStep = ({ client, refreshData, plantNameFilter }) => {
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`w-full px-3 py-2 text-xs font-semibold rounded-md transition-all ${
-                                            isActive
-                                                ? 'border border-gray-300 text-gray-700 bg-gray-100 shadow-sm'
-                                                : 'border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 hover:text-gray-800'
-                                        }`}
+                                        className={`
+                                            flex-1 flex items-center justify-center px-4 py-3 rounded-md text-sm font-medium transition-all min-w-[140px]
+                                            ${isActive 
+                                                ? 'bg-white text-gray-800 shadow-sm border border-gray-200' 
+                                                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+                                            }
+                                        `}
                                     >
-                                        {tab.label}
+                                        <span className={isActive ? "font-bold" : ""}>{tab.label}</span>
                                     </button>
                                 );
                             })}
@@ -351,6 +364,26 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(5);
     const [lastSavedRows, setLastSavedRows] = useState([]);
+
+    // Document Viewer State
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState('');
+    const [viewerName, setViewerName] = useState('');
+
+    const handleViewDocument = (urlOrFile, docType, docName) => {
+        let url = '';
+        if (typeof urlOrFile === 'string') {
+            url = toAbsUrl(urlOrFile);
+        } else if (urlOrFile instanceof File) {
+            url = URL.createObjectURL(urlOrFile);
+        }
+        
+        if (url) {
+            setViewerUrl(url);
+            setViewerName(docName || docType);
+            setViewerOpen(true);
+        }
+    };
 
     // Pagination Logic
     const indexOfLastItem = currentPage * itemsPerPage;
@@ -833,6 +866,33 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
                 </select>
             )
         },
+        { 
+            label: "INDUSTRY CATEGORY", 
+            field: "industryCategory",
+            width: "min-w-[180px]",
+            render: (row, idx) => (
+                <select 
+                    value={row.industryCategory}
+                    onChange={(e) => handleRowChange(idx, 'industryCategory', e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white"
+                    disabled={isManager}
+                >
+                    <option value="">Select</option>
+                    <option value="Food & Beverage Packaging">Food & Beverage Packaging</option>
+                    <option value="Personal Care & Cosmetics">Personal Care & Cosmetics</option>
+                    <option value="Home Care / Household Products">Home Care / Household Products</option>
+                    <option value="Pharmaceutical & Healthcare">Pharmaceutical & Healthcare</option>
+                    <option value="Agriculture & Allied Products">Agriculture & Allied Products</option>
+                    <option value="Electrical & Electronics Packaging">Electrical & Electronics Packaging</option>
+                    <option value="Industrial & Institutional Packaging">Industrial & Institutional Packaging</option>
+                    <option value="Retail & Carry Bags">Retail & Carry Bags</option>
+                    <option value="Transport / Secondary / Tertiary Packaging">Transport / Secondary / Tertiary Packaging</option>
+                    <option value="Consumer Durables Packaging">Consumer Durables Packaging</option>
+                    <option value="Multi-Layered Plastic (MLP) Packaging">Multi-Layered Plastic (MLP) Packaging</option>
+                    <option value="Others / Miscellaneous Plastics">Others / Miscellaneous Plastics</option>
+                </select>
+            )
+        },
         { label: "SKU CODE", field: "skuCode", width: "min-w-[120px]" },
         { label: "SKU DESCRIPTION", field: "skuDescription", width: "min-w-[200px]" },
         { label: "SKU UOM", field: "skuUom", width: "min-w-[100px]" },
@@ -847,7 +907,7 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
                              {row.productImage instanceof File ? (
                                 <span className="text-xs text-green-600 font-bold">New File</span>
                              ) : (
-                                <a href={toAbsUrl(row.productImage)} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline font-bold">View</a>
+                                <button onClick={() => handleViewDocument(row.productImage, 'Product Image', 'Product Image')} className="text-xs text-blue-600 underline font-bold">View</button>
                              )}
                              {!isManager && (
                                  <label className="cursor-pointer text-xs text-gray-500 hover:text-orange-500">
@@ -945,7 +1005,7 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
                              {row.componentImage instanceof File ? (
                                 <span className="text-xs text-green-600 font-bold">New File</span>
                              ) : (
-                                <a href={toAbsUrl(row.componentImage)} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline font-bold">View</a>
+                                <button onClick={() => handleViewDocument(row.componentImage, 'Component Image', 'Component Image')} className="text-xs text-blue-600 underline font-bold">View</button>
                              )}
                              {!isManager && (
                                  <label className="cursor-pointer text-xs text-gray-500 hover:text-orange-500">
@@ -1015,6 +1075,7 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
 
         const exportData = rows.map((row) => ({
             'Packaging Type': row.packagingType,
+            'Industry Category': row.industryCategory,
             'SKU Code': row.skuCode,
             'SKU Description': row.skuDescription,
             'SKU UOM': row.skuUom,
@@ -1399,6 +1460,13 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
                     scroll={{ x: 'max-content' }}
                 />
             </Modal>
+
+            <DocumentViewerModal
+                isOpen={viewerOpen}
+                onClose={() => setViewerOpen(false)}
+                documentUrl={viewerUrl}
+                documentName={viewerName}
+            />
         </div>
     );
 };

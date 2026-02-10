@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Table, Button, Tooltip, Upload, Popconfirm, Select, Input, Card, Tag } from 'antd';
-import { FileExcelOutlined, SaveOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
+import { SaveOutlined, DeleteOutlined, CheckCircleFilled, FileExcelOutlined, LoadingOutlined, PlusOutlined, FileImageOutlined, UploadOutlined, UndoOutlined, CodeSandboxOutlined, DownloadOutlined, SyncOutlined, DownOutlined, RightOutlined, HistoryOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import Pagination from '../Pagination';
 import api from '../../services/api';
 import { API_ENDPOINTS } from '../../services/apiEndpoints';
+import DocumentViewerModal from '../DocumentViewerModal';
+import BulkUploadControl from '../common/BulkUploadControl';
 
 import { 
   PACKAGING_TYPES, 
@@ -20,7 +22,6 @@ const ProductCompliance = ({
     subTab,
     setSubTab,
     isManager,
-    fileInputRef,
     handleExcelUpload,
     handleProductTemplateDownload,
     handleProductExport,
@@ -30,6 +31,8 @@ const ProductCompliance = ({
     productRows,
     addRow,
     handleRowChange,
+    handleGenerateChange,
+    handleProductComponentCodeChange,
     handleGenerateSupplierCodeChange,
     formatProductFieldValue,
     resolveUrl,
@@ -44,7 +47,6 @@ const ProductCompliance = ({
     setCurrentPage,
     setItemsPerPage,
     
-    fileInputSupplierRef,
     handleSupplierExcelUpload,
     handleSupplierTemplateDownload,
     handleSupplierExport,
@@ -67,7 +69,6 @@ const ProductCompliance = ({
     setSupplierPage,
     setSupplierItemsPerPage,
 
-    fileInputComponentRef,
     handleComponentExcelUpload,
     handleComponentTemplateDownload,
     handleComponentExport,
@@ -137,6 +138,25 @@ const ProductCompliance = ({
     savingRecycledRow,
     categorySummary = []
 }) => {
+    // Document Viewer State
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState('');
+    const [viewerName, setViewerName] = useState('');
+
+    const handleViewDocument = (urlOrFile, docType, docName) => {
+        let url = '';
+        if (typeof urlOrFile === 'string') {
+            url = resolveUrl(urlOrFile);
+        } else if (urlOrFile instanceof File) {
+            url = URL.createObjectURL(urlOrFile);
+        }
+        
+        if (url) {
+            setViewerUrl(url);
+            setViewerName(docName || docType);
+            setViewerOpen(true);
+        }
+    };
     
     const [savingMonthlyRow, setSavingMonthlyRow] = useState(null);
     const [isChangeSummaryExpanded, setIsChangeSummaryExpanded] = useState(false);
@@ -161,7 +181,7 @@ const ProductCompliance = ({
                                         : 'text-gray-500 hover:text-primary-600 hover:bg-white/50'
                             }`}
                         >
-                            {isCompleted && <i className="fas fa-check-circle text-green-600"></i>}
+                            {isCompleted && <CheckCircleFilled className="text-green-600" />}
                             {step.label}
                         </button>
                     )})}
@@ -174,30 +194,15 @@ const ProductCompliance = ({
                     <div className="flex gap-2">
                         {!isManager && (
                         <>
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleExcelUpload}
-                            accept=".xlsx, .xls"
-                            className="hidden"
+                        <BulkUploadControl 
+                            onUpload={handleExcelUpload}
+                            onDownloadTemplate={handleProductTemplateDownload}
                         />
-                        <button 
-                            onClick={() => fileInputRef.current?.click()} 
-                            className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                        >
-                            <FileExcelOutlined /> Upload Excel
-                        </button>
-                        <button 
-                            onClick={handleProductTemplateDownload} 
-                            className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                        >
-                            <FileExcelOutlined /> Template
-                        </button>
                         <button 
                             onClick={handleProductExport} 
                             className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
                         >
-                            <i className="fas fa-file-export"></i> Export Excel
+                            <FileExcelOutlined /> Export Excel
                         </button>
                         <Popconfirm
                             title="Are you sure you want to delete all rows?"
@@ -217,10 +222,10 @@ const ProductCompliance = ({
                             disabled={isBulkSaving}
                             className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {isBulkSaving ? <i className="fas fa-spinner fa-spin"></i> : <SaveOutlined />} Save All
+                            {isBulkSaving ? <LoadingOutlined spin /> : <SaveOutlined />} Save All
                         </button>
                         <button onClick={addRow} className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs">
-                            <i className="fas fa-plus"></i> Add Product
+                            <PlusOutlined /> Add Product
                         </button>
                         </>
                         )}
@@ -233,6 +238,7 @@ const ProductCompliance = ({
                                 {[
                                     { label: '#', width: 'w-12 text-center' },
                                     { label: 'Packaging Type', width: 'min-w-[150px]' },
+                                    { label: 'Industry Category', width: 'min-w-[150px]' },
                                     { label: 'SKU code', width: 'min-w-[120px]' },
                                     { label: 'SKU Description', width: 'min-w-[200px]' },
                                     { label: 'SKU UOM', width: 'min-w-[120px]' },
@@ -260,6 +266,7 @@ const ProductCompliance = ({
                                 const globalIndex = indexOfFirstRow + idx;
                                 const prevRow = lastSavedRows[globalIndex] || {};
                                 const packagingTypeChanged = isProductFieldChanged(globalIndex, 'packagingType', row.packagingType);
+                                const industryCategoryChanged = isProductFieldChanged(globalIndex, 'industryCategory', row.industryCategory);
                                 const skuCodeChanged = isProductFieldChanged(globalIndex, 'skuCode', row.skuCode);
                                 const skuDescriptionChanged = isProductFieldChanged(globalIndex, 'skuDescription', row.skuDescription);
                                 const skuUomChanged = isProductFieldChanged(globalIndex, 'skuUom', row.skuUom);
@@ -275,6 +282,7 @@ const ProductCompliance = ({
                                 const componentImageChanged = isProductFieldChanged(globalIndex, 'componentImage', row.componentImage);
                                 const rowChanged =
                                     packagingTypeChanged ||
+                                    industryCategoryChanged ||
                                     skuCodeChanged ||
                                     skuDescriptionChanged ||
                                     skuUomChanged ||
@@ -309,6 +317,42 @@ const ProductCompliance = ({
                                                 <div className="mt-1 text-[9px] leading-tight">
                                                     <div className="text-gray-500">Prev: {formatProductFieldValue(prevRow.packagingType, 'packagingType')}</div>
                                                     <div className="text-primary-700 font-bold">Now: {formatProductFieldValue(row.packagingType, 'packagingType')}</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                        <div className="flex flex-col">
+                                            {isManager ? (
+                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.industryCategory || '-'}</div>
+                                            ) : (
+                                            <select
+                                                className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${industryCategoryChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
+                                                value={row.industryCategory}
+                                                onChange={(e) => handleRowChange(globalIndex, 'industryCategory', e.target.value)}
+                                                disabled={isManager}
+                                            >
+                                                <option value="">Select</option>
+                                                {[
+                                                    "Food & Beverage Packaging",
+                                                    "Personal Care & Cosmetics",
+                                                    "Home Care / Household Products",
+                                                    "Pharmaceutical & Healthcare",
+                                                    "Agriculture & Allied Products",
+                                                    "Electrical & Electronics Packaging",
+                                                    "Industrial & Institutional Packaging",
+                                                    "Retail & Carry Bags",
+                                                    "Transport / Secondary / Tertiary Packaging",
+                                                    "Consumer Durables Packaging",
+                                                    "Multi-Layered Plastic (MLP) Packaging",
+                                                    "Others / Miscellaneous Plastics"
+                                                ].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                            </select>
+                                            )}
+                                            {industryCategoryChanged && (
+                                                <div className="mt-1 text-[9px] leading-tight">
+                                                    <div className="text-gray-500">Prev: {formatProductFieldValue(prevRow.industryCategory, 'industryCategory')}</div>
+                                                    <div className="text-primary-700 font-bold">Now: {formatProductFieldValue(row.industryCategory, 'industryCategory')}</div>
                                                 </div>
                                             )}
                                         </div>
@@ -401,18 +445,16 @@ const ProductCompliance = ({
                                                                 onError={(e) => {e.target.style.display='none';}}
                                                             />
                                                         )}
-                                                        <i className={`fas fa-image text-gray-400 text-xs absolute inset-0 m-auto flex items-center justify-center ${(typeof row.productImage === 'string' || row.productImage instanceof File) ? '-z-10' : ''}`}></i>
+                                                        <FileImageOutlined className={`text-gray-400 text-xs absolute inset-0 m-auto flex items-center justify-center ${(typeof row.productImage === 'string' || row.productImage instanceof File) ? '-z-10' : ''}`} />
                                                     </div>
                                                     <div className="flex flex-col gap-1">
-                                                        <a 
-                                                            href={typeof row.productImage === 'string' ? resolveUrl(row.productImage) : (row.productImage instanceof File ? URL.createObjectURL(row.productImage) : '#')} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer"
+                                                        <button 
+                                                            onClick={() => handleViewDocument(row.productImage, 'Product Image', 'Product Image')}
                                                             className="text-[10px] font-bold text-primary-600 hover:text-primary-800 flex items-center gap-1 leading-none"
                                                             title="View Image"
                                                         >
                                                             View
-                                                        </a>
+                                                        </button>
                                                         {!isManager && (
                                                         <label 
                                                             htmlFor={`product-image-${globalIndex}`} 
@@ -430,7 +472,7 @@ const ProductCompliance = ({
                                                     htmlFor={`product-image-${globalIndex}`} 
                                                     className={`cursor-pointer flex flex-col items-center justify-center w-20 py-1.5 border border-dashed rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-all group ${productImageChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
                                                 >
-                                                    <i className="fas fa-cloud-upload-alt text-gray-400 group-hover:text-primary-500 mb-0.5"></i>
+                                                    <UploadOutlined className="text-gray-400 group-hover:text-primary-500 mb-0.5" />
                                                     <span className="text-[9px] font-medium text-gray-500 group-hover:text-primary-600">Upload</span>
                                                 </label>
                                                 ) : <span className="text-[10px] text-gray-400">-</span>
@@ -617,10 +659,10 @@ const ProductCompliance = ({
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.supplierCode || '-'}</div>
                                             ) : (
                                             <input 
-                                                className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all text-center hover:border-primary-400 ${supplierCodeChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'} ${row.generateSupplierCode !== 'Yes' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                                className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all text-center hover:border-primary-400 ${supplierCodeChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'} ${row.generateSupplierCode === 'No' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                 placeholder="Supplier Code" 
                                                 value={row.supplierCode} 
-                                                readOnly={row.generateSupplierCode !== 'Yes'}
+                                                readOnly={row.generateSupplierCode === 'No'}
                                                 onChange={(e)=>handleRowChange(globalIndex,'supplierCode',e.target.value)} 
                                             />
                                             )}
@@ -654,18 +696,16 @@ const ProductCompliance = ({
                                                                 onError={(e) => {e.target.style.display='none';}}
                                                             />
                                                         )}
-                                                        <i className={`fas fa-image text-gray-400 text-xs absolute inset-0 m-auto flex items-center justify-center ${(typeof row.componentImage === 'string' || row.componentImage instanceof File) ? '-z-10' : ''}`}></i>
+                                                        <FileImageOutlined className={`text-gray-400 text-xs absolute inset-0 m-auto flex items-center justify-center ${(typeof row.componentImage === 'string' || row.componentImage instanceof File) ? '-z-10' : ''}`} />
                                                     </div>
                                                     <div className="flex flex-col gap-1">
-                                                        <a 
-                                                            href={typeof row.componentImage === 'string' ? resolveUrl(row.componentImage) : (row.componentImage instanceof File ? URL.createObjectURL(row.componentImage) : '#')} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer"
+                                                        <button 
+                                                            onClick={() => handleViewDocument(row.componentImage, 'Component Image', 'Component Image')}
                                                             className="text-[10px] font-bold text-primary-600 hover:text-primary-800 flex items-center gap-1 leading-none"
                                                             title="View Image"
                                                         >
                                                             View
-                                                        </a>
+                                                        </button>
                                                         {!isManager && (
                                                         <label 
                                                             htmlFor={`component-image-${globalIndex}`} 
@@ -683,7 +723,7 @@ const ProductCompliance = ({
                                                     htmlFor={`component-image-${globalIndex}`} 
                                                     className={`cursor-pointer flex flex-col items-center justify-center w-20 py-1.5 border border-dashed rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-all group ${componentImageChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
                                                 >
-                                                    <i className="fas fa-cloud-upload-alt text-gray-400 group-hover:text-primary-500 mb-0.5"></i>
+                                                    <UploadOutlined className="text-gray-400 group-hover:text-primary-500 mb-0.5" />
                                                     <span className="text-[9px] font-medium text-gray-500 group-hover:text-primary-600">Upload</span>
                                                 </label>
                                                 ) : <span className="text-[10px] text-gray-400">-</span>
@@ -716,21 +756,21 @@ const ProductCompliance = ({
                                                 className="p-1.5 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all hover:scale-110"
                                                 title="Save Row"
                                             >
-                                                {savingRow === globalIndex ? <i className="fas fa-spinner fa-spin text-xs"></i> : <i className="fas fa-save text-xs"></i>}
+                                                {savingRow === globalIndex ? <LoadingOutlined spin className="text-xs" /> : <SaveOutlined className="text-xs" />}
                                             </button>
                                             <button
                                                 onClick={() => cancelRow(globalIndex)}
                                                 className="p-1.5 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all hover:scale-110"
                                                 title="Cancel Changes"
                                             >
-                                                <i className="fas fa-undo text-xs"></i>
+                                                <UndoOutlined className="text-xs" />
                                             </button>
                                             <button 
                                                 onClick={()=>removeRow(globalIndex)} 
                                                 className="p-1.5 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all hover:scale-110"
                                                 title="Remove Row"
                                             >
-                                                <i className="fas fa-trash-alt text-xs"></i>
+                                                <DeleteOutlined className="text-xs" />
                                             </button>
                                         </div>
                                     </td>
@@ -760,30 +800,15 @@ const ProductCompliance = ({
                         <div className="flex gap-2">
                             {!isManager && (
                             <>
-                            <input
-                                type="file"
-                                ref={fileInputSupplierRef}
-                                onChange={handleSupplierExcelUpload}
-                                accept=".xlsx, .xls"
-                                className="hidden"
+                            <BulkUploadControl 
+                                onUpload={handleSupplierExcelUpload}
+                                onDownloadTemplate={handleSupplierTemplateDownload}
                             />
-                            <button 
-                                onClick={() => fileInputSupplierRef.current?.click()} 
-                                className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                            >
-                                <FileExcelOutlined /> Upload Excel
-                            </button>
-                            <button
-                                onClick={handleSupplierTemplateDownload}
-                                className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                            >
-                                <FileExcelOutlined /> Template
-                            </button>
                             <button 
                                 onClick={handleSupplierExport} 
                                 className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
                             >
-                                <i className="fas fa-file-export"></i> Export Excel
+                                <FileExcelOutlined /> Export Excel
                             </button>
                             <Popconfirm
                                 title="Are you sure you want to delete all rows?"
@@ -803,10 +828,10 @@ const ProductCompliance = ({
                                 disabled={isSupplierBulkSaving}
                                 className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {isSupplierBulkSaving ? <i className="fas fa-spinner fa-spin"></i> : <SaveOutlined />} Save All
+                                {isSupplierBulkSaving ? <LoadingOutlined spin /> : <SaveOutlined />} Save All
                             </button>
                             <button onClick={addSupplierRow} className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs">
-                                <i className="fas fa-plus"></i> Add Supplier
+                                <PlusOutlined /> Add Supplier
                             </button>
                             </>
                             )}
@@ -983,21 +1008,21 @@ const ProductCompliance = ({
                                                     className="p-1 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all"
                                                     title="Save Row"
                                                 >
-                                                    {savingSupplierRow === idx ? <i className="fas fa-spinner fa-spin text-xs"></i> : <i className="fas fa-save text-xs"></i>}
+                                                    {savingSupplierRow === idx ? <LoadingOutlined spin className="text-xs" /> : <SaveOutlined className="text-xs" />}
                                                 </button>
                                                 <button
                                                     onClick={() => cancelSupplierRow(idx)}
                                                     className="p-1 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all"
                                                     title="Cancel Changes"
                                                 >
-                                                    <i className="fas fa-undo text-xs"></i>
+                                                    <UndoOutlined className="text-xs" />
                                                 </button>
                                                 <button 
                                                     onClick={()=>removeSupplierRow(idx)} 
                                                     className="p-1 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all"
                                                     title="Remove Row"
                                                 >
-                                                    <i className="fas fa-trash-alt text-xs"></i>
+                                                    <DeleteOutlined className="text-xs" />
                                                 </button>
                                             </div>
                                         </td>
@@ -1026,37 +1051,22 @@ const ProductCompliance = ({
                     <div className="flex gap-2">
                         {!isManager && (
                         <>
-                        <input
-                            type="file"
-                            ref={fileInputComponentRef}
-                            onChange={handleComponentExcelUpload}
-                            accept=".xlsx, .xls"
-                            className="hidden"
+                        <BulkUploadControl 
+                            onUpload={handleComponentExcelUpload}
+                            onDownloadTemplate={handleComponentTemplateDownload}
                         />
-                        <button 
-                            onClick={() => fileInputComponentRef.current?.click()} 
-                            className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                        >
-                            <FileExcelOutlined /> Upload Excel
-                        </button>
-                        <button
-                            onClick={handleComponentTemplateDownload}
-                            className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                        >
-                            <FileExcelOutlined /> Template
-                        </button>
                         <button 
                             onClick={handleComponentExport} 
                             className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
                         >
-                            <i className="fas fa-file-export"></i> Export Excel
+                            <FileExcelOutlined /> Export Excel
                         </button>
                         <button 
                             onClick={handleComponentBulkSave}
                             disabled={isComponentBulkSaving || componentRows.length === 0}
                             className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {isComponentBulkSaving ? <i className="fas fa-spinner fa-spin"></i> : <SaveOutlined />} Save All
+                            {isComponentBulkSaving ? <LoadingOutlined spin /> : <SaveOutlined />} Save All
                         </button>
                         <Popconfirm
                             title="Are you sure you want to delete all rows?"
@@ -1072,7 +1082,7 @@ const ProductCompliance = ({
                             </button>
                         </Popconfirm>
                         <button onClick={addComponentRow} className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs">
-                            <i className="fas fa-plus"></i> Add Component
+                            <PlusOutlined /> Add Component
                         </button>
                         </>
                         )}
@@ -1386,22 +1396,22 @@ const ProductCompliance = ({
                                                     className="p-1.5 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all hover:scale-110"
                                                     title="Save Row"
                                                 >
-                                                    {savingComponentRow === idx ? <i className="fas fa-spinner fa-spin text-xs"></i> : <i className="fas fa-save text-xs"></i>}
+                                                    {savingComponentRow === idx ? <LoadingOutlined spin className="text-xs" /> : <SaveOutlined className="text-xs" />}
                                                 </button>
                                                 <button
-                                                    onClick={() => cancelComponentRow(idx)}
-                                                    className="p-1.5 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all hover:scale-110"
-                                                    title="Cancel Changes"
-                                                >
-                                                    <i className="fas fa-undo text-xs"></i>
-                                                </button>
-                                                <button 
-                                                    onClick={()=>removeComponentRow(idx)} 
-                                                    className="p-1.5 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all hover:scale-110"
-                                                    title="Remove Row"
-                                                >
-                                                    <i className="fas fa-trash-alt text-xs"></i>
-                                                </button>
+                                                onClick={() => cancelComponentRow(idx)}
+                                                className="p-1.5 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all hover:scale-110"
+                                                title="Cancel Changes"
+                                            >
+                                                <UndoOutlined className="text-xs" />
+                                            </button>
+                                            <button 
+                                                onClick={()=>removeComponentRow(idx)} 
+                                                className="p-1.5 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all hover:scale-110"
+                                                title="Remove Row"
+                                            >
+                                                <DeleteOutlined className="text-xs" />
+                                            </button>
                                             </div>
                                             )}
                                         </td>
@@ -1427,28 +1437,22 @@ const ProductCompliance = ({
                     <div className="flex justify-between items-center mb-3">
                         <div className="flex items-center gap-2">
                              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider border-b pb-2 border-primary-100 flex items-center gap-2">
-                                <span className="bg-primary-50 text-primary-700 p-1.5 rounded-md"><i className="fas fa-dolly"></i></span>
+                                <span className="bg-primary-50 text-primary-700 p-1.5 rounded-md"><CodeSandboxOutlined /></span>
                                 Monthly Procurement Data
                             </h3>
                         </div>
                         <div className="flex gap-2">
                             {!isManager && (
                             <>
-                            <label className="cursor-pointer bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105">
-                                <i className="fas fa-file-excel"></i> Upload Excel
-                                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleMonthlyExcelUpload} />
-                            </label>
-                            <button
-                                onClick={handleMonthlyTemplateDownload}
-                                className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                            >
-                                <i className="fas fa-file-excel"></i> Template
-                            </button>
+                            <BulkUploadControl 
+                                onUpload={handleMonthlyExcelUpload}
+                                onDownloadTemplate={handleMonthlyTemplateDownload}
+                            />
                             <button
                                 onClick={handleMonthlyExport}
                                 className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
                             >
-                                <i className="fas fa-download"></i> Export Excel
+                                <DownloadOutlined /> Export Excel
                             </button>
                             <button
                                 onClick={() => {
@@ -1468,7 +1472,7 @@ const ProductCompliance = ({
                                 }}
                                 className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
                             >
-                                <i className="fas fa-save"></i> Save All
+                                <SaveOutlined /> Save All
                             </button>
                             <Popconfirm
                                 title="Are you sure you want to delete all rows?"
@@ -1489,7 +1493,7 @@ const ProductCompliance = ({
                                 <button
                                     className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
                                 >
-                                    <i className="fas fa-trash"></i> Delete All
+                                    <DeleteOutlined /> Delete All
                                 </button>
                             </Popconfirm>
                             <button
@@ -1503,7 +1507,7 @@ const ProductCompliance = ({
                                 }])}
                                 className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs"
                             >
-                                <i className="fas fa-plus"></i> Add Row
+                                <PlusOutlined /> Add Row
                             </button>
                             </>
                             )}
@@ -1878,21 +1882,21 @@ const ProductCompliance = ({
                                                         className="p-1 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all"
                                                         title="Save Row"
                                                     >
-                                                        {savingMonthlyRow === idx ? <i className="fas fa-spinner fa-spin text-xs"></i> : <i className="fas fa-save text-xs"></i>}
+                                                        {savingMonthlyRow === idx ? <LoadingOutlined className="text-xs" /> : <SaveOutlined className="text-xs" />}
                                                     </button>
                                                     <button
                                                         onClick={cancelRow}
                                                         className="p-1 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all"
                                                         title="Cancel Changes"
                                                     >
-                                                        <i className="fas fa-undo text-xs"></i>
+                                                        <UndoOutlined className="text-xs" />
                                                     </button>
                                                     <button
                                                         onClick={()=>setMonthlyRows(prev => prev.filter((_, i) => i !== idx))}
                                                         className="p-1 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all"
                                                         title="Remove Row"
                                                     >
-                                                        <i className="fas fa-trash-alt text-xs"></i>
+                                                        <DeleteOutlined className="text-xs" />
                                                     </button>
                                                 </div>
                                                 )}
@@ -1913,34 +1917,28 @@ const ProductCompliance = ({
                     <div className="flex justify-between items-center mb-3">
                         <div className="flex items-center gap-2">
                              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider border-b pb-2 border-primary-100 flex items-center gap-2">
-                                <span className="bg-primary-50 text-primary-700 p-1.5 rounded-md"><i className="fas fa-recycle"></i></span>
+                                <span className="bg-primary-50 text-primary-700 p-1.5 rounded-md"><SyncOutlined /></span>
                                 Recycled Quantity Used
                             </h3>
                         </div>
                         <div className="flex gap-2">
                             {!isManager && (
                             <>
-                            <label className="cursor-pointer bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105">
-                                <i className="fas fa-file-excel"></i> Upload Excel
-                                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleRecycledExcelUpload} />
-                            </label>
-                            <button
-                                onClick={handleRecycledTemplateDownload}
-                                className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                            >
-                                <i className="fas fa-file-excel"></i> Template
-                            </button>
+                            <BulkUploadControl 
+                                onUpload={handleRecycledExcelUpload}
+                                onDownloadTemplate={handleRecycledTemplateDownload}
+                            />
                             <button
                                 onClick={handleRecycledExport}
                                 className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
                             >
-                                <i className="fas fa-download"></i> Export Excel
+                                <DownloadOutlined /> Export Excel
                             </button>
                             <button
                                 onClick={handleRecycledBulkSave}
                                 className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
                             >
-                                <i className="fas fa-save"></i> Save All
+                                <SaveOutlined /> Save All
                             </button>
                             <Popconfirm
                                 title="Are you sure you want to delete all rows?"
@@ -1951,11 +1949,11 @@ const ProductCompliance = ({
                                 <button
                                     className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
                                 >
-                                    <i className="fas fa-trash"></i> Delete All
+                                    <DeleteOutlined /> Delete All
                                 </button>
                             </Popconfirm>
                             <button onClick={addRecycledRow} className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs">
-                                <i className="fas fa-plus"></i> Add Row
+                                <PlusOutlined /> Add Row
                             </button>
                             </>
                             )}
@@ -2170,21 +2168,21 @@ const ProductCompliance = ({
                                                         className="p-1 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all"
                                                         title="Save Row"
                                                     >
-                                                        {savingRecycledRow === idx ? <i className="fas fa-spinner fa-spin text-xs"></i> : <i className="fas fa-save text-xs"></i>}
+                                                        {savingRecycledRow === idx ? <LoadingOutlined className="text-xs" /> : <SaveOutlined className="text-xs" />}
                                                     </button>
                                                     <button
                                                         onClick={() => cancelRecycledRow(idx)}
                                                         className="p-1 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all"
                                                         title="Cancel Changes"
                                                     >
-                                                        <i className="fas fa-undo text-xs"></i>
+                                                        <UndoOutlined className="text-xs" />
                                                     </button>
                                                     <button
                                                         onClick={()=>removeRecycledRow(idx)}
                                                         className="p-1 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all"
                                                         title="Remove Row"
                                                     >
-                                                        <i className="fas fa-trash-alt text-xs"></i>
+                                                        <DeleteOutlined className="text-xs" />
                                                     </button>
                                                 </div>
                                                 )}
@@ -2325,6 +2323,13 @@ const ProductCompliance = ({
                         </button>
                     </div>
                 </div>
+
+            <DocumentViewerModal
+                isOpen={viewerOpen}
+                onClose={() => setViewerOpen(false)}
+                documentUrl={viewerUrl}
+                documentName={viewerName}
+            />
             </div>
     );
 };

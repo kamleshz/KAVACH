@@ -1,6 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Tooltip, Button } from 'antd';
-import { HistoryOutlined } from '@ant-design/icons';
+import { 
+    HistoryOutlined, 
+    CheckCircleFilled, 
+    BankOutlined, 
+    EnvironmentOutlined, 
+    IdcardOutlined, 
+    PhoneOutlined, 
+    MailOutlined, 
+    SafetyCertificateOutlined, 
+    CloseCircleFilled, 
+    ClockCircleFilled, 
+    FileTextOutlined, 
+    FilePdfOutlined, 
+    CheckOutlined,
+    CloseOutlined,
+    EyeOutlined,
+    ProfileOutlined,
+    LoadingOutlined,
+    ArrowRightOutlined
+} from '@ant-design/icons';
+import DocumentViewerModal from '../DocumentViewerModal';
+import api from '../../services/api';
 
 const ConsentVerification = ({
     item,
@@ -18,13 +39,30 @@ const ConsentVerification = ({
     isSaving,
     handleNext
 }) => {
+    // Document Viewer State
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState('');
+    const [viewerName, setViewerName] = useState('');
+
+    const resolveUrl = (p) => {
+        if (!p) return '';
+        const isAbs = p.startsWith('http://') || p.startsWith('https://');
+        return isAbs ? p : `${api.defaults.baseURL}/${p}`;
+    };
+
+    const handleViewDocument = (filePath, docType, docName) => {
+        setViewerUrl(resolveUrl(filePath));
+        setViewerName(docName || docType);
+        setViewerOpen(true);
+    };
+
     return (
         <div className="space-y-8">
             
             {item.verification?.status === 'Verified' && (
                 <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-3 flex items-center gap-4 shadow-sm animate-fadeIn mb-6">
                     <div className="bg-green-100 p-2.5 rounded-full text-green-600">
-                        <i className="fas fa-check-circle text-lg"></i>
+                        <CheckCircleFilled className="text-lg" />
                     </div>
                     <div>
                         <p className="text-sm font-bold text-green-800">Verification Complete</p>
@@ -46,7 +84,7 @@ const ConsentVerification = ({
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow duration-300">
                     <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                         <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                            <i className="fas fa-industry text-primary-500"></i>
+                            <BankOutlined className="text-primary-500" />
                             Plant Information
                         </h2>
                     </div>
@@ -58,7 +96,7 @@ const ConsentVerification = ({
                         <div>
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Location</p>
                             <p className="font-medium text-gray-900 flex items-center gap-2">
-                                <i className="fas fa-map-pin text-gray-300"></i>
+                                <EnvironmentOutlined className="text-gray-300" />
                                 {item.plantLocation}
                             </p>
                         </div>
@@ -73,7 +111,7 @@ const ConsentVerification = ({
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow duration-300">
                     <div className="bg-gray-50 px-6 py-4 border-b border-gray-100">
                         <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                            <i className="fas fa-address-card text-primary-500"></i>
+                            <IdcardOutlined className="text-primary-500" />
                             Contact Details
                         </h2>
                     </div>
@@ -86,10 +124,10 @@ const ConsentVerification = ({
                             </div>
                             <div className="space-y-1">
                                 <p className="text-sm text-gray-600 flex items-center gap-2">
-                                    <i className="fas fa-phone text-gray-300 text-xs w-4"></i> {item.factoryHeadMobile}
+                                    <PhoneOutlined className="text-gray-300 text-xs w-4" /> {item.factoryHeadMobile}
                                 </p>
                                 <p className="text-sm text-gray-600 flex items-center gap-2">
-                                    <i className="fas fa-envelope text-gray-300 text-xs w-4"></i> {item.factoryHeadEmail}
+                                    <MailOutlined className="text-gray-300 text-xs w-4" /> {item.factoryHeadEmail}
                                 </p>
                             </div>
                         </div>
@@ -102,10 +140,10 @@ const ConsentVerification = ({
                             </div>
                             <div className="space-y-1">
                                 <p className="text-sm text-gray-600 flex items-center gap-2">
-                                    <i className="fas fa-phone text-gray-300 text-xs w-4"></i> {item.contactPersonMobile}
+                                    <PhoneOutlined className="text-gray-300 text-xs w-4" /> {item.contactPersonMobile}
                                 </p>
                                 <p className="text-sm text-gray-600 flex items-center gap-2">
-                                    <i className="fas fa-envelope text-gray-300 text-xs w-4"></i> {item.contactPersonEmail}
+                                    <MailOutlined className="text-gray-300 text-xs w-4" /> {item.contactPersonEmail}
                                 </p>
                             </div>
                         </div>
@@ -116,7 +154,7 @@ const ConsentVerification = ({
             {/* Verification Cards List */}
             <div className="space-y-6">
                 <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2 border-b pb-4">
-                    <i className="fas fa-check-double text-primary-600"></i>
+                    <SafetyCertificateOutlined className="text-primary-600" />
                     Consent Verification
                 </h3>
 
@@ -145,15 +183,15 @@ const ConsentVerification = ({
                                 <div>
                                     {isVerified ? (
                                         <span className="bg-green-100 text-green-700 px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-2">
-                                            <i className="fas fa-check-circle"></i> Verified
+                                            <CheckCircleFilled /> Verified
                                         </span>
                                     ) : isRejected ? (
                                         <span className="bg-red-100 text-red-700 px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-2">
-                                            <i className="fas fa-times-circle"></i> Rejected
+                                            <CloseCircleFilled /> Rejected
                                         </span>
                                     ) : (
                                         <span className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-2">
-                                            <i className="fas fa-clock"></i> Pending
+                                            <ClockCircleFilled /> Pending
                                         </span>
                                     )}
                                 </div>
@@ -206,18 +244,18 @@ const ConsentVerification = ({
 
                                     <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                                         <h4 className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
-                                            <i className="fas fa-file-alt"></i> User Document
+                                            <FileTextOutlined /> User Document
                                         </h4>
                                         {relItem.documentFile ? (
                                             <div className="flex items-center justify-between bg-white p-3 rounded border border-blue-200">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center text-red-500">
-                                                        <i className="fas fa-file-pdf"></i>
+                                                        <FilePdfOutlined />
                                                     </div>
                                                     <span className="text-sm font-medium text-gray-700">Uploaded File</span>
                                                 </div>
                                                 <button
-                                                    onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: relItem.documentFile, documentType: 'User Document', documentName: relItem.type === 'CTE' ? `CTE_${relItem.consentNo}` : `CTO_${relItem.consentOrderNo}` } } })}
+                                                    onClick={() => handleViewDocument(relItem.documentFile, 'User Document', relItem.type === 'CTE' ? `CTE_${relItem.consentNo}` : `CTO_${relItem.consentOrderNo}`)}
                                                     className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-200 font-bold transition-colors"
                                                 >
                                                     View
@@ -257,15 +295,15 @@ const ConsentVerification = ({
                                             />
                                             {file && (
                                                 <p className="mt-1 text-xs text-primary-600 font-medium flex items-center gap-1">
-                                                    <i className="fas fa-check"></i> Selected: {file.name}
+                                                    <CheckOutlined /> Selected: {file.name}
                                                 </p>
                                             )}
                                         </div>
                                         {relItem.verification?.document && (
                                             <div className="mt-2 flex items-center gap-2 text-xs bg-green-50 text-green-700 px-2 py-1 rounded border border-green-200 w-fit">
-                                                <i className="fas fa-check-circle"></i> 
+                                                <CheckCircleFilled /> 
                                                 <span>Proof Uploaded</span>
-                                                <button onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: relItem.verification.document, documentType: 'Verification Proof', documentName: `Proof_${relItem._id}` } } })} className="underline font-bold ml-1">View</button>
+                                                <button onClick={() => handleViewDocument(relItem.verification.document, 'Verification Proof', `Proof_${relItem._id}`)} className="underline font-bold ml-1">View</button>
                                             </div>
                                         )}
                                     </div>
@@ -290,14 +328,14 @@ const ConsentVerification = ({
                                             disabled={verifying || rejecting || isStepReadOnly()}
                                             className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                                         >
-                                            <i className="fas fa-check"></i> Verify
+                                            <CheckOutlined /> Verify
                                         </button>
                                         <button
                                             onClick={() => handleVerify('Rejected', relItem)}
                                             disabled={verifying || rejecting || isStepReadOnly()}
                                             className="flex-1 py-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                                         >
-                                            <i className="fas fa-times"></i> Reject
+                                            <CloseOutlined /> Reject
                                         </button>
                                     </div>
                                 </div>
@@ -311,7 +349,7 @@ const ConsentVerification = ({
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mt-6">
                     <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                         <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                            <i className="fas fa-clipboard-list text-primary-500"></i>
+                            <ProfileOutlined className="text-primary-500" />
                             CTO/CCA Additional Details
                         </h2>
                     </div>
@@ -334,10 +372,10 @@ const ConsentVerification = ({
                                 <div className="mt-2">
                                     {client?.productionFacility?.cgwaNocDocument ? (
                                         <button
-                                            onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: client.productionFacility.cgwaNocDocument, documentType: 'CGWA', documentName: 'CGWA NOC' } } })}
+                                            onClick={() => handleViewDocument(client.productionFacility.cgwaNocDocument, 'CGWA', 'CGWA NOC')}
                                             className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                                         >
-                                            <i className="fas fa-eye mr-1"></i> View
+                                            <EyeOutlined className="mr-1" /> View
                                         </button>
                                     ) : (
                                         <span className="text-gray-400 text-xs italic">No Doc</span>
@@ -374,6 +412,7 @@ const ConsentVerification = ({
                                                 <th className="p-3 font-semibold border-b w-20">SR No</th>
                                                 <th className="p-3 font-semibold border-b">Description (water consumption / waste)</th>
                                                 <th className="p-3 font-semibold border-b w-48">Permitted quantity</th>
+                                                <th className="p-3 font-semibold border-b w-24">UOM</th>
                                             </tr>
                                         </thead>
                                         <tbody className="text-sm divide-y divide-gray-100">
@@ -382,6 +421,7 @@ const ConsentVerification = ({
                                                     <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
                                                     <td className="p-3 text-gray-700">{row?.description || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.permittedQuantity || '-'}</td>
+                                                    <td className="p-3 text-gray-700">{row?.uom || '-'}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -397,6 +437,7 @@ const ConsentVerification = ({
                                                 <th className="p-3 font-semibold border-b w-20">SR No</th>
                                                 <th className="p-3 font-semibold border-b">Parameters</th>
                                                 <th className="p-3 font-semibold border-b w-80">Permissible annual / daily limit</th>
+                                                <th className="p-3 font-semibold border-b w-24">UOM</th>
                                             </tr>
                                         </thead>
                                         <tbody className="text-sm divide-y divide-gray-100">
@@ -405,6 +446,7 @@ const ConsentVerification = ({
                                                     <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
                                                     <td className="p-3 text-gray-700">{row?.parameter || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.permittedLimit || '-'}</td>
+                                                    <td className="p-3 text-gray-700">{row?.uom || '-'}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -424,6 +466,7 @@ const ConsentVerification = ({
                                                 <th className="p-3 font-semibold border-b">Name of Hazardous Waste</th>
                                                 <th className="p-3 font-semibold border-b">Facility &amp; Mode of Disposal</th>
                                                 <th className="p-3 font-semibold border-b w-40">Quantity MT/YR</th>
+                                                <th className="p-3 font-semibold border-b w-24">UOM</th>
                                             </tr>
                                         </thead>
                                         <tbody className="text-sm divide-y divide-gray-100">
@@ -433,6 +476,7 @@ const ConsentVerification = ({
                                                     <td className="p-3 text-gray-700">{row?.nameOfHazardousWaste || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.facilityModeOfDisposal || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.quantityMtYr || '-'}</td>
+                                                    <td className="p-3 text-gray-700">{row?.uom || '-'}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -450,10 +494,17 @@ const ConsentVerification = ({
                     disabled={isSaving}
                     className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-wait"
                 >
-                    {isSaving ? <i className="fas fa-spinner fa-spin"></i> : null}
-                    Next Step <i className="fas fa-arrow-right"></i>
+                    {isSaving ? <LoadingOutlined spin /> : null}
+                    Next Step <ArrowRightOutlined />
                 </button>
             </div>
+
+            <DocumentViewerModal
+                isOpen={viewerOpen}
+                onClose={() => setViewerOpen(false)}
+                documentUrl={viewerUrl}
+                documentName={viewerName}
+            />
         </div>
     );
 };

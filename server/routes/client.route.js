@@ -43,7 +43,10 @@ import {
     saveEWasteComplianceController,
     getEWasteComplianceController,
     uploadEWasteProductImageController,
-    saveEWasteROHSComplianceController
+    saveEWasteROHSComplianceController,
+    saveEWasteStorageComplianceController,
+    uploadEWasteStorageImageController,
+    saveEWasteAwarenessController
 } from '../controllers/eWasteCompliance.controller.js';
 
 const router = express.Router();
@@ -51,6 +54,9 @@ const router = express.Router();
 router.post('/:clientId/e-waste-compliance/upload-image', auth, upload.single('productImage'), uploadEWasteProductImageController);
 router.post('/:clientId/e-waste-compliance', auth, saveEWasteComplianceController);
 router.post('/:clientId/e-waste-compliance/rohs', auth, saveEWasteROHSComplianceController);
+router.post('/:clientId/e-waste-compliance/storage', auth, saveEWasteStorageComplianceController);
+router.post('/:clientId/e-waste-compliance/awareness', auth, saveEWasteAwarenessController);
+router.post('/:clientId/e-waste-compliance/storage/upload-image', auth, upload.single('storageImage'), uploadEWasteStorageImageController);
 router.get('/:clientId/e-waste-compliance', auth, getEWasteComplianceController);
 
 router.get('/:clientId/marking-labelling/events', auth, (req, res) => {
@@ -101,11 +107,13 @@ router.post('/:clientId/plant-process-progress', auth, updatePlantProcessProgres
 router.post('/:clientId/verify-facility', auth, upload.single('document'), verifyFacilityController);
 router.post('/:clientId/product-compliance', auth, saveProductComplianceController);
 router.put('/:clientId/product-compliance', auth, saveProductComplianceController);
+router.post('/:clientId/product-compliance-row-save', auth, saveProductComplianceController);
 router.get('/:clientId/product-compliance', auth, getProductComplianceController);
 router.get('/:clientId/all-product-compliance-rows', auth, getAllProductComplianceRowsController);
 router.post('/:clientId/product-compliance/upload-row', auth, upload.fields([
     { name: 'productImage', maxCount: 1 },
-    { name: 'componentImage', maxCount: 1 }
+    { name: 'componentImage', maxCount: 1 },
+    { name: 'additionalDocument', maxCount: 1 }
 ]), uploadProductComplianceRowController);
 
 router.post('/:clientId/sku-compliance', auth, saveSkuComplianceController);

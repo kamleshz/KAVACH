@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import useAuth from '../hooks/useAuth';
 import useOnClickOutside from '../hooks/useOnClickOutside';
+import { UserOutlined, DownOutlined, LogoutOutlined } from '@ant-design/icons';
 
 const DashboardLayout = () => {
   const [showDropdown, setShowDropdown] = useState(false);
@@ -51,10 +52,10 @@ const DashboardLayout = () => {
                 <p className="text-xs text-gray-500">{user?.email}</p>
               </div>
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md transition-transform group-hover:scale-105">
-                <i className="fas fa-user text-sm" />
+                <UserOutlined className="text-sm" />
               </div>
-              <i
-                className={`fas fa-chevron-down text-[10px] text-gray-400 transition-transform ${
+              <DownOutlined
+                className={`text-[10px] text-gray-400 transition-transform ${
                   showDropdown ? 'rotate-180' : ''
                 }`}
               />
@@ -84,7 +85,7 @@ const DashboardLayout = () => {
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 text-gray-600">
-                    <i className="fas fa-user text-xs" />
+                    <UserOutlined className="text-xs" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-900">Profile</p>
@@ -100,7 +101,7 @@ const DashboardLayout = () => {
                   className="mt-1 flex w-full items-center gap-3 border-t border-gray-100 px-4 py-3 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600">
-                    <i className="fas fa-sign-out-alt text-xs" />
+                    <LogoutOutlined className="text-xs" />
                   </div>
                   <div>
                     <p className="text-sm font-medium">Logout</p>

@@ -17,6 +17,7 @@ const skuComplianceSchema = new mongoose.Schema({
   markingImage: [{ type: String }], 
   compostableRegNo: { type: String, default: "" },
   remarks: [{ type: String }],
+  complianceRemarks: [{ type: String }],
 }, { timestamps: true });
 
 skuComplianceSchema.index({ client: 1, skuCode: 1 });

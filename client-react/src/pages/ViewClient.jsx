@@ -11,6 +11,7 @@ import useSkuCompliance from '../hooks/useSkuCompliance';
 import { getPostValidationColumns } from '../components/AddClientSteps/utils/postAuditColumns';
 import { generateMarkingLabellingReport, generateSkuComplianceReport, buildCategoryProcurementSummary, buildPolymerProcurementSummary } from '../components/AddClientSteps/utils/reportUtils';
 import { parseRemarksToItems } from '../utils/pdfHelpers';
+import DocumentViewerModal from '../components/DocumentViewerModal';
 
 const ViewClient = () => {
   const { id } = useParams();
@@ -21,6 +22,23 @@ const ViewClient = () => {
   
   // Unlock State for Post-Audit
   const [isPostAuditUnlocked, setIsPostAuditUnlocked] = useState(false);
+
+  // Document Viewer State
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerName, setViewerName] = useState('');
+
+  const resolveUrl = (p) => {
+    if (!p) return '';
+    const isAbs = p.startsWith('http://') || p.startsWith('https://');
+    return isAbs ? p : `${api.defaults.baseURL}/${p}`;
+  };
+
+  const handleViewDocument = (filePath, docType, docName) => {
+    setViewerUrl(resolveUrl(filePath));
+    setViewerName(docName || docType);
+    setViewerOpen(true);
+  };
 
   useEffect(() => {
     const unlocked = localStorage.getItem(`postAuditUnlocked_${id}`) === 'true';
@@ -37,7 +55,7 @@ const ViewClient = () => {
   };
   
   // Post-Audit State (reusing logic from AddClient)
-  const [postValidationActiveTab, setPostValidationActiveTab] = useState('markingLabelling');
+  const [postValidationActiveTab, setPostValidationActiveTab] = useState('productAssessment');
   const [postValidationData, setPostValidationData] = useState([]);
   const [postValidationSearch, setPostValidationSearch] = useState('');
   const [postValidationPagination, setPostValidationPagination] = useState({ current: 1, pageSize: 10 });
@@ -107,7 +125,8 @@ const ViewClient = () => {
       handleImageRemove: noOp, // Read-only
       loading: false,
       readOnly: !isPostAuditUnlocked, // Ensure columns respect read-only if supported, otherwise actions are disabled via noOp
-      parseRemarksToItems // Passed utility function
+      parseRemarksToItems, // Passed utility function
+      onViewDocument: handleViewDocument
   });
 
   // Filter logic for Post Audit
@@ -183,6 +202,8 @@ const ViewClient = () => {
             handleSkuPageChange={(page, pageSize) => setSkuPagination({ ...skuPagination, current: page, pageSize })}
             handleSkuPageSizeChange={(current, size) => setSkuPagination({ ...skuPagination, current: 1, pageSize: size })}
             readOnly={!isPostAuditUnlocked}
+            applicationType="CTO"
+            selectedPlantId={fullClientData?.productionFacility?.ctoDetailsList?.[0]?._id}
             // Add other required props with empty/default values
             regulationsCoveredUnderCto={[]}
             waterRegulationsRows={[]}
@@ -248,6 +269,12 @@ const ViewClient = () => {
             className="custom-tabs"
         />
       )}
+      <DocumentViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        documentUrl={viewerUrl}
+        documentName={viewerName}
+      />
     </div>
   );
 };

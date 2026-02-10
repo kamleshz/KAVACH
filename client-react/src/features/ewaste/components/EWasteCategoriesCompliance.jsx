@@ -2,9 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Popconfirm, Button } from 'antd';
 import { FileExcelOutlined, SaveOutlined, DeleteOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
-import api from '../../services/api';
-import { API_ENDPOINTS } from '../../services/apiEndpoints';
-import { E_WASTE_DATA } from '../../constants/EWasteData';
+import api from '../../../services/api';
+import { API_ENDPOINTS } from '../../../services/apiEndpoints';
+import { E_WASTE_DATA } from '../constants/EWasteData';
+import { useExcelImport } from '../../../hooks/useExcelImport';
+import BulkUploadControl from '../../../components/common/BulkUploadControl';
+import { E_WASTE_CATEGORIES_TEMPLATE } from '../../../constants/excelTemplates';
 
 const EEE_CATEGORIES = [
     "Information Technology and Telecommunication Equipment",
@@ -23,6 +26,45 @@ const EWasteCategoriesCompliance = ({ clientId, clientName, isManager = false })
     const [savingRow, setSavingRow] = useState(null); // Track which row is being saved
     const [page, setPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const { importData, downloadTemplate, isLoading } = useExcelImport();
+
+    const handleExcelUpload = (e) => {
+        importData(e, (data) => {
+            const newRows = data.map((row, index) => {
+                const newRow = {
+                    id: Date.now() + index,
+                    categoryCode: row["Category Code"] || '',
+                    productName: row["Product Name"] || '',
+                    productImage: null,
+                    categoryEEE: row["Category of EEE"] || '',
+                    eeeCode: row["EEE Code"] || '',
+                    listEEE: row["List of EEE"] || '',
+                    avgLife: row["Product Avg Life"] || '',
+                    salesDate: row["Sales / Import Date"] || '',
+                    tentativeEndLife: '',
+                    quantity: row["Quantity sold/Imported in MT"] || ''
+                };
+
+                // Calculate tentativeEndLife
+                if (newRow.avgLife && newRow.salesDate) {
+                    const date = new Date(newRow.salesDate);
+                    if (!isNaN(date.getTime())) {
+                        const yearsToAdd = Number(newRow.avgLife);
+                        if (!isNaN(yearsToAdd)) {
+                            date.setFullYear(date.getFullYear() + yearsToAdd);
+                            const yyyy = date.getFullYear();
+                            const mm = String(date.getMonth() + 1).padStart(2, '0');
+                            const dd = String(date.getDate()).padStart(2, '0');
+                            newRow.tentativeEndLife = `${yyyy}-${mm}-${dd}`;
+                        }
+                    }
+                }
+                return newRow;
+            });
+            
+            setRows(prev => [...prev, ...newRows]);
+        });
+    };
 
     useEffect(() => {
         const fetchComplianceData = async () => {
@@ -350,18 +392,12 @@ const EWasteCategoriesCompliance = ({ clientId, clientName, isManager = false })
                 <div className="flex gap-2">
                     {!isManager && (
                         <>
-                            <button 
-                                className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                                onClick={() => toast.info('Excel upload not implemented yet')}
-                            >
-                                <FileExcelOutlined /> Upload Excel
-                            </button>
-                            <button 
-                                className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
-                                onClick={() => toast.info('Template download not implemented yet')}
-                            >
-                                <FileExcelOutlined /> Template
-                            </button>
+                            <BulkUploadControl
+                                onUpload={handleExcelUpload}
+                                onDownloadTemplate={() => downloadTemplate(E_WASTE_CATEGORIES_TEMPLATE)}
+                                uploadLabel="Upload Excel"
+                                templateLabel="Template"
+                            />
                             <Popconfirm
                                 title="Are you sure you want to delete all rows?"
                                 onConfirm={() => setRows([])}

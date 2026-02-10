@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Table, Select, Input, Button, Upload, ConfigProvider, Radio } from 'antd';
 import { UploadOutlined, PlusOutlined } from '@ant-design/icons';
 import { FaCheckCircle, FaFileContract, FaSave, FaEdit, FaUndo, FaTrashAlt } from 'react-icons/fa';
 import { useClientContext } from '../../context/ClientContext';
 import { getWasteTypeConfig } from '../../constants/WasteTypeConfig';
+import DocumentViewerModal from '../DocumentViewerModal';
 
 const CompanyDocument = ({
     msmeRows,
@@ -17,6 +18,16 @@ const CompanyDocument = ({
 }) => {
     const { formData, handleChange, handleFileChange } = useClientContext();
     const currentConfig = getWasteTypeConfig(formData.wasteType);
+    
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState('');
+    const [viewerName, setViewerName] = useState('');
+
+    const handleViewDocument = (url, name) => {
+        setViewerUrl(url);
+        setViewerName(name);
+        setViewerOpen(true);
+    };
 
     // Hardcode logic for debugging/persistence
     const isEwaste = 
@@ -93,14 +104,13 @@ const CompanyDocument = ({
                                     </span>
                                 )}
                                 {formData[pathField] && !formData[fileField] && (
-                                    <a 
-                                        href={formData[pathField]} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-primary-600 hover:underline text-xs flex items-center gap-1"
+                                    <button 
+                                        type="button"
+                                        onClick={() => handleViewDocument(formData[pathField], fileLabel)}
+                                        className="text-primary-600 hover:underline text-xs flex items-center gap-1 bg-transparent border-0 p-0 cursor-pointer"
                                     >
                                         <FaFileContract /> View Uploaded
-                                    </a>
+                                    </button>
                                 )}
                             </div>
                         </div>
@@ -206,14 +216,13 @@ const CompanyDocument = ({
                                             </div>
                                         )}
                                         {formData[`${doc.key}FilePath`] && !formData[`${doc.key}File`] && (
-                                            <a 
-                                                href={formData[`${doc.key}FilePath`]} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="text-primary-600 hover:underline text-xs flex items-center gap-1 mt-1"
+                                            <button 
+                                                type="button"
+                                                onClick={() => handleViewDocument(formData[`${doc.key}FilePath`], doc.label)}
+                                                className="text-primary-600 hover:underline text-xs flex items-center gap-1 mt-1 bg-transparent border-0 p-0 cursor-pointer"
                                             >
                                                 <FaFileContract /> View Existing
-                                            </a>
+                                            </button>
                                         )}
                                     </div>
                                 </td>
@@ -365,15 +374,14 @@ const CompanyDocument = ({
                                 ) : (
                                     record.certificateFile ? (
                                         typeof record.certificateFile === 'string' ? (
-                                            <a 
-                                                href={record.certificateFile} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-1 text-primary-600 hover:underline"
+                                            <button 
+                                                type="button"
+                                                onClick={() => handleViewDocument(record.certificateFile, 'MSME Certificate')}
+                                                className="flex items-center gap-1 text-primary-600 hover:underline bg-transparent border-0 p-0 cursor-pointer"
                                             >
                                                 <FaFileContract className="text-xs" />
                                                 <span className="text-xs">View Certificate</span>
-                                            </a>
+                                            </button>
                                         ) : (
                                             <div className="flex items-center gap-1 text-green-600">
                                                 <FaCheckCircle className="text-xs" />
@@ -445,6 +453,13 @@ const CompanyDocument = ({
                     </button>
                 </div>
             )}
+
+            <DocumentViewerModal
+                isOpen={viewerOpen}
+                onClose={() => setViewerOpen(false)}
+                documentUrl={viewerUrl}
+                documentName={viewerName}
+            />
         </div>
     );
 };

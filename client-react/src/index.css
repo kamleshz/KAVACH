@@ -14,6 +14,11 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Apply Nunito font globally to all elements including Ant Design components */
+  * {
+    font-family: Nunito, sans-serif !important;
+  }
+
   input, textarea, select, button {
     font-family: Nunito, sans-serif !important;
   }
@@ -135,7 +140,7 @@
 }
 
 .ant-table-wrapper .ant-table-thead > tr > th {
-  @apply !bg-gray-50 !text-gray-600 !font-bold;
+  @apply !bg-gray-50 !text-gray-600 !font-bold !text-center;
 }
 
 .sku-compliance-table .ant-table-thead > tr > th {
@@ -160,4 +165,9 @@
 .compliance-select-red .ant-select-selector {
   background-color: #fca5a5 !important; /* red-300 */
   border-color: #f87171 !important; /* red-400 */
+}
+
+/* Center align all custom table headers */
+table thead th {
+  text-align: center !important;
 }

@@ -1,32 +1,39 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import useAuth from './hooks/useAuth';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import DashboardLayout from './layouts/DashboardLayout';
-import DashboardHome from './pages/DashboardHome';
-import Clients from './pages/Clients';
-import ClientDetail from './pages/ClientDetail';
-import AddClient from './pages/AddClient';
-import ClientTypeSelection from './pages/ClientTypeSelection';
-import EWasteCategorySelection from './pages/EWasteCategorySelection';
-import WasteTypeSelection from './pages/WasteTypeSelection';
-import EditClient from './pages/EditClient';
-import ClientGroupSearch from './pages/ClientGroupSearch';
-import ClientValidation from './pages/ClientValidation';
-import PlantProcess from './pages/PlantProcess';
-import EWasteProcess from './pages/EWasteProcess';
-import DocumentViewer from './pages/DocumentViewer';
-import AdminPanel from './pages/AdminPanel';
-import LoginLogs from './pages/LoginLogs';
-import CompanyManagement from './pages/CompanyManagement';
-import KPIDashboard from './pages/KPIDashboard';
-import ViewClient from './pages/ViewClient';
 import PrivateRoute from './components/PrivateRoute';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './index.css';
+
+// Lazy load heavy components
+const DashboardHome = lazy(() => import('./pages/DashboardHome'));
+const Clients = lazy(() => import('./pages/Clients'));
+const ClientDetail = lazy(() => import('./pages/ClientDetail'));
+const AddClient = lazy(() => import('./pages/AddClient'));
+const ClientTypeSelection = lazy(() => import('./pages/ClientTypeSelection'));
+const EWasteCategorySelection = lazy(() => import('./features/ewaste/pages/EWasteCategorySelection'));
+const WasteTypeSelection = lazy(() => import('./pages/WasteTypeSelection'));
+const EditClient = lazy(() => import('./pages/EditClient'));
+const ClientGroupSearch = lazy(() => import('./pages/ClientGroupSearch'));
+const ClientValidation = lazy(() => import('./pages/ClientValidation'));
+const PlantProcess = lazy(() => import('./pages/PlantProcess'));
+const EWasteProcess = lazy(() => import('./features/ewaste/pages/EWasteProcess'));
+const AdminPanel = lazy(() => import('./pages/AdminPanel'));
+const LoginLogs = lazy(() => import('./pages/LoginLogs'));
+const CompanyManagement = lazy(() => import('./pages/CompanyManagement'));
+const KPIDashboard = lazy(() => import('./pages/KPIDashboard'));
+const ViewClient = lazy(() => import('./pages/ViewClient'));
+
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+  </div>
+);
 
 function App() {
   const { checkAuth } = useAuth();
@@ -38,18 +45,19 @@ function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ToastContainer position="top-right" autoClose={3000} />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <DashboardLayout />
-            </PrivateRoute>
-          }
-        >
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <DashboardLayout />
+              </PrivateRoute>
+            }
+          >
           <Route index element={<DashboardHome />} />
           <Route path="clients" element={<Clients />} />
           <Route path="client/:id" element={<ClientDetail />} />
@@ -63,8 +71,6 @@ function App() {
           <Route path="client/:id/validate" element={<ClientValidation />} />
           <Route path="client/:clientId/process-plant/:type/:itemId" element={<PlantProcess />} />
           <Route path="client/:clientId/process-ewaste/:type/:itemId" element={<EWasteProcess />} />
-          <Route path="client/:id/document/:docId" element={<DocumentViewer />} />
-          <Route path="document-viewer" element={<DocumentViewer />} />
           <Route path="profile" element={<DashboardHome />} />
           <Route
             path="admin"
@@ -108,7 +114,8 @@ function App() {
           />
         </Route>
         <Route path="/" element={<Navigate to="/login" replace />} />
-      </Routes>
+        </Routes>
+      </Suspense>
     </Router>
   );
 }

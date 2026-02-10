@@ -3,12 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Modal, Button, Tooltip, Tabs, Card, Tag } from 'antd';
 import { HistoryOutlined } from '@ant-design/icons';
 import { FaCheckDouble, FaBoxes, FaBullhorn, FaCheck, FaArrowLeft, FaClipboardCheck } from 'react-icons/fa';
-import api from '../services/api';
-import { API_ENDPOINTS } from '../services/apiEndpoints';
-import useAuth from '../hooks/useAuth';
-import ConsentVerification from '../components/PlantProcessSteps/ConsentVerification';
-import EWasteCategoriesCompliance from '../components/EWasteProcessSteps/EWasteCategoriesCompliance';
-import EWasteROHSCompliance from '../components/EWasteProcessSteps/EWasteROHSCompliance';
+import api from '../../../services/api';
+import { API_ENDPOINTS } from '../../../services/apiEndpoints';
+import useAuth from '../../../hooks/useAuth';
+import ConsentVerification from '../../../components/PlantProcessSteps/ConsentVerification';
+import EWasteCategoriesCompliance from '../components/EWasteCategoriesCompliance';
+import EWasteROHSCompliance from '../components/EWasteROHSCompliance';
+import EWasteStorage from '../components/EWasteStorage';
+import EWasteAwareness from '../components/EWasteAwareness';
 import { toast } from 'react-toastify';
 
 const EWasteProcess = ({ clientId: propClientId, type: propType, itemId: propItemId, onBack }) => {
@@ -26,6 +28,7 @@ const EWasteProcess = ({ clientId: propClientId, type: propType, itemId: propIte
     
     // Steps State
     const [activeTab, setActiveTab] = useState('verification');
+    const [productSubTab, setProductSubTab] = useState('categories');
     const [completedSteps, setCompletedSteps] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -416,33 +419,43 @@ const EWasteProcess = ({ clientId: propClientId, type: propType, itemId: propIte
 
                 {activeTab === 'product-check' && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-h-[600px]">
-                        <Tabs 
-                            defaultActiveKey="categories" 
-                            type="card"
-                            items={[
-                                {
-                                    key: 'categories',
-                                    label: 'Categories Wise EEE Compliance',
-                                    children: <EWasteCategoriesCompliance clientId={clientId} clientName={client?.clientName} />
-                                },
-                                {
-                                    key: 'rohs',
-                                    label: 'RoHS Compliance',
-                                    children: <EWasteROHSCompliance clientId={clientId} />
-                                },
-                                {
-                                    key: 'storage',
-                                    label: 'Storage E-Waste',
-                                    children: (
-                                        <div className="p-8 text-center border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
-                                            <FaBoxes className="mx-auto text-4xl text-orange-300 mb-4" />
-                                            <h3 className="text-lg font-medium text-gray-900">Storage E-Waste</h3>
-                                            <p className="text-gray-500">This module is under development.</p>
-                                        </div>
-                                    )
-                                }
-                            ]}
-                        />
+                        {/* Custom Tabs */}
+                        <div className="mb-6">
+                            <div className="bg-gray-100 p-1.5 rounded-lg">
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        { id: 'categories', label: 'Categories Wise EEE Compliance' },
+                                        { id: 'rohs', label: 'RoHS Compliance' },
+                                        { id: 'storage', label: 'Storage E-Waste' }
+                                    ].map((tab) => {
+                                        const isCurrent = productSubTab === tab.id;
+                                        return (
+                                            <button
+                                                key={tab.id}
+                                                onClick={() => setProductSubTab(tab.id)}
+                                                className={`
+                                                    flex-1 flex items-center justify-center px-4 py-3 rounded-md text-sm font-medium transition-all min-w-[140px]
+                                                    ${isCurrent 
+                                                        ? 'bg-white text-gray-800 shadow-sm border border-gray-200' 
+                                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+                                                    }
+                                                `}
+                                            >
+                                                <span className={isCurrent ? "font-bold" : ""}>{tab.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="mt-4">
+                            {productSubTab === 'categories' && <EWasteCategoriesCompliance clientId={clientId} clientName={client?.clientName} />}
+                            {productSubTab === 'rohs' && <EWasteROHSCompliance clientId={clientId} />}
+                            {productSubTab === 'storage' && <EWasteStorage clientId={clientId} />}
+                        </div>
+
                         <div className="mt-8 pt-4 border-t flex justify-end">
                             <Button 
                                 type="primary" 
@@ -458,11 +471,7 @@ const EWasteProcess = ({ clientId: propClientId, type: propType, itemId: propIte
 
                 {activeTab === 'awareness' && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-h-[400px]">
-                        <div className="p-8 text-center border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 mb-6">
-                            <FaBullhorn className="mx-auto text-4xl text-blue-300 mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900">Awareness Programs</h3>
-                            <p className="text-gray-500">This module is under development.</p>
-                        </div>
+                        <EWasteAwareness clientId={clientId} />
                         <div className="mt-8 pt-4 border-t flex justify-end">
                             <Button 
                                 type="primary" 

@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LuFactory, LuRecycle, LuCpu, LuWrench, LuArrowLeft, LuArrowRight, LuClock } from 'react-icons/lu';
 import { toast } from 'react-toastify';
-import useAuth from '../hooks/useAuth';
+import useAuth from '../../../hooks/useAuth';
 
 const EWasteCategorySelection = () => {
   const navigate = useNavigate();

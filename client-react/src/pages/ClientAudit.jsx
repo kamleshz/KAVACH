@@ -22,9 +22,10 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import ProductComplianceStep from '../components/ProductComplianceStep';
+import DocumentViewerModal from '../components/DocumentViewerModal';
 
 // New Consent Verification Row Component matching the image
-const ConsentVerificationRow = ({ item, type, onVerify, isSubmitting, resolveUrl }) => {
+const ConsentVerificationRow = ({ item, type, onVerify, isSubmitting, resolveUrl, onViewDocument }) => {
     const [localRemark, setLocalRemark] = useState(item.verification?.remark || '');
     const [file, setFile] = useState(null);
     const [status, setStatus] = useState(item.verification?.status || 'Pending');
@@ -79,14 +80,12 @@ const ConsentVerificationRow = ({ item, type, onVerify, isSubmitting, resolveUrl
                             </div>
                         </div>
                         {item.documentFile && (
-                            <a 
-                                href={resolveUrl(item.documentFile)} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
+                            <button 
+                                onClick={() => onViewDocument(item.documentFile, 'User Document', 'User Document')}
                                 className="px-3 py-1 bg-white text-blue-600 text-xs font-bold rounded border border-blue-200 hover:bg-blue-50"
                             >
                                 View
-                            </a>
+                            </button>
                         )}
                     </div>
                 </div>
@@ -245,6 +244,17 @@ const ClientAudit = () => {
     const [selectedPlant, setSelectedPlant] = useState(null); // Contains the grouped plant data
     const [loading, setLoading] = useState(false);
     const [verifiedClients, setVerifiedClients] = useState([]);
+
+    // Document Viewer State
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState('');
+    const [viewerName, setViewerName] = useState('');
+
+    const handleViewDocument = (filePath, docType, docName) => {
+        setViewerUrl(resolveUrl(filePath));
+        setViewerName(docName || docType);
+        setViewerOpen(true);
+    };
 
     // Fetch verified clients on mount
     useEffect(() => {
@@ -601,8 +611,8 @@ const ClientAudit = () => {
 
                                 // Combine Products
                                 const combinedProducts = [
-                                    ...cteProd.map(r => ({ ...r, type: 'CTE', _rawType: 'cte', capacity: r.maxCapacityPerYear, capacityUnit: r.unit || 'MT/Year' })),
-                                    ...ctoProds.map(r => ({ ...r, type: 'CTO', _rawType: 'cto', capacity: r.quantity, capacityUnit: r.unit || 'MT' }))
+                                    ...cteProd.map(r => ({ ...r, type: 'CTE', _rawType: 'cte', capacity: r.maxCapacityPerYear, capacityUnit: r.uom || 'MT/Year' })),
+                                    ...ctoProds.map(r => ({ ...r, type: 'CTO', _rawType: 'cto', capacity: r.quantity, capacityUnit: r.uom || 'MT' }))
                                 ];
 
                                 // Audit Button Logic
@@ -762,19 +772,17 @@ const ClientAudit = () => {
                                                                                     </div>
                                                                                 </td>
                                                                                 <td className="p-3">
-                                                                                    {r.documentFile ? (
-                                                                                        <a
-                                                                                            href={resolveUrl(r.documentFile)}
-                                                                                            target="_blank"
-                                                                                            rel="noopener noreferrer"
-                                                                                            className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                                                                                        >
-                                                                                            <FaFileUpload className="mr-1" /> View
-                                                                                        </a>
-                                                                                    ) : (
-                                                                                        <span className="text-gray-400 text-xs italic">No Doc</span>
-                                                                                    )}
-                                                                                </td>
+                                                    {r.documentFile ? (
+                                                        <button
+                                                            onClick={() => handleViewDocument(r.documentFile, 'CTE Document', `CTE_${r.consentNo}`)}
+                                                            className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                                                        >
+                                                            <FaFileUpload className="mr-1" /> View
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-gray-400 text-xs italic">No Doc</span>
+                                                    )}
+                                                </td>
                                                                                 <td className="p-3 text-center">
                                                                                     {r.verification?.status === 'Verified' ? (
                                                                                         <div className="flex flex-col items-center">
@@ -887,19 +895,17 @@ const ClientAudit = () => {
                                                                                     </div>
                                                                                 </td>
                                                                                 <td className="p-3">
-                                                                                    {r.documentFile ? (
-                                                                                        <a
-                                                                                            href={resolveUrl(r.documentFile)}
-                                                                                            target="_blank"
-                                                                                            rel="noopener noreferrer"
-                                                                                            className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                                                                                        >
-                                                                                            <FaFileUpload className="mr-1" /> View
-                                                                                        </a>
-                                                                                    ) : (
-                                                                                        <span className="text-gray-400 text-xs italic">No Doc</span>
-                                                                                    )}
-                                                                                </td>
+                                                    {r.documentFile ? (
+                                                        <button
+                                                            onClick={() => handleViewDocument(r.documentFile, 'CTO Document', `CTO_${r.consentOrderNo}`)}
+                                                            className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                                                        >
+                                                            <FaFileUpload className="mr-1" /> View
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-gray-400 text-xs italic">No Doc</span>
+                                                    )}
+                                                </td>
                                                                                 <td className="p-3 text-center">
                                                                                     {r.verification?.status === 'Verified' ? (
                                                                                         <div className="flex flex-col items-center">
@@ -1261,6 +1267,7 @@ const ClientAudit = () => {
                                                             item={item}
                                                             type="CTE"
                                                             resolveUrl={resolveUrl}
+                                                            onViewDocument={handleViewDocument}
                                                             onVerify={(s, r, f) => handleUpdate('cteDetailsList', item.originalIndex, s, r, f)}
                                                         />
                                                     ))}
@@ -1271,6 +1278,7 @@ const ClientAudit = () => {
                                                             item={item}
                                                             type="CTO"
                                                             resolveUrl={resolveUrl}
+                                                            onViewDocument={handleViewDocument}
                                                             onVerify={(s, r, f) => handleUpdate('ctoDetailsList', item.originalIndex, s, r, f)}
                                                         />
                                                     ))}
@@ -1334,6 +1342,13 @@ const ClientAudit = () => {
                     </div>
                 )}
             </div>
+
+            <DocumentViewerModal
+                isOpen={viewerOpen}
+                onClose={() => setViewerOpen(false)}
+                documentUrl={viewerUrl}
+                documentName={viewerName}
+            />
         </div>
     );
 };

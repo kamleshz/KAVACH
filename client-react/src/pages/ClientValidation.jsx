@@ -4,8 +4,28 @@ import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { FaCheckCircle, FaSpinner } from 'react-icons/fa';
+import { 
+  FaCheckCircle, 
+  FaSpinner, 
+  FaFileContract, 
+  FaUser, 
+  FaMapMarkerAlt, 
+  FaFileInvoice,
+  FaIndustry,
+  FaCheck,
+  FaCommentAlt,
+  FaArrowLeft,
+  FaFilePdf,
+  FaCheckDouble,
+  FaPencilAlt,
+  FaListAlt,
+  FaFolderOpen,
+  FaFile,
+  FaEye,
+  FaBuilding
+} from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import DocumentViewerModal from '../components/DocumentViewerModal';
 
 const ClientValidation = ({ clientId: propClientId, embedded = false, onComplete }) => {
   const { id: paramId } = useParams();
@@ -25,6 +45,11 @@ const ClientValidation = ({ clientId: propClientId, embedded = false, onComplete
   const [engagementContent, setEngagementContent] = useState('');
   const [isEditingLetter, setIsEditingLetter] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  
+  // Document Viewer State
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerName, setViewerName] = useState('');
 
   useEffect(() => {
     fetchClientDetails();
@@ -774,12 +799,18 @@ Date: ___________________`;
     return isAbs ? p : `${api.defaults.baseURL}/${p}`;
   };
 
+  const handleViewDocument = (filePath, docType, docName) => {
+    setViewerUrl(resolveUrl(filePath));
+    setViewerName(docName || docType);
+    setViewerOpen(true);
+  };
+
   const tabs = [
-    { number: 1, title: 'Engagement Letter', description: 'Agreement & Terms', icon: 'fas fa-file-contract' },
-    { number: 2, title: 'Client Basic Info', description: 'Legal & Trade Details', icon: 'fas fa-user' },
-    { number: 3, title: 'Company Address', description: 'Registered & Communication', icon: 'fas fa-map-marker-alt' },
-    { number: 4, title: 'Company Documents', description: 'GST, PAN, CIN, etc.', icon: 'fas fa-file-shield' },
-    { number: 5, title: 'CTE & CTO/CCA', description: 'Consent Details', icon: 'fas fa-industry' }
+    { number: 1, title: 'Engagement Letter', description: 'Agreement & Terms', icon: <FaFileContract /> },
+    { number: 2, title: 'Client Basic Info', description: 'Legal & Trade Details', icon: <FaUser /> },
+    { number: 3, title: 'Company Address', description: 'Registered & Communication', icon: <FaMapMarkerAlt /> },
+    { number: 4, title: 'Company Documents', description: 'GST, PAN, CIN, etc.', icon: <FaFileInvoice /> },
+    { number: 5, title: 'CTE & CTO/CCA', description: 'Consent Details', icon: <FaIndustry /> }
   ];
 
   const VerifyButton = ({ id, label = "Verify" }) => (
@@ -792,7 +823,7 @@ Date: ___________________`;
                 : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
             }`}
         >
-            <i className={`fas ${isVerified(id) ? 'fa-check-circle' : 'fa-check'}`}></i>
+            {isVerified(id) ? <FaCheckCircle /> : <FaCheck />}
             {isVerified(id) ? 'Verified' : label}
         </button>
         <button
@@ -804,7 +835,7 @@ Date: ___________________`;
             }`}
             title={verificationRemarks[id] || "Add Remark"}
         >
-            <i className="fas fa-comment-alt text-xs"></i>
+            <FaCommentAlt className="text-xs" />
         </button>
     </div>
   );
@@ -901,14 +932,14 @@ Date: ___________________`;
             className="group flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-500 shadow-md transition-all hover:bg-primary-600 hover:text-white"
             title="Back to Clients"
           >
-            <i className="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+            <FaArrowLeft className="transition-transform group-hover:-translate-x-1" />
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Validate: {client.clientName}</h1>
             <p className="text-sm text-gray-500">Verify client details and documents</p>
             {client.validationDetails?.validatedBy && (
               <p className="text-sm text-green-600 mt-1 font-medium">
-                <i className="fas fa-check-circle mr-1"></i>
+                <FaCheckCircle className="mr-1 inline" />
                 Verified by: {client.validationDetails.validatedBy.name}
               </p>
             )}
@@ -919,14 +950,14 @@ Date: ___________________`;
                 onClick={() => generateValidationPDF(client, client.validationDetails || {})}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 font-semibold shadow-md"
             >
-                <i className="fas fa-file-pdf"></i>
+                <FaFilePdf />
                 Download Report
             </button>
             <button
                 onClick={handleCompleteValidation}
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 font-semibold shadow-md"
             >
-                <i className="fas fa-check-double"></i>
+                <FaCheckDouble />
                 Complete Validation
             </button>
         </div>
@@ -955,7 +986,7 @@ Date: ___________________`;
                             >
                                 <span className={isCurrent ? "font-bold" : ""}>{tab.title}</span>
                                 {verified && (
-                                    <i className="fas fa-check-circle ml-2 text-green-500 text-lg"></i>
+                                    <FaCheckCircle className="ml-2 text-green-500 text-lg" />
                                 )}
                             </button>
                         );
@@ -971,7 +1002,7 @@ Date: ___________________`;
               <div className="rounded-xl border border-gray-200 bg-white">
                 <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl flex justify-between items-center">
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                    <i className="fas fa-file-contract text-primary-600"></i>
+                    <FaFileContract className="text-primary-600" />
                     Engagement Letter
                   </span>
                   <div className="flex items-center gap-2">
@@ -981,7 +1012,7 @@ Date: ___________________`;
                             className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 mr-2 flex items-center gap-1"
                             title="Save as PDF to Documents"
                         >
-                            <i className="fas fa-file-pdf"></i>
+                            <FaFilePdf />
                             Save as PDF
                         </button>
                     )}
@@ -1006,7 +1037,7 @@ Date: ___________________`;
                             className="text-gray-400 hover:text-primary-600 transition-colors"
                             title="Edit Content"
                         >
-                            <i className="fas fa-pencil-alt"></i>
+                            <FaPencilAlt />
                         </button>
                     )}
                     <VerifyButton id="tab1_engagement" />
@@ -1035,7 +1066,7 @@ Date: ___________________`;
               <div className="rounded-xl border border-gray-200 bg-white">
                 <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl flex justify-between items-center">
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                    <i className="fas fa-list-alt text-primary-600"></i>
+                    <FaListAlt className="text-primary-600" />
                     Overview
                   </span>
                   <VerifyButton id="tab2_overview" />
@@ -1121,7 +1152,7 @@ Date: ___________________`;
               <div className="rounded-xl border border-gray-200 bg-white">
                 <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl flex justify-between items-center">
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                    <i className="fas fa-map-marker-alt text-primary-600"></i>
+                    <FaMapMarkerAlt className="text-primary-600" />
                     Company Address Details
                   </span>
                   <VerifyButton id="tab3_address" />
@@ -1147,7 +1178,7 @@ Date: ___________________`;
               <div className="rounded-xl border border-gray-200 bg-white">
                 <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl">
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                    <i className="fas fa-file-shield text-primary-600"></i>
+                    <FaFileInvoice className="text-primary-600" />
                     Company Documents
                   </span>
                 </div>
@@ -1169,7 +1200,7 @@ Date: ___________________`;
                       if (relevantDocs.length === 0) {
                           return (
                             <div className="text-center py-8 bg-gray-50 rounded-xl border">
-                              <i className="fas fa-folder-open text-gray-300 text-4xl mb-3"></i>
+                              <FaFolderOpen className="text-gray-300 text-4xl mb-3 mx-auto" />
                               <p className="text-gray-500 text-sm">No required certificates uploaded for {isEwaste ? 'E-Waste' : 'Plastic Waste'}</p>
                             </div>
                           );
@@ -1178,7 +1209,7 @@ Date: ___________________`;
                       return relevantDocs.map((doc, i) => (
                       <div key={i} className="flex items-center justify-between bg-gray-50 border rounded-lg p-4">
                         <div className="flex items-center gap-4">
-                          <i className="fas fa-file text-primary-600 text-xl"></i>
+                          <FaFile className="text-primary-600 text-xl" />
                           <div>
                             <p className="font-semibold text-gray-900 text-sm">{doc.documentType}</p>
                             <p className="text-xs text-gray-600">
@@ -1188,10 +1219,10 @@ Date: ___________________`;
                         </div>
                         <div className="flex items-center gap-2">
                             <button
-                            onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: doc.filePath, documentType: doc.documentType, documentName: doc.documentType } } })}
+                            onClick={() => handleViewDocument(doc.filePath, doc.documentType, doc.documentType)}
                             className="px-3 py-1.5 bg-white text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors text-sm flex items-center gap-1"
                             >
-                            <i className="fas fa-eye text-xs"></i>
+                            <FaEye className="text-xs" />
                             View
                             </button>
                             <VerifyButton id={`doc_${i}`} />
@@ -1231,7 +1262,7 @@ Date: ___________________`;
                               <td className="p-3">{row.turnover}</td>
                               <td className="p-3">
                                 {row.certificateFile ? (
-                                  <button onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: row.certificateFile, documentType: 'MSME Certificate', documentName: `MSME_${row.udyamNumber}` } } })} className="text-primary-600 hover:underline">View</button>
+                                  <button onClick={() => handleViewDocument(row.certificateFile, 'MSME Certificate', `MSME_${row.udyamNumber}`)} className="text-primary-600 hover:underline">View</button>
                                 ) : (
                                   <span className="text-gray-400">-</span>
                                 )}
@@ -1281,7 +1312,7 @@ Date: ___________________`;
                     return (
                         <div className="text-center py-12 bg-white rounded-xl border border-gray-200 shadow-sm">
                             <div className="bg-gray-50 rounded-full h-20 w-20 flex items-center justify-center mx-auto mb-4">
-                                <i className="fas fa-industry text-3xl text-gray-400"></i>
+                                <FaIndustry className="text-3xl text-gray-400" />
                             </div>
                             <h3 className="text-lg font-medium text-gray-900">No Plant Details Found</h3>
                             <p className="text-gray-500 mt-1">There are no CTE or CTO/CCA details available for any plant.</p>
@@ -1310,7 +1341,7 @@ Date: ___________________`;
                                     <div className="px-6 py-5 border-b bg-gradient-to-r from-gray-50 to-white flex justify-between items-center">
                                         <div className="flex items-center gap-3">
                                             <div className="h-10 w-10 rounded-lg bg-primary-50 flex items-center justify-center text-primary-600">
-                                                <i className="fas fa-building text-xl"></i>
+                                                <FaBuilding className="text-xl" />
                                             </div>
                                             <div>
                                                 <h3 className="font-bold text-lg text-gray-900">{plantName}</h3>
@@ -1360,8 +1391,8 @@ Date: ___________________`;
                                                                     </td>
                                                                     <td className="p-3">
                                                                         {r.documentFile ? (
-                                                                            <button onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: r.documentFile, documentType: 'CTO Document', documentName: `CTO_${r.consentOrderNo}` } } })} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                                                                                <i className="fas fa-eye mr-1"></i> View
+                                                                            <button onClick={() => handleViewDocument(r.documentFile, 'CTE Document', `CTE_${r.consentNo}`)} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                                                                                <FaEye className="mr-1" /> View
                                                                             </button>
                                                                         ) : (
                                                                             <span className="text-gray-400 text-xs italic">No Doc</span>
@@ -1423,8 +1454,8 @@ Date: ___________________`;
                                                                     </td>
                                                                     <td className="p-3">
                                                                         {r.documentFile ? (
-                                                                            <button onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: r.documentFile, documentType: 'CTO Document', documentName: `CTO_${r.consentOrderNo}` } } })} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                                                                                <i className="fas fa-eye mr-1"></i> View
+                                                                            <button onClick={() => handleViewDocument(r.documentFile, 'CTO Document', `CTO_${r.consentOrderNo}`)} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                                                                                <FaEye className="mr-1" /> View
                                                                             </button>
                                                                         ) : (
                                                                             <span className="text-gray-400 text-xs italic">No Doc</span>
@@ -1469,10 +1500,10 @@ Date: ___________________`;
                                                         <div className="mt-2">
                                                             {pf.cgwaNocDocument ? (
                                                                 <button
-                                                                    onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: pf.cgwaNocDocument, documentType: 'CGWA', documentName: 'CGWA NOC' } } })}
+                                                                    onClick={() => handleViewDocument(pf.cgwaNocDocument, 'CGWA', 'CGWA NOC')}
                                                                     className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                                                                 >
-                                                                    <i className="fas fa-eye mr-1"></i> View
+                                                                    <FaEye className="mr-1" /> View
                                                                 </button>
                                                             ) : (
                                                                 <span className="text-gray-400 text-xs italic">No Doc</span>
@@ -1633,6 +1664,13 @@ Date: ___________________`;
         setRemark={setTempRemark}
         onSave={saveRemark}
       />
+
+      <DocumentViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        documentUrl={viewerUrl}
+        documentName={viewerName}
+      />
     </div>
   );
 };
@@ -1649,7 +1687,7 @@ const RemarkModal = ({ isOpen, onClose, remark, setRemark, onSave }) => {
                     <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <div className="sm:flex sm:items-start">
                             <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-amber-100 sm:mx-0 sm:h-10 sm:w-10">
-                                <i className="fas fa-comment-alt text-amber-600 text-lg"></i>
+                                <FaCommentAlt className="text-amber-600 text-lg" />
                             </div>
                             <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                                 <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">

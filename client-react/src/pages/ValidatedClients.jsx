@@ -4,6 +4,7 @@ import { Button, Card, Input, message, Popconfirm, Space, Table, Tag, Tooltip, T
 import { DeleteOutlined, EyeOutlined, LoadingOutlined, UndoOutlined } from '@ant-design/icons';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
+import DocumentViewerModal from '../components/DocumentViewerModal';
 
 const ValidatedClients = () => {
   const navigate = useNavigate();
@@ -11,6 +12,11 @@ const ValidatedClients = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploadingClientId, setUploadingClientId] = useState(null);
+
+  // Document Viewer State
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerName, setViewerName] = useState('');
 
   const fetchValidatedClients = async (search = '') => {
     setLoading(true);
@@ -52,6 +58,12 @@ const ValidatedClients = () => {
     const base = baseRaw.endsWith('/api') ? baseRaw.slice(0, -4) : baseRaw;
     const origin = base || 'http://127.0.0.1:8080';
     return `${origin}/${raw}`;
+  };
+
+  const handleViewDocument = (filePath, docType, docName) => {
+    setViewerUrl(resolveUrl(filePath));
+    setViewerName(docName || docType);
+    setViewerOpen(true);
   };
 
   const makeUploadProps = (clientId) => ({
@@ -161,17 +173,7 @@ const ValidatedClients = () => {
                 title={doc ? 'View signed document' : 'Signed document not uploaded'}
                 disabled={!doc}
                 className="bg-green-600 text-white"
-                onClick={() =>
-                  navigate('/dashboard/document-viewer', {
-                    state: {
-                      doc: {
-                        filePath: doc?.filePath,
-                        documentType: 'Signed Document',
-                        documentName: doc?.documentName || 'Signed Document'
-                      }
-                    }
-                  })
-                }
+                onClick={() => handleViewDocument(doc?.filePath, 'Signed Document', doc?.documentName || 'Signed Document')}
               >
                 <EyeOutlined />
               </ActionTile>
@@ -209,7 +211,7 @@ const ValidatedClients = () => {
         }
       }
     ],
-    [navigate, searchTerm, uploadingClientId]
+    [navigate, searchTerm, uploadingClientId, handleViewDocument]
   );
 
   return (
@@ -244,6 +246,13 @@ const ValidatedClients = () => {
           />
         </Card>
       </div>
+
+      <DocumentViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        documentUrl={viewerUrl}
+        documentName={viewerName}
+      />
     </div>
   );
 };

@@ -4,6 +4,7 @@ const rowSchema = new mongoose.Schema({
   generate: { type: String, default: "No" },
   systemCode: { type: String, default: "" },
   packagingType: { type: String, default: "" },
+  industryCategory: { type: String, default: "" },
   skuCode: { type: String, default: "" },
   skuDescription: { type: String, default: "" },
   skuUom: { type: String, default: "" },
@@ -19,7 +20,11 @@ const rowSchema = new mongoose.Schema({
   rcPercent: { type: String, default: "" },
   auditorRemarks: { type: String, default: "" },
   clientRemarks: { type: String, default: "" },
-  complianceStatus: { type: String, default: "" }
+  additionalDocument: { type: String, default: "" },
+  componentComplianceStatus: { type: String, default: "" },
+  productComplianceStatus: { type: String, default: "" },
+  productAuditorRemarks: { type: String, default: "" },
+  managerRemarks: { type: String, default: "" }
 }, { _id: false });
 
 const componentRowSchema = new mongoose.Schema({
@@ -71,6 +76,12 @@ const recycledQuantityRowSchema = new mongoose.Schema({
   usedRecycledQtyMt: { type: Number, default: 0 }
 }, { _id: false });
 
+const plasticAnalysisSchema = new mongoose.Schema({
+  summary: { type: Object, default: {} },
+  rows: { type: Array, default: [] },
+  lastUpdated: { type: Date, default: Date.now }
+}, { _id: false });
+
 const procurementSchema = new mongoose.Schema({
   systemCode: { type: String, default: "" },
   skuCode: { type: String, default: "" },
@@ -119,6 +130,7 @@ const productComplianceSchema = new mongoose.Schema({
   supplierCompliance: { type: [supplierComplianceRowSchema], default: [] },
   recycledQuantityUsed: { type: [recycledQuantityRowSchema], default: [] },
   procurementDetails: { type: [procurementSchema], default: [] },
+  plasticAnalysis: { type: plasticAnalysisSchema, default: {} },
   changeHistory: { type: [changeHistorySchema], default: [] },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }
 }, { timestamps: true });

@@ -50,7 +50,10 @@ export const API_ENDPOINTS = {
         PROCUREMENT: (id) => `/api/client/${id}/procurement`,
         E_WASTE_COMPLIANCE: (id) => `/api/client/${id}/e-waste-compliance`,
         E_WASTE_COMPLIANCE_UPLOAD: (id) => `/api/client/${id}/e-waste-compliance/upload-image`,
-        E_WASTE_ROHS_COMPLIANCE: (id) => `/api/client/${id}/e-waste-compliance/rohs`
+        E_WASTE_ROHS_COMPLIANCE: (id) => `/api/client/${id}/e-waste-compliance/rohs`,
+        E_WASTE_STORAGE_COMPLIANCE: (id) => `/api/client/${id}/e-waste-compliance/storage`,
+        E_WASTE_STORAGE_UPLOAD: (id) => `/api/client/${id}/e-waste-compliance/storage/upload-image`,
+        E_WASTE_AWARENESS_COMPLIANCE: (id) => `/api/client/${id}/e-waste-compliance/awareness`
     },
     USER: {
         BASE: '/api/user',
@@ -68,6 +71,11 @@ export const API_ENDPOINTS = {
     },
     AI: {
         ANALYZE: '/api/ai/analyze'
+    },
+    ANALYSIS: {
+        PLASTIC_PREPOST: '/api/analysis/plastic-prepost',
+        SALES: '/api/analysis/sales-analysis',
+        PURCHASE: '/api/analysis/purchase-analysis'
     }
 };
 

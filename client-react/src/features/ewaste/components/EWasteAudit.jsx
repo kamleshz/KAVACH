@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, Spin, Alert, Card, Button, List, Tag, Empty } from 'antd';
 import { FaClipboardCheck, FaCheckDouble, FaBoxes, FaLeaf, FaBullhorn, FaArrowLeft } from 'react-icons/fa';
-import api from '../../services/api';
-import { API_ENDPOINTS } from '../../services/apiEndpoints';
-import ConsentVerification from '../PlantProcessSteps/ConsentVerification';
+import api from '../../../services/api';
+import { API_ENDPOINTS } from '../../../services/apiEndpoints';
+import ConsentVerification from '../../../components/PlantProcessSteps/ConsentVerification';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
-import EWasteCategoriesCompliance from '../EWasteProcessSteps/EWasteCategoriesCompliance';
-import EWasteROHSCompliance from '../EWasteProcessSteps/EWasteROHSCompliance';
+import EWasteCategoriesCompliance from './EWasteCategoriesCompliance';
+import EWasteROHSCompliance from './EWasteROHSCompliance';
+import EWasteStorage from './EWasteStorage';
 
 const EWasteAudit = ({ clientId, setIsAuditComplete, setActiveTab }) => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [client, setClient] = useState(null);
     const [activeTabKey, setActiveTabKey] = useState('verification');
+    const [productSubTab, setProductSubTab] = useState('categories');
     const [selectedConsent, setSelectedConsent] = useState(null); // For Master-Detail in Verification
     
     // Verification State (Replicated from PlantProcess)
@@ -194,21 +196,44 @@ const EWasteAudit = ({ clientId, setIsAuditComplete, setActiveTab }) => {
 
     const renderProductCheckTab = () => {
         return (
-            <Tabs defaultActiveKey="categories" type="card">
-                <Tabs.TabPane tab="Categories Wise EEE Compliance" key="categories">
-                    <EWasteCategoriesCompliance clientId={clientId} clientName={client?.clientName} />
-                </Tabs.TabPane>
-                <Tabs.TabPane tab="RoHS Compliance" key="rohs">
-                    <EWasteROHSCompliance clientId={clientId} />
-                </Tabs.TabPane>
-                <Tabs.TabPane tab="Storage E-Waste" key="storage">
-                    <div className="p-8 text-center border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
-                        <FaBoxes className="mx-auto text-4xl text-orange-300 mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900">Storage E-Waste</h3>
-                        <p className="text-gray-500">This module is under development.</p>
-                    </div>
-                </Tabs.TabPane>
-            </Tabs>
+            <div>
+                 {/* Custom Tabs */}
+                 <div className="mb-6">
+                     <div className="bg-gray-100 p-1.5 rounded-lg">
+                         <div className="flex flex-wrap gap-2">
+                             {[
+                                 { id: 'categories', label: 'Categories Wise EEE Compliance' },
+                                 { id: 'rohs', label: 'RoHS Compliance' },
+                                 { id: 'storage', label: 'Storage E-Waste' }
+                             ].map((tab) => {
+                                 const isCurrent = productSubTab === tab.id;
+                                 return (
+                                     <button
+                                         key={tab.id}
+                                         onClick={() => setProductSubTab(tab.id)}
+                                         className={`
+                                             flex-1 flex items-center justify-center px-4 py-3 rounded-md text-sm font-medium transition-all min-w-[140px]
+                                             ${isCurrent 
+                                                 ? 'bg-white text-gray-800 shadow-sm border border-gray-200' 
+                                                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+                                             }
+                                         `}
+                                     >
+                                         <span className={isCurrent ? "font-bold" : ""}>{tab.label}</span>
+                                     </button>
+                                 );
+                             })}
+                         </div>
+                     </div>
+                 </div>
+
+                 {/* Content */}
+                 <div className="mt-4">
+                     {productSubTab === 'categories' && <EWasteCategoriesCompliance clientId={clientId} clientName={client?.clientName} />}
+                     {productSubTab === 'rohs' && <EWasteROHSCompliance clientId={clientId} />}
+                     {productSubTab === 'storage' && <EWasteStorage clientId={clientId} />}
+                 </div>
+            </div>
         );
     };
 

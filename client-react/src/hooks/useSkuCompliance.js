@@ -20,10 +20,11 @@ const useSkuCompliance = (clientId) => {
             recycledPercent: '', 
             complianceStatus: '', 
             markingImage: [], 
-            compostableRegNo: '', 
-            remarks: [] 
-        }
-    ]);
+                compostableRegNo: '', 
+                remarks: [],
+                complianceRemarks: []
+            }
+        ]);
     const [skuSearchText, setSkuSearchText] = useState('');
     const [skuStatusFilter, setSkuStatusFilter] = useState('all');
     const [skuPagination, setSkuPagination] = useState({ current: 1, pageSize: 10 });
@@ -56,7 +57,8 @@ const useSkuCompliance = (clientId) => {
                 complianceStatus: '', 
                 markingImage: [], 
                 compostableRegNo: '', 
-                remarks: [] 
+                remarks: [],
+                complianceRemarks: []
             },
             ...prev
         ]);
@@ -213,7 +215,8 @@ const useSkuCompliance = (clientId) => {
                         url: url
                     })) : [],
                      compostableRegNo: existing?.compostableRegNo || '',
-                     remarks: Array.isArray(existing?.remarks) ? existing.remarks : []
+                     remarks: Array.isArray(existing?.remarks) ? existing.remarks : [],
+                     complianceRemarks: Array.isArray(existing?.complianceRemarks) ? existing.complianceRemarks : []
                  };
                  mergedData.push(mergedItem);
                  // Remove from map to track what's left
@@ -241,7 +244,8 @@ const useSkuCompliance = (clientId) => {
                              url: url
                            })) : [],
                            polymerUsed: Array.isArray(value.polymerUsed) ? value.polymerUsed : [],
-                           remarks: Array.isArray(value.remarks) ? value.remarks : []
+                           remarks: Array.isArray(value.remarks) ? value.remarks : [],
+                           complianceRemarks: Array.isArray(value.complianceRemarks) ? value.complianceRemarks : []
                       });
                  });
             }
@@ -267,7 +271,8 @@ const useSkuCompliance = (clientId) => {
                         complianceStatus: '', 
                         markingImage: [], 
                         compostableRegNo: '', 
-                        remarks: [] 
+                        remarks: [],
+                        complianceRemarks: []
                     }
                  ]);
             } else {

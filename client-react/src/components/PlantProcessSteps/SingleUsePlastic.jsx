@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Upload, Table, Tabs, Button, Input, Select, DatePicker } from 'antd';
 import { PlusOutlined, DeleteOutlined, CloseOutlined, UploadOutlined, SaveOutlined, CloudUploadOutlined, UndoOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import DocumentViewerModal from '../DocumentViewerModal';
 
 const AREA_NAME_OPTIONS = [
     { value: 'Raw Material Storage Area', label: 'Raw Material Storage Area' },
@@ -107,6 +108,17 @@ const SingleUsePlastic = ({
     const [activeTab, setActiveTab] = useState('1');
     const [checklistRows, setChecklistRows] = useState([]);
     const isRemoteUpdate = React.useRef(false);
+
+    // Document Viewer State
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState('');
+    const [viewerName, setViewerName] = useState('');
+
+    const handleViewDocument = (url, name) => {
+        setViewerUrl(url);
+        setViewerName(name);
+        setViewerOpen(true);
+    };
 
     // Load initial data and initialize Tab 2, 3, 4 items if missing
     React.useEffect(() => {
@@ -391,14 +403,7 @@ const SingleUsePlastic = ({
                                 {(text.startsWith('data:image') || text.startsWith('http')) && (
                                     <span 
                                         className="text-orange-500 cursor-pointer hover:underline"
-                                        onClick={() => {
-                                            const w = window.open('about:blank');
-                                            const image = new Image();
-                                            image.src = text;
-                                            setTimeout(function(){
-                                              if (w) w.document.write(image.outerHTML);
-                                            }, 0);
-                                        }}
+                                        onClick={() => handleViewDocument(text, 'Photo')}
                                     >
                                         View
                                     </span>
@@ -791,14 +796,7 @@ const SingleUsePlastic = ({
                                                         {(text.startsWith('data:image') || text.startsWith('http')) && (
                                                             <span 
                                                                 className="text-orange-500 cursor-pointer hover:underline"
-                                                                onClick={() => {
-                                                                    const w = window.open('about:blank');
-                                                                    const image = new Image();
-                                                                    image.src = text;
-                                                                    setTimeout(function(){
-                                                                      if (w) w.document.write(image.outerHTML);
-                                                                    }, 0);
-                                                                }}
+                                                                onClick={() => handleViewDocument(text, 'Photo')}
                                                             >
                                                                 View
                                                             </span>
@@ -1030,14 +1028,7 @@ const SingleUsePlastic = ({
                                                 {(text.startsWith('data:image') || text.startsWith('http')) && (
                                                     <span 
                                                         className="text-orange-500 cursor-pointer hover:underline"
-                                                        onClick={() => {
-                                                            const w = window.open('about:blank');
-                                                            const image = new Image();
-                                                            image.src = text;
-                                                            setTimeout(function(){
-                                                              if (w) w.document.write(image.outerHTML);
-                                                            }, 0);
-                                                        }}
+                                                        onClick={() => handleViewDocument(text, 'Photo')}
                                                     >
                                                         View
                                                     </span>
@@ -1369,6 +1360,13 @@ const SingleUsePlastic = ({
                     Next Step <i className="fas fa-arrow-right"></i>
                 </button>
             </div>
+
+            <DocumentViewerModal
+                isOpen={viewerOpen}
+                onClose={() => setViewerOpen(false)}
+                documentUrl={viewerUrl}
+                documentName={viewerName}
+            />
         </div>
     );
 };

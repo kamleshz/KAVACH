@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Table, Modal, Button, Tag, Tooltip, Input, Select, Upload, Popconfirm, Card } from 'antd';
-import { UploadOutlined, HistoryOutlined, FileExcelOutlined, SaveOutlined, DeleteOutlined } from '@ant-design/icons';
+import { UploadOutlined, HistoryOutlined, FileExcelOutlined, SaveOutlined, DeleteOutlined, CheckOutlined, LoadingOutlined, ArrowLeftOutlined, ExclamationCircleFilled, CheckCircleFilled, CloseOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
@@ -842,6 +842,42 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         }
     };
 
+    const handleSummaryChange = (skuCode, field, value) => {
+        setProductRows(prev => prev.map(row => {
+            if ((row.skuCode || '').trim() === skuCode) {
+                return { ...row, [field]: value };
+            }
+            return row;
+        }));
+    };
+
+    const handleComponentSummaryChange = (skuCode, componentCode, field, value) => {
+        setProductRows(prev => prev.map(row => {
+            if ((row.skuCode || '').trim() === skuCode && (row.componentCode || '').trim() === componentCode) {
+                return { ...row, [field]: value };
+            }
+            return row;
+        }));
+    };
+
+    const handleSummaryFileChange = (skuCode, file) => {
+        setProductRows(prev => prev.map(row => {
+            if ((row.skuCode || '').trim() === skuCode) {
+                return { ...row, additionalDocument: file };
+            }
+            return row;
+        }));
+    };
+
+    const handleComponentSummaryFileChange = (skuCode, componentCode, file) => {
+        setProductRows(prev => prev.map(row => {
+            if ((row.skuCode || '').trim() === skuCode && (row.componentCode || '').trim() === componentCode) {
+                return { ...row, additionalDocument: file };
+            }
+            return row;
+        }));
+    };
+
     const handleProductExport = () => {
         if (productRows.length === 0) {
             notify('warning', 'No data to export');
@@ -851,6 +887,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         const exportData = productRows.map((row) => {
             const data = {
                 'Packaging Type': row.packagingType,
+                'Industry Category': row.industryCategory,
                 'SKU Code': row.skuCode,
                 'SKU Description': row.skuDescription,
                 'SKU UOM': row.skuUom,
@@ -878,6 +915,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     const handleProductTemplateDownload = () => {
         const headers = [
             'Packaging Type',
+            'Industry Category',
             'SKU Code',
             'SKU Description',
             'SKU UOM',
@@ -1020,6 +1058,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 };
                 
                 let packagingType = getValue([/packaging.*type/i]);
+                let industryCategory = getValue([/industry.*cat/i, /category/i]);
                 let skuCode = getValue([/sku.*code/i, /^sku$/i]);
                 let skuDescription = getValue([/sku.*desc/i]);
                 let skuUom = getValue([/sku.*uom/i, /uom/i]);
@@ -1076,6 +1115,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
 
                 const newRow = {
                     packagingType,
+                    industryCategory,
                     skuCode,
                     skuDescription,
                     skuUom,
@@ -1592,6 +1632,18 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     }
   };
 
+  const handleComponentSave = async (skuCode, componentCode) => {
+    const idx = productRows.findIndex(r => 
+        (r.skuCode || '').trim() === skuCode && 
+        (r.componentCode || '').trim() === componentCode
+    );
+    if (idx !== -1) {
+        await saveRow(idx);
+    } else {
+        notify('error', 'Component not found');
+    }
+  };
+
   const [isSkuBulkSaving, setIsSkuBulkSaving] = useState(false);
   const [savingSkuRow, setSavingSkuRow] = useState(null);
 
@@ -1941,7 +1993,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 let generateSupplierCode = getValue([/generate.*supplier/i]) || 'No';
                 let supplierCode = getValue([/supplier.*code/i]);
 
-                if (generate === 'No') {
+                if (generate === 'Yes') {
                      const match = currentAllRows.find(r => 
                         (r.skuCode || '').trim() === skuCode && 
                         (r.componentDescription || '').trim() === componentDescription
@@ -1954,7 +2006,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                      }
                 }
                 
-                if (generateSupplierCode === 'No') {
+                if (generateSupplierCode === 'Yes') {
                      const match = currentAllRows.find(r => 
                         (r.supplierName || '').trim().toLowerCase() === supplierName.toLowerCase() && 
                         (r.supplierCode || '').trim()
@@ -3547,6 +3599,106 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         }
     };
 
+    const handleSaveSummary = async () => {
+        setIsSaving(true);
+        try {
+            // 1. Handle File Uploads
+            const fileUploads = [];
+            productRows.forEach((row, index) => {
+                if (row.additionalDocument instanceof File) {
+                    fileUploads.push({ index, row });
+                }
+            });
+
+            // Group by SKU Code to avoid duplicate uploads for same SKU
+            const uniqueUploads = new Map();
+            fileUploads.forEach(item => {
+                const sku = (item.row.skuCode || '').trim();
+                if (sku && !uniqueUploads.has(sku)) {
+                    uniqueUploads.set(sku, item);
+                }
+            });
+
+            const uploadPromises = Array.from(uniqueUploads.values()).map(async ({ index, row }) => {
+                const formData = new FormData();
+                formData.append('type', type);
+                formData.append('itemId', itemId);
+                formData.append('rowIndex', index);
+                
+                const rowData = { ...row };
+                // Ensure we don't send the File object in JSON
+                delete rowData.additionalDocument;
+                
+                formData.append('row', JSON.stringify(rowData));
+                formData.append('additionalDocument', row.additionalDocument);
+                
+                try {
+                    const res = await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE_UPLOAD(clientId), formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                    if (res.data.success && res.data.data && res.data.data.row) {
+                        return { skuCode: row.skuCode, url: res.data.data.row.additionalDocument };
+                    }
+                } catch (err) {
+                    console.error("Failed to upload document for row", index, err);
+                }
+                return null;
+            });
+
+            const results = await Promise.all(uploadPromises);
+            
+            // Update local rows with new URLs
+            let updatedRows = [...productRows];
+            results.forEach(res => {
+                if (res) {
+                    updatedRows = updatedRows.map(r => {
+                        if ((r.skuCode || '').trim() === (res.skuCode || '').trim()) {
+                            return { ...r, additionalDocument: res.url };
+                        }
+                        return r;
+                    });
+                }
+            });
+            
+            // 2. Save All Data (JSON)
+            // This ensures Compliance Status and Remarks are saved, along with new URLs
+            // We bypass validation check for mandatory fields here to ensure we don't drop rows.
+            // But usually we should validate. Assuming previous steps ensured validation.
+            
+            const payload = updatedRows.map(r => {
+                 const { _validationError, ...rest } = r;
+                 return {
+                    ...rest,
+                    productImage: typeof rest.productImage === 'string' ? rest.productImage : '',
+                    componentImage: typeof rest.componentImage === 'string' ? rest.componentImage : '',
+                    additionalDocument: typeof rest.additionalDocument === 'string' ? rest.additionalDocument : ''
+                 };
+            });
+            
+            const res = await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(clientId), {
+                type,
+                itemId,
+                rows: payload
+            });
+            
+            if (res.data && res.data.success) {
+                setProductRows(res.data.data || updatedRows);
+                setLastSavedRows(res.data.data || updatedRows);
+                notify('success', 'Summary report saved successfully');
+            } else {
+                throw new Error(res.data.message || 'Failed to save summary');
+            }
+
+        } catch (error) {
+            console.error("Failed to save summary", error);
+            notify('error', 'Failed to save summary report');
+            throw error; // Re-throw to prevent proceeding if save fails?
+            // Actually handleNext swallows errors usually, but we should probably block.
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleNext = async () => {
         // Combined behaviour for Product Compliance sub-steps and main steps
         if (activeTab === 'tab2') {
@@ -3575,7 +3727,16 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         if (currentIndex < steps.length - 1) {
             setActiveTab(steps[currentIndex + 1].id);
         } else {
-             // Last step (Finish) - Force save tab5 (or current activeTab) to backend to ensure audit completion logic triggers
+             // Last step (Finish)
+             if (activeTab === 'tab5') {
+                 try {
+                     await handleSaveSummary();
+                 } catch (e) {
+                     return; // Don't finish if save fails
+                 }
+             }
+
+             // Force save tab5 (or current activeTab) to backend to ensure audit completion logic triggers
              if (!newSteps.includes(activeTab)) {
                  // Should be handled above, but double check
                  newSteps = [...newSteps, activeTab];
@@ -3843,7 +4004,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
   if (error) return (
     <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="text-red-600 bg-white p-6 rounded-lg shadow-lg">
-            <i className="fas fa-exclamation-circle text-4xl mb-4 block text-center"></i>
+            <ExclamationCircleFilled className="text-4xl mb-4 block text-center" />
             <p className="text-lg font-semibold">{error}</p>
         </div>
     </div>
@@ -3904,9 +4065,9 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                         disabled={isSaving}
                     >
                         {isSaving ? (
-                            <i className="fas fa-spinner fa-spin"></i>
+                            <LoadingOutlined spin />
                         ) : (
-                            <i className="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                            <ArrowLeftOutlined className="transition-transform group-hover:-translate-x-1" />
                         )}
                     </button>
                     <div>
@@ -3945,7 +4106,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             }`}
           >
             <div className="flex items-center gap-2">
-              {n.type === 'error' ? <i className="fas fa-exclamation-circle"></i> : <i className="fas fa-check-circle"></i>}
+              {n.type === 'error' ? <ExclamationCircleFilled /> : <CheckCircleFilled />}
               <span className="text-sm font-medium">{n.text}</span>
             </div>
             <button
@@ -3953,7 +4114,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
               className={`text-white/90 hover:text-white`}
               title="Dismiss"
             >
-              <i className="fas fa-times"></i>
+              <CloseOutlined />
             </button>
             <div
               className="absolute left-0 bottom-0 h-0.5 bg-white/80"
@@ -4012,7 +4173,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                                                 : 'border-gray-300 text-gray-500 bg-white'
                                     }`}>
                                         {isCompleted ? (
-                                            <i className="fas fa-check"></i>
+                                            <CheckOutlined />
                                         ) : (
                                             <span>{String(index + 1).padStart(2, '0')}</span>
                                         )}
@@ -4084,6 +4245,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 productRows={productRows}
                 addRow={addRow}
                 handleRowChange={handleRowChange}
+                handleGenerateChange={handleGenerateChange}
+                handleProductComponentCodeChange={handleProductComponentCodeChange}
                 handleGenerateSupplierCodeChange={handleGenerateSupplierCodeChange}
                 formatProductFieldValue={formatProductFieldValue}
                 resolveUrl={resolveUrl}
@@ -4199,8 +4362,20 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         )}
         {activeTab === 'tab5' && (
             <SummaryReport
+                clientId={clientId}
                 handleNext={handleNext}
                 isSaving={isSaving}
+                productRows={productRows}
+                monthlyRows={monthlyRows}
+                resolveUrl={resolveUrl}
+                supplierRows={supplierRows}
+                componentRows={componentRows}
+                handleSummaryChange={handleSummaryChange}
+                handleComponentSummaryChange={handleComponentSummaryChange}
+                handleSummaryFileChange={handleSummaryFileChange}
+                handleComponentSummaryFileChange={handleComponentSummaryFileChange}
+                handleComponentSave={handleComponentSave}
+                savingRow={savingRow}
             />
         )}
 
@@ -4208,7 +4383,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       <Modal
         title={
             <div className="flex items-center gap-2 text-xl font-bold text-gray-800">
-                <i className="fas fa-history text-primary-600"></i> Change History
+                <HistoryOutlined className="text-primary-600" /> Change History
             </div>
         }
         open={showHistoryModal}
@@ -4225,7 +4400,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       >
         {historyModalData.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
-                <i className="fas fa-history text-4xl mb-3 text-gray-300"></i>
+                <HistoryOutlined className="text-4xl mb-3 text-gray-300" />
                 <p>No changes recorded.</p>
             </div>
         ) : (

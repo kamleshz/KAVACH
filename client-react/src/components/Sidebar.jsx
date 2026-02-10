@@ -14,7 +14,9 @@ import {
   ExperimentOutlined,
   DesktopOutlined,
   BarChartOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  LeftOutlined,
+  RightOutlined
 } from '@ant-design/icons';
 import useAuth from '../hooks/useAuth';
 import { WASTE_TYPES } from '../constants/wasteTypes';
@@ -122,7 +124,7 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
           onClick={onToggleCollapse}
           className="flex h-7 w-7 items-center justify-center rounded-md border border-white/30 bg-white/10 text-orange-50 shadow-sm transition-colors hover:bg-white/20"
         >
-          <i className={`fas fa-angle-${collapsed ? 'right' : 'left'} text-xs`} />
+          {collapsed ? <RightOutlined className="text-xs" /> : <LeftOutlined className="text-xs" />}
         </button>
       </div>
       <div className="flex-1 overflow-y-auto">

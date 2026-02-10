@@ -330,7 +330,8 @@ const clientSchema = new mongoose.Schema({
             plantName: { type: String, default: "" },
             productName: { type: String, required: true },
             maxCapacityPerYear: { type: String, required: true },
-            verification: {
+            uom: { type: String, default: "" },
+        verification: {
                 status: {
                     type: String,
                     enum: ['Pending', 'Verified', 'Rejected'],
@@ -422,7 +423,8 @@ const clientSchema = new mongoose.Schema({
             plantName: { type: String, default: "" },
             productName: { type: String, required: true },
             quantity: { type: String, required: true },
-            verification: {
+            uom: { type: String, default: "" },
+        verification: {
                 status: {
                     type: String,
                     enum: ['Pending', 'Verified', 'Rejected'],

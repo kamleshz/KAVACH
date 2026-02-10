@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
-import { Table, Select, Input, Button, Upload, Popover, Popconfirm } from 'antd';
+import { Table, Select, Input, Button, Upload, Popover, Popconfirm, message, Modal } from 'antd';
 import { 
   FaCheckDouble, FaFilePdf, FaClipboardCheck, FaChartLine, FaFilter, 
   FaExclamationCircle, FaTrashAlt, FaEdit, FaSave, FaUndo, FaCheck, FaCheckCircle,
   FaChevronDown, FaPlus, FaMinus
 } from 'react-icons/fa';
-import { UploadOutlined } from '@ant-design/icons';
+import { UploadOutlined, LoadingOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
   Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
+import Analysis from '../PlantProcessSteps/Analysis';
+import SalesAnalysis from '../PlantProcessSteps/SalesAnalysis';
+import PurchaseAnalysis from '../PlantProcessSteps/PurchaseAnalysis';
+import SummaryReport from '../PlantProcessSteps/SummaryReport';
+import api from '../../services/api';
+import { API_ENDPOINTS } from '../../services/apiEndpoints';
 
 const HoverRow = ({ children, ...props }) => {
     const { record, ...restProps } = props;
@@ -97,6 +103,9 @@ const PostAuditCheck = ({
     handlePostValidationPageSizeChange,
     postValidationGotoPage,
     setPostValidationGotoPage,
+    // For Plastic Specific Analysis
+    applicationType, // CTE or CTO
+    selectedPlantId, // If applicable, or use clientId/plantId logic
     handlePostValidationGotoSubmit,
     skuSearchText,
     setSkuSearchText,
@@ -138,21 +147,170 @@ const PostAuditCheck = ({
     buildPolymerProcurementSummary,
     monthlyProcurementRaw,
     urepData,
-    handleSkuImageUpload,
-    handleSkuImageDelete,
     skuImageLoading,
-    saveSkuRow,
-    cancelSkuRow,
-    removeSkuRow,
-    addSkuRow,
-    editingSkuKey,
     skuComplianceColumns,
     skuTableDataSource, // Added prop
     readOnly = false, // Add readOnly with default value to avoid undefined
     handleBulkSavePostValidation, // Added prop for bulk save
     handleAddPostValidationRow,
-    handleDeleteAllPostValidation
+    handleDeleteAllPostValidation,
+    wasteType
 }) => {
+    const [plasticAnalysisTab, setPlasticAnalysisTab] = useState('prePostValidation');
+    
+    // Summary Report State
+    const [summaryProductRows, setSummaryProductRows] = useState([]);
+    const [summaryMonthlyRows, setSummaryMonthlyRows] = useState([]);
+    const [summarySupplierRows, setSummarySupplierRows] = useState([]);
+    const [summaryComponentRows, setSummaryComponentRows] = useState([]);
+    const [summaryLoading, setSummaryLoading] = useState(false);
+    const [savingSummary, setSavingSummary] = useState(false);
+    const [savingRowIndex, setSavingRowIndex] = useState(null);
+
+    // Remark Modal State
+    const [remarkModalOpen, setRemarkModalOpen] = useState(false);
+    const [currentRemarkRecord, setCurrentRemarkRecord] = useState(null);
+    const [currentRemarkField, setCurrentRemarkField] = useState(null);
+    const [tempRemarks, setTempRemarks] = useState([]);
+    const [newRemark, setNewRemark] = useState('');
+
+    const openRemarkModal = (record, field) => {
+        setCurrentRemarkRecord(record);
+        setCurrentRemarkField(field);
+        setTempRemarks(Array.isArray(record[field]) ? record[field] : (record[field] ? [record[field]] : []));
+        setRemarkModalOpen(true);
+    };
+
+    const closeRemarkModal = () => {
+        setRemarkModalOpen(false);
+        setCurrentRemarkRecord(null);
+        setCurrentRemarkField(null);
+        setTempRemarks([]);
+        setNewRemark('');
+    };
+
+    const handleSaveRemarksFromModal = () => {
+        if (currentRemarkRecord && currentRemarkField) {
+            handlePostValidationChange(currentRemarkRecord.key, currentRemarkField, tempRemarks);
+        }
+        closeRemarkModal();
+    };
+
+    const addRemark = () => {
+        if (newRemark.trim()) {
+            setTempRemarks([...tempRemarks, newRemark.trim()]);
+            setNewRemark('');
+        }
+    };
+
+    const removeRemark = (index) => {
+        const newRemarks = [...tempRemarks];
+        newRemarks.splice(index, 1);
+        setTempRemarks(newRemarks);
+    };
+
+    const handleSummaryChange = (skuCode, field, value) => {
+        setSummaryProductRows(prev => prev.map(row => {
+            if ((row.skuCode || '').trim() === skuCode) {
+                return { ...row, [field]: value };
+            }
+            return row;
+        }));
+    };
+
+    const handleComponentSummaryChange = (skuCode, componentCode, field, value) => {
+        setSummaryProductRows(prev => prev.map(row => {
+            if ((row.skuCode || '').trim() === skuCode && (row.componentCode || '').trim() === componentCode) {
+                return { ...row, [field]: value };
+            }
+            return row;
+        }));
+    };
+
+    const handleSaveProductAssessment = async () => {
+        try {
+            setSavingSummary(true);
+            await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE_ROW_SAVE(clientId), {
+                type: applicationType,
+                itemId: selectedPlantId,
+                rows: summaryProductRows
+            });
+            message.success("Product assessment saved successfully");
+        } catch (error) {
+            console.error("Error saving product assessment", error);
+            message.error("Failed to save product assessment");
+        } finally {
+            setSavingSummary(false);
+        }
+    };
+
+    const handleComponentSave = async (skuCode, componentCode) => {
+        // Find the row
+        const rowIndex = summaryProductRows.findIndex(r => 
+            (r.skuCode || '').trim() === skuCode && 
+            (r.componentCode || '').trim() === componentCode
+        );
+
+        if (rowIndex === -1) {
+            message.error("Row not found");
+            return;
+        }
+
+        const row = summaryProductRows[rowIndex];
+
+        try {
+            setSavingRowIndex(rowIndex);
+            await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE_ROW_SAVE(clientId), {
+                type: applicationType,
+                itemId: selectedPlantId,
+                rowIndex: rowIndex,
+                row: row
+            });
+            message.success("Row saved successfully");
+        } catch (error) {
+            console.error("Error saving row", error);
+            message.error("Failed to save row");
+        } finally {
+            setSavingRowIndex(null);
+        }
+    };
+
+    const resolveUrl = (path) => {
+        if (!path) return '';
+        if (path.startsWith('http') || path.startsWith('blob:')) return path;
+        return `${import.meta.env.VITE_API_URL}/${path.replace(/^\/+/, '')}`;
+    };
+
+    React.useEffect(() => {
+        const fetchSummaryData = async () => {
+            if (postValidationActiveTab === 'productAssessment' && clientId) {
+                try {
+                    setSummaryLoading(true);
+                    const params = { type: applicationType, itemId: selectedPlantId };
+                    
+                    const [prodRes, compRes, suppRes, monthlyRes] = await Promise.all([
+                         api.get(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(clientId), { params }),
+                         api.get(API_ENDPOINTS.CLIENT.PRODUCT_COMPONENT_DETAILS(clientId), { params }),
+                         api.get(API_ENDPOINTS.CLIENT.PRODUCT_SUPPLIER_COMPLIANCE(clientId), { params }),
+                         api.get(API_ENDPOINTS.CLIENT.MONTHLY_PROCUREMENT(clientId), { params })
+                    ]);
+            
+                    if (prodRes.data?.success) setSummaryProductRows(prodRes.data.data || []);
+                    if (compRes.data?.success) setSummaryComponentRows(compRes.data.data || []);
+                    if (suppRes.data?.success) setSummarySupplierRows(suppRes.data.data || []);
+                    if (monthlyRes.data?.success) setSummaryMonthlyRows(monthlyRes.data.data || []);
+            
+                } catch (error) {
+                    console.error("Error fetching summary data", error);
+                } finally {
+                    setSummaryLoading(false);
+                }
+            }
+        };
+
+        fetchSummaryData();
+    }, [postValidationActiveTab, clientId, applicationType, selectedPlantId]);
+
     // Local state for read-only view controls
     const [localUrepSelectedYear, setLocalUrepSelectedYear] = useState(urepSelectedYear);
     const [localCostAnalysisSubTab, setLocalCostAnalysisSubTab] = useState(costAnalysisSubTab);
@@ -219,18 +377,31 @@ const PostAuditCheck = ({
                                     className="w-full"
                                     size="large"
                                     options={[
+                                        { value: 'productAssessment', label: 'Product Assessment' },
                                         { value: 'markingLabelling', label: 'Packaging Assessment & Marking' },
                                         { value: 'sku', label: 'SKU Compliance' },
                                         { value: 'analysis', label: 'Analysis' },
                                         { value: 'analysis2', label: 'Analysis 2' },
                                         { value: 'costAnalysis', label: 'Cost Analysis' },
+                                        ...(wasteType === 'Plastic' || wasteType === 'Plastic Waste' ? [{ value: 'plasticSpecific', label: 'Plastic Specific Analysis' }] : [])
                                     ]}
                                 />
                             </div>
 
                             {/* Desktop Tab Grid */}
                             <div className="hidden md:block w-full rounded-2xl border border-gray-200 bg-gray-100 p-1">
-                                <div className="grid grid-cols-5 gap-1">
+                                <div className={`grid ${wasteType === 'Plastic' ? 'grid-cols-7' : 'grid-cols-6'} gap-1`}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPostValidationActiveTab('productAssessment')}
+                                        className={`w-full rounded-xl px-4 py-2 text-xs font-semibold leading-tight transition-all ${
+                                            postValidationActiveTab === 'productAssessment'
+                                                ? 'bg-white text-orange-600 shadow-sm'
+                                                : 'text-gray-700 hover:bg-white/70'
+                                        }`}
+                                    >
+                                        Product Assessment
+                                    </button>
                                     <button
                                         type="button"
                                         onClick={() => setPostValidationActiveTab('markingLabelling')}
@@ -286,10 +457,62 @@ const PostAuditCheck = ({
                                     >
                                         Cost Analysis
                                     </button>
+                                    {(wasteType === 'Plastic' || wasteType === 'Plastic Waste') && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setPostValidationActiveTab('plasticSpecific')}
+                                            className={`w-full rounded-xl px-4 py-2 text-xs font-semibold leading-tight transition-all ${
+                                                postValidationActiveTab === 'plasticSpecific'
+                                                    ? 'bg-white text-orange-600 shadow-sm'
+                                                    : 'text-gray-700 hover:bg-white/70'
+                                            }`}
+                                        >
+                                            Plastic Specific Analysis
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
                         <div>
+                            {postValidationActiveTab === 'productAssessment' && (
+                                <div className="border border-gray-200 rounded-xl bg-white p-4">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+                                        <div className="text-left">
+                                            <p className="text-gray-800 font-semibold">Product Assessment</p>
+                                            <p className="text-gray-500 text-xs">Review product assessment details.</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveProductAssessment}
+                                            disabled={summaryLoading || savingSummary}
+                                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 shadow-sm transition-all"
+                                        >
+                                            {savingSummary ? <LoadingOutlined spin /> : <FaSave />} Save Changes
+                                        </button>
+                                    </div>
+                                    {summaryLoading ? (
+                                        <div className="flex justify-center p-8"><LoadingOutlined spin className="text-2xl text-primary-500" /></div>
+                                    ) : (
+                                        <SummaryReport
+                                            clientId={clientId}
+                                            productRows={summaryProductRows}
+                                            monthlyRows={summaryMonthlyRows}
+                                            supplierRows={summarySupplierRows}
+                                            componentRows={summaryComponentRows}
+                                            resolveUrl={resolveUrl}
+                                            isSaving={savingSummary}
+                                            handleSummaryChange={handleSummaryChange}
+                                            handleComponentSummaryChange={handleComponentSummaryChange}
+                                            handleSummaryFileChange={() => {}}
+                                            handleComponentSummaryFileChange={() => {}}
+                                            handleComponentSave={handleComponentSave}
+                                            savingRow={savingRowIndex}
+                                            handleNext={() => {}} 
+                                            onlyTable={true}
+                                        />
+                                    )}
+                                </div>
+                            )}
                             {postValidationActiveTab === 'markingLabelling' && (
                                 <div className="border border-gray-200 rounded-xl bg-white p-4">
                                     <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
@@ -1800,6 +2023,73 @@ const PostAuditCheck = ({
                                     </div>
                                 </div>
                             )}
+                            {postValidationActiveTab === 'plasticSpecific' && (
+                                <div className="border border-gray-200 rounded-xl bg-white p-4">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+                                         <div className="text-left">
+                                            <p className="text-gray-800 font-semibold">Plastic Specific Analysis</p>
+                                            <p className="text-gray-500 text-xs">Plastic specific analysis details.</p>
+                                        </div>
+                                        <div className="flex bg-gray-100 p-1 rounded-lg">
+                                            <button
+                                                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                                                    plasticAnalysisTab === 'prePostValidation'
+                                                        ? 'bg-white text-primary-600 shadow-sm'
+                                                        : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                                onClick={() => setPlasticAnalysisTab('prePostValidation')}
+                                            >
+                                                Pre/Post Validation
+                                            </button>
+                                            <button
+                                                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                                                    plasticAnalysisTab === 'sales'
+                                                        ? 'bg-white text-primary-600 shadow-sm'
+                                                        : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                                onClick={() => setPlasticAnalysisTab('sales')}
+                                            >
+                                                Sales
+                                            </button>
+                                            <button
+                                                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                                                    plasticAnalysisTab === 'purchase'
+                                                        ? 'bg-white text-primary-600 shadow-sm'
+                                                        : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                                onClick={() => setPlasticAnalysisTab('purchase')}
+                                            >
+                                                Purchase
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    {plasticAnalysisTab === 'prePostValidation' && (
+                                        <Analysis 
+                                            isStepReadOnly={readOnly} 
+                                            clientId={clientId}
+                                            type={applicationType}
+                                            itemId={selectedPlantId}
+                                        />
+                                    )}
+
+                                    {plasticAnalysisTab === 'sales' && (
+                                        <SalesAnalysis 
+                                            clientId={clientId}
+                                            type={applicationType}
+                                            itemId={selectedPlantId}
+                                        />
+                                    )}
+
+                                    {plasticAnalysisTab === 'purchase' && (
+                                        <PurchaseAnalysis 
+                                            clientId={clientId}
+                                            type={applicationType}
+                                            itemId={selectedPlantId}
+                                        />
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                  ) : (
@@ -1811,7 +2101,54 @@ const PostAuditCheck = ({
                         <p className="text-gray-500 mt-2">Please save the client data and complete audit to access post-validation check.</p>
                     </div>
                  )}
-             </div>
+                 {/* Remark Modal */}
+            <Modal
+                title={currentRemarkField === 'complianceRemarks' ? "Compliance Remarks" : "Auditor Remarks"}
+                open={remarkModalOpen}
+                onOk={handleSaveRemarksFromModal}
+                onCancel={closeRemarkModal}
+                width={500}
+                okText="Save"
+                cancelText="Cancel"
+            >
+                <div className="flex flex-col gap-3">
+                    <p className="text-gray-500 text-xs">Enter one remark per line.</p>
+                    
+                    <div className="flex gap-2">
+                        <Input 
+                            value={newRemark}
+                            onChange={(e) => setNewRemark(e.target.value)}
+                            placeholder="Type a remark..."
+                            onPressEnter={addRemark}
+                            className="flex-1"
+                        />
+                        <Button type="primary" onClick={addRemark} icon={<PlusOutlined />}>Add</Button>
+                    </div>
+
+                    <div className="border rounded-md max-h-60 overflow-y-auto p-2 bg-gray-50">
+                        {tempRemarks.length === 0 ? (
+                            <div className="text-center text-gray-400 text-xs py-4">No remarks added yet.</div>
+                        ) : (
+                            <ul className="list-disc pl-4 m-0">
+                                {tempRemarks.map((remark, index) => (
+                                    <li key={index} className="text-sm text-gray-700 mb-1 flex justify-between items-start group">
+                                        <span>{remark}</span>
+                                        <Button 
+                                            type="text" 
+                                            size="small" 
+                                            danger 
+                                            icon={<DeleteOutlined />} 
+                                            className="opacity-0 group-hover:opacity-100"
+                                            onClick={() => removeRemark(index)}
+                                        />
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+            </Modal>
+        </div>
     );
 };
 

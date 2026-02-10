@@ -4,9 +4,16 @@ import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 import { FaChevronDown } from 'react-icons/fa';
 import AuditStepper from '../components/AuditStepper';
+import DocumentViewerModal from '../components/DocumentViewerModal';
+import { 
+  ArrowLeftOutlined, 
+  CalendarOutlined, 
+  AuditOutlined, 
+  EditOutlined 
+} from '@ant-design/icons';
 
 import PlantProcess from './PlantProcess';
-import EWasteProcess from './EWasteProcess';
+import EWasteProcess from '../features/ewaste/pages/EWasteProcess';
 
 const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComplete }) => {
   const { id: paramId } = useParams();
@@ -20,6 +27,11 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState(isProcessMode ? 4 : 1);
   const [expandedSections, setExpandedSections] = useState({});
+
+  // Document Viewer State
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerName, setViewerName] = useState('');
 
   // Embedded Audit Detail state
   const [embeddedAuditTarget, setEmbeddedAuditTarget] = useState(null); // { type, id }
@@ -122,6 +134,12 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
     return isAbs ? p : `${api.defaults.baseURL}/${p}`;
   };
 
+  const handleViewDocument = (filePath, docType, docName) => {
+    setViewerUrl(resolveUrl(filePath));
+    setViewerName(docName || docType);
+    setViewerOpen(true);
+  };
+
     if (embeddedAuditTarget) {
       const isEWaste = client?.wasteType === 'E-Waste';
       const ProcessComponent = isEWaste ? EWasteProcess : PlantProcess;
@@ -149,7 +167,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                 className="group flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-500 shadow-md transition-all hover:bg-primary-600 hover:text-white"
                 title="Back to Clients"
             >
-                <i className="fas fa-arrow-left transition-transform group-hover:-translate-x-1"></i>
+                <ArrowLeftOutlined className="transition-transform group-hover:-translate-x-1" />
             </button>
           )}
           <div>
@@ -157,7 +175,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
             <p className="text-sm text-gray-500">Client Details</p>
             {(client.auditStartDate || client.auditEndDate) && (
               <p className="text-sm font-medium text-blue-600 mt-1">
-                <i className="fas fa-calendar-alt mr-1"></i>
+                <CalendarOutlined className="mr-1" />
                 Audit Period: {client.auditStartDate ? new Date(client.auditStartDate).toLocaleDateString() : 'N/A'} - {client.auditEndDate ? new Date(client.auditEndDate).toLocaleDateString() : 'N/A'}
               </p>
             )}
@@ -170,7 +188,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
               onClick={() => navigate(`/dashboard/client/${id}/edit`, { state: { activeTab: 'Pre - Validation', unlockAudit: true } })}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
             >
-              <i className="fas fa-clipboard-check"></i>
+              <AuditOutlined />
               Start Audit
             </button>
           )}
@@ -178,7 +196,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
             onClick={() => navigate(`/dashboard/client/${id}/edit`)}
             className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
           >
-            <i className="fas fa-edit"></i>
+            <EditOutlined />
             Edit
           </button>
         </div>
@@ -332,7 +350,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                         </div>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => navigate(`/dashboard/client/${id}/document/${doc._id || i}`, { state: { doc } })}
+                            onClick={() => handleViewDocument(doc.filePath, doc.documentType, doc.documentType)}
                             className="px-3 py-1.5 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition-colors text-sm flex items-center gap-1"
                           >
                             <i className="fas fa-eye text-xs"></i>
@@ -386,7 +404,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                               <td className="p-3">
                                 {row.certificateFile ? (
                                   <button 
-                                    onClick={() => navigate('/dashboard/document-viewer', { state: { doc: { filePath: row.certificateFile, documentType: 'MSME Certificate', documentName: `MSME_${row.udyamNumber}` } } })}
+                                    onClick={() => handleViewDocument(row.certificateFile, 'MSME Certificate', `MSME_${row.udyamNumber}`)}
                                     className="text-primary-600 hover:underline"
                                   >
                                     View
@@ -471,8 +489,8 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
 
                     // 3. Combine Products
                     const combinedProducts = [
-                        ...cteProd.map(r => ({ ...r, type: 'CTE', _rawType: 'cte', capacity: r.maxCapacityPerYear, capacityUnit: 'Capacity/Yr' })),
-                        ...ctoProds.map(r => ({ ...r, type: 'CTO', _rawType: 'cto', capacity: r.quantity, capacityUnit: 'Quantity' }))
+                        ...cteProd.map(r => ({ ...r, type: 'CTE', _rawType: 'cte', capacity: r.maxCapacityPerYear, capacityUnit: r.uom || 'MT/Year' })),
+                        ...ctoProds.map(r => ({ ...r, type: 'CTO', _rawType: 'cto', capacity: r.quantity, capacityUnit: r.uom || 'MT' }))
                     ];
 
                     // 4. Determine Audit Action (Single Button Logic)
@@ -630,9 +648,9 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                                                                     </td>
                                                                     <td className="p-3">
                                                                         {r.documentFile ? (
-                                                                            <a href={resolveUrl(r.documentFile)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                                                                            <button onClick={() => handleViewDocument(r.documentFile, 'CTE Document', `CTE_${r.consentNo}`)} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
                                                                                 <i className="fas fa-eye mr-1"></i> View
-                                                                            </a>
+                                                                            </button>
                                                                         ) : (
                                                                             <span className="text-gray-400 text-xs italic">No Doc</span>
                                                                         )}
@@ -721,9 +739,9 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                                                                     </td>
                                                                     <td className="p-3">
                                                                         {r.documentFile ? (
-                                                                            <a href={resolveUrl(r.documentFile)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                                                                            <button onClick={() => handleViewDocument(r.documentFile, 'CTO Document', `CTO_${r.consentOrderNo}`)} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
                                                                                 <i className="fas fa-eye mr-1"></i> View
-                                                                            </a>
+                                                                            </button>
                                                                         ) : (
                                                                             <span className="text-gray-400 text-xs italic">No Doc</span>
                                                                         )}
@@ -809,6 +827,12 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
 
         </div>
       </div>
+      <DocumentViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        documentUrl={viewerUrl}
+        documentName={viewerName}
+      />
     </div>
   );
 };

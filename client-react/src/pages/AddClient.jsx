@@ -27,6 +27,7 @@ import PostAuditCheck from '../components/AddClientSteps/PostAuditCheck';
 import { getPostValidationColumns } from '../components/AddClientSteps/utils/postAuditColumns';
 import { generateMarkingLabellingReport, generateSkuComplianceReport } from '../components/AddClientSteps/utils/reportUtils';
 import { parseRemarksToItems } from '../utils/pdfHelpers';
+import DocumentViewerModal from '../components/DocumentViewerModal';
 
 import { 
   UREP_YEAR_OPTIONS, 
@@ -110,6 +111,47 @@ const AddClientContent = () => {
   const [activeTab, setActiveTab] = useState(isAuditMode ? 'Pre - Validation' : 'Client Data');
   const [ewasteSubTab, setEwasteSubTab] = useState('1');
   
+  // Preview state for file uploads
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState('');
+  const [previewTitle, setPreviewTitle] = useState('');
+
+  const getBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+
+  const handleCancelPreview = () => setPreviewOpen(false);
+
+  const handlePreview = async (file) => {
+    if (!file.url && !file.preview) {
+      file.preview = await getBase64(file.originFileObj);
+    }
+    setPreviewImage(file.url || file.preview);
+    setPreviewOpen(true);
+    setPreviewTitle(file.name || file.url.substring(file.url.lastIndexOf('/') + 1));
+  };
+
+  // Document Viewer State
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerName, setViewerName] = useState('');
+
+  const resolveUrl = (p) => {
+    if (!p) return '';
+    const isAbs = p.startsWith('http://') || p.startsWith('https://');
+    return isAbs ? p : `${API_URL}/${p}`;
+  };
+
+  const handleViewDocument = (filePath, docType, docName) => {
+    setViewerUrl(resolveUrl(filePath));
+    setViewerName(docName || docType);
+    setViewerOpen(true);
+  };
+
   const { 
       formData, 
       setFormData, 
@@ -132,20 +174,30 @@ const AddClientContent = () => {
   });
   const [costAnalysisSubTab, setCostAnalysisSubTab] = useState('Product');
   const [postValidationGotoPage, setPostValidationGotoPage] = useState('');
-  const [postValidationActiveTab, setPostValidationActiveTab] = useState('markingLabelling');
+  const [postValidationActiveTab, setPostValidationActiveTab] = useState('productAssessment');
 
   const {
-      // skuComplianceData, // Removed to avoid redeclaration
-      // setSkuComplianceData, // Removed to avoid redeclaration
+      skuComplianceData,
+      setSkuComplianceData,
       skuSearchText,
       setSkuSearchText,
       skuStatusFilter,
       setSkuStatusFilter,
-      // Removed duplicate declarations that are now handled by the hook destructuring later in the component
-      // or were causing redeclaration errors
+      skuPagination,
+      setSkuPagination,
+      skuImageLoading,
       setSkuImageLoading,
+      editingSkuKey,
       setEditingSkuKey,
-      handleSaveSkuCompliance
+      handleSkuComplianceChange,
+      addSkuRow,
+      removeSkuRow,
+      cancelSkuRow,
+      handleSkuPageChange,
+      handleSkuPageSizeChange,
+      handleSkuStatusChange,
+      handleSaveSkuCompliance,
+      fetchSkuComplianceData
   } = useSkuCompliance(clientId);
   
   // Alias for prop consistency
@@ -2418,9 +2470,12 @@ const AddClientContent = () => {
   const [tempPolymers, setTempPolymers] = useState([]);
   const [newPolymerInput, setNewPolymerInput] = useState('');
 
-  const handleOpenRemarksModal = (record) => {
-      setTempRemarks(Array.isArray(record.remarks) ? record.remarks : (record.remarks ? [record.remarks] : []));
+  const [currentRemarkField, setCurrentRemarkField] = useState('remarks');
+
+  const handleOpenRemarksModal = (record, field = 'remarks') => {
+      setTempRemarks(Array.isArray(record[field]) ? record[field] : (record[field] ? [record[field]] : []));
       setCurrentRemarkRecordKey(record.key);
+      setCurrentRemarkField(field);
       setNewRemarkInput('');
       setEditingRemarkIndex(null);
       setEditingRemarkValue('');
@@ -2480,7 +2535,7 @@ const AddClientContent = () => {
 
   const handleSaveRemarksFromModal = () => {
       if (currentRemarkRecordKey) {
-          handleSkuComplianceChange(currentRemarkRecordKey, 'remarks', tempRemarks);
+          handleSkuComplianceChange(currentRemarkRecordKey, currentRemarkField, tempRemarks);
       }
       setRemarksModalOpen(false);
   };
@@ -2724,30 +2779,13 @@ const AddClientContent = () => {
       openRemarkModal,
       handlePostValidationChange,
       appendRemarkPoint,
-      handleSavePostValidation
+      handleSavePostValidation,
+      onViewDocument: handleViewDocument
   }), [postValidationPagination, API_URL, openRemarkModal, handlePostValidationChange, appendRemarkPoint, handleSavePostValidation]);
 
 
 
-  const {
-      handleSkuImageUpload,
-      handleSkuImageDelete,
-      skuImageLoading,
-      saveSkuRow,
-      cancelSkuRow,
-      removeSkuRow,
-      addSkuRow,
-      editingSkuKey,
-      handleSkuComplianceChange,
-      handleSkuStatusChange,
-      skuPagination,
-      setSkuPagination,
-      handleSkuPageChange,
-      handleSkuPageSizeChange,
-      fetchSkuComplianceData,
-      skuComplianceData,
-      setSkuComplianceData
-  } = useSkuCompliance(clientId, postValidationActiveTab, activeTab);
+
 
   const skuTableDataSource = useMemo(() => {
     let data = skuComplianceData || [];
@@ -2877,12 +2915,10 @@ const AddClientContent = () => {
                   
                   const handleView = () => {
                       try {
-                          const url = src.startsWith('http://') || src.startsWith('https://')
-                              ? src
-                              : new URL(src, API_URL).toString();
-                          window.open(url, '_blank', 'noopener,noreferrer');
+                          const url = src.startsWith('http') ? src : new URL(src, API_URL).toString();
+                          handleViewDocument(url, 'Image', 'Product Image');
                       } catch {
-                          window.open(src, '_blank', 'noopener,noreferrer');
+                          handleViewDocument(src, 'Image', 'Product Image');
                       }
                   };
      
@@ -2930,6 +2966,7 @@ const AddClientContent = () => {
                     variant="borderless"
                     style={{ border: '1px solid #d1d5db', borderRadius: '0.375rem', height: '36px', display: 'flex', alignItems: 'center' }}
                     styles={{ popup: { root: { borderRadius: '0.5rem', padding: '4px' } } }}
+                    disabled
                 />
             ) 
         },
@@ -2947,6 +2984,7 @@ const AddClientContent = () => {
                     variant="borderless"
                     style={{ border: '1px solid #d1d5db', borderRadius: '0.375rem', height: '36px', display: 'flex', alignItems: 'center' }}
                     styles={{ popup: { root: { borderRadius: '0.5rem', padding: '4px' } } }}
+                    disabled
                 />
             ) 
         },
@@ -2964,6 +3002,7 @@ const AddClientContent = () => {
                     variant="borderless"
                     style={{ border: '1px solid #d1d5db', borderRadius: '0.375rem', height: '36px', display: 'flex', alignItems: 'center' }}
                     styles={{ popup: { root: { borderRadius: '0.5rem', padding: '4px' } } }}
+                    disabled
                 />
             ) 
         },
@@ -2981,6 +3020,7 @@ const AddClientContent = () => {
                     variant="borderless"
                     style={{ border: '1px solid #d1d5db', borderRadius: '0.375rem', height: '36px', display: 'flex', alignItems: 'center' }}
                     styles={{ popup: { root: { borderRadius: '0.5rem', padding: '4px' } } }}
+                    disabled
                 />
             ) 
         },
@@ -3081,6 +3121,7 @@ const AddClientContent = () => {
                     variant="borderless"
                     style={{ border: '1px solid #d1d5db', borderRadius: '0.375rem', height: '36px', display: 'flex', alignItems: 'center' }}
                     styles={{ popup: { root: { borderRadius: '0.5rem', padding: '4px' } } }}
+                    disabled
                 />
             ) 
         },
@@ -3098,11 +3139,28 @@ const AddClientContent = () => {
                     variant="borderless"
                     style={{ border: '1px solid #d1d5db', borderRadius: '0.375rem', height: '36px', display: 'flex', alignItems: 'center' }}
                     styles={{ popup: { root: { borderRadius: '0.5rem', padding: '4px' } } }}
+                    disabled
                 />
             ) 
         },
+        {
+            title: 'UPLOAD PHOTOS',
+            dataIndex: 'markingImage',
+            key: 'markingImage',
+            width: 200,
+            render: (fileList, record) => (
+                <Upload
+                    listType="picture-card"
+                    fileList={fileList || []}
+                    onPreview={handlePreview}
+                    showUploadList={{ showRemoveIcon: false }}
+                    disabled={true}
+                >
+                </Upload>
+            )
+        },
         { 
-            title: 'AUDITOR REMARKS', 
+            title: 'Auditor Remarks for Marking and Labeling', 
             dataIndex: 'remarks', 
             key: 'remarks', 
             width: 250, 
@@ -3120,10 +3178,44 @@ const AddClientContent = () => {
                                 ))}
                             </div>
                         )}
+                        {/* 
                         <Button 
                             size="small" 
                             type="dashed" 
                             onClick={() => handleSkuRemark(record.key, 'remarks')}
+                            className="w-full flex items-center justify-center gap-1 text-xs text-gray-600 border-gray-300 hover:text-primary-600 hover:border-primary-400 h-7"
+                        >
+                            <FaPencilAlt className="text-[10px]" />
+                            {remarks.length > 0 ? 'Edit Remarks' : 'Add Remarks'}
+                        </Button>
+                        */}
+                    </div>
+                );
+            }
+        },
+        { 
+            title: 'Compliance Remarks', 
+            dataIndex: 'complianceRemarks', 
+            key: 'complianceRemarks', 
+            width: 250, 
+            render: (_, record) => {
+                const remarks = Array.isArray(record.complianceRemarks) ? record.complianceRemarks : (record.complianceRemarks ? [record.complianceRemarks] : []);
+                return (
+                    <div className="flex flex-col gap-2">
+                        {remarks.length > 0 && (
+                            <div className="flex flex-col gap-1 mb-1">
+                                {remarks.map((r, i) => (
+                                    <div key={i} className="flex items-start gap-1.5 bg-gray-50 p-1.5 rounded border border-gray-100">
+                                        <span className="text-[10px] text-gray-400 mt-0.5">•</span>
+                                        <span className="text-xs text-gray-700 leading-snug break-words">{r}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <Button 
+                            size="small" 
+                            type="dashed" 
+                            onClick={() => handleOpenRemarksModal(record, 'complianceRemarks')}
                             className="w-full flex items-center justify-center gap-1 text-xs text-gray-600 border-gray-300 hover:text-primary-600 hover:border-primary-400 h-7"
                         >
                             <FaPencilAlt className="text-[10px]" />
@@ -3191,6 +3283,7 @@ const AddClientContent = () => {
                                 alignItems: 'center' 
                             }}
                             styles={{ popup: { root: { borderRadius: '0.5rem', padding: '4px' } } }}
+                            disabled
                         />
                     </ConfigProvider>
                 );
@@ -3207,7 +3300,7 @@ const AddClientContent = () => {
                     <Button 
                         type="primary"
                         icon={<FaSave />} 
-                        onClick={() => saveSkuRow(record)}
+                        onClick={() => handleSaveSkuCompliance(record)}
                         className="bg-green-600 hover:bg-green-700 border-green-600 h-8 w-8 flex items-center justify-center rounded-md shadow-sm"
                         title="Save Row"
                     />
@@ -3352,7 +3445,7 @@ const AddClientContent = () => {
     <div className="-mt-2 md:-mt-4 px-2 md:px-4 pb-2 md:pb-4 bg-gray-50 min-h-screen">
       {contextHolder}
       <Modal
-          title="SKU Compliance Remarks"
+          title={currentRemarkField === 'complianceRemarks' ? "Compliance Remarks" : "Auditor Remarks"}
           open={remarksModalOpen}
           onCancel={() => setRemarksModalOpen(false)}
           onOk={handleSaveRemarksFromModal}
@@ -3780,17 +3873,13 @@ const AddClientContent = () => {
                 buildPolymerProcurementSummary={buildPolymerProcurementSummary}
                 monthlyProcurementRaw={monthlyProcurementRaw}
                 urepData={urepData}
-                handleSkuImageUpload={handleSkuImageUpload}
-                handleSkuImageDelete={handleSkuImageDelete}
                 skuImageLoading={skuImageLoading}
-                saveSkuRow={saveSkuRow}
-                cancelSkuRow={cancelSkuRow}
-                removeSkuRow={removeSkuRow}
-                addSkuRow={addSkuRow}
-                editingSkuKey={editingSkuKey}
                 handleBulkSavePostValidation={handleBulkSavePostValidation}
                 handleAddPostValidationRow={handleAddPostValidationRow}
                 handleDeleteAllPostValidation={handleDeleteAllPostValidation}
+                wasteType={formData.wasteType}
+                applicationType="CTO"
+                selectedPlantId={fullClientData?.productionFacility?.ctoDetailsList?.[0]?._id}
             />
         ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500 min-h-[400px] flex items-center justify-center">
@@ -3862,6 +3951,17 @@ const AddClientContent = () => {
             )}
         </div>
       </Modal>
+
+      <Modal open={previewOpen} title={previewTitle} footer={null} onCancel={handleCancelPreview}>
+        <img alt="example" style={{ width: '100%' }} src={previewImage} />
+      </Modal>
+
+      <DocumentViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        documentUrl={viewerUrl}
+        documentName={viewerName}
+      />
 
       <SubmitConfirmationModal 
         isOpen={isSubmitModalOpen} 

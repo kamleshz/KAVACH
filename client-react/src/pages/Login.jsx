@@ -4,6 +4,16 @@ import { toast } from 'react-toastify';
 import useAuth from '../hooks/useAuth';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
+import { 
+  SafetyCertificateOutlined, 
+  TeamOutlined, 
+  LineChartOutlined, 
+  MailOutlined, 
+  LockOutlined, 
+  EyeOutlined, 
+  EyeInvisibleOutlined, 
+  ExclamationCircleOutlined 
+} from '@ant-design/icons';
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '', otp: '' });
@@ -314,7 +324,7 @@ const Login = () => {
            <div className="relative z-20">
              <div className="flex items-center gap-3 mb-2">
                 <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner">
-                    <i className="fas fa-shield-alt text-xl text-white"></i>
+                    <SafetyCertificateOutlined className="text-xl text-white" />
                 </div>
              </div>
              <h1 className="text-2xl font-bold text-white tracking-wide mb-1">EPR Kavach</h1>
@@ -328,7 +338,7 @@ const Login = () => {
               <div className="group bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300">
                   <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-                          <i className="fas fa-shield-alt text-white text-sm"></i>
+                          <SafetyCertificateOutlined className="text-white text-sm" />
                       </div>
                       <div>
                           <h3 className="font-bold text-white text-xs mb-0.5">Secure & Reliable</h3>
@@ -341,7 +351,7 @@ const Login = () => {
               <div className="group bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300">
                   <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-                          <i className="fas fa-users text-white text-sm"></i>
+                          <TeamOutlined className="text-white text-sm" />
                       </div>
                       <div>
                           <h3 className="font-bold text-white text-xs mb-0.5">Client Management</h3>
@@ -354,7 +364,7 @@ const Login = () => {
               <div className="group bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300">
                   <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-                          <i className="fas fa-chart-line text-white text-sm"></i>
+                          <LineChartOutlined className="text-white text-sm" />
                       </div>
                       <div>
                           <h3 className="font-bold text-white text-xs mb-0.5">Real-time Analytics</h3>
@@ -378,7 +388,7 @@ const Login = () => {
                 {/* Mobile Header (Visible only on small screens) */}
                 <div className="lg:hidden text-center mb-8">
                     <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-[#20A65A] to-[#E85D40] text-white mb-3 shadow-lg">
-                        <i className="fas fa-shield-alt text-lg"></i>
+                        <SafetyCertificateOutlined className="text-lg" />
                     </div>
                     <h1 className="text-xl font-bold text-[#3D2E4A]">EPR Kavach</h1>
                 </div>
@@ -390,7 +400,7 @@ const Login = () => {
                 
                 {error && (
                     <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-lg text-xs flex items-center animate-slideUp">
-                        <i className="fas fa-exclamation-circle mr-2 text-sm"></i>
+                        <ExclamationCircleOutlined className="mr-2 text-sm" />
                         <span className="flex-1">{error}</span>
                     </div>
                 )}
@@ -411,7 +421,7 @@ const Login = () => {
                                             className="w-full px-4 py-2.5 bg-[#F4F1ED] rounded-lg text-sm text-[#3D2E4A] placeholder-[#706B77] focus:outline-none focus:ring-2 focus:ring-[#E85D40] focus:bg-white border border-[#E4E0DC] transition-all pl-10"
                                             required
                                         />
-                                        <i className="fas fa-envelope absolute left-3.5 top-1/2 -translate-y-1/2 text-[#706B77] group-focus-within:text-[#E85D40] transition-colors duration-300 text-xs"></i>
+                                        <MailOutlined className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#706B77] group-focus-within:text-[#E85D40] transition-colors duration-300 text-xs" />
                                     </div>
                                 </div>
 
@@ -427,13 +437,13 @@ const Login = () => {
                                             className="w-full px-4 py-2.5 bg-[#F4F1ED] rounded-lg text-sm text-[#3D2E4A] placeholder-[#706B77] focus:outline-none focus:ring-2 focus:ring-[#E85D40] focus:bg-white border border-[#E4E0DC] transition-all pl-10 pr-10"
                                             required
                                         />
-                                        <i className="fas fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-[#706B77] group-focus-within:text-[#E85D40] transition-colors duration-300 text-xs"></i>
+                                        <LockOutlined className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#706B77] group-focus-within:text-[#E85D40] transition-colors duration-300 text-xs" />
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
                                             className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#706B77] hover:text-[#3D2E4A] focus:outline-none"
                                         >
-                                            <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
+                                            {showPassword ? <EyeInvisibleOutlined className="text-xs" /> : <EyeOutlined className="text-xs" />}
                                         </button>
                                     </div>
                                 </div>

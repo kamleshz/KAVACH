@@ -280,7 +280,8 @@ const pwpSchema = new mongoose.Schema({
         cteProduction: [{
             plantName: { type: String, default: "" },
             productName: { type: String, required: true },
-            maxCapacityPerYear: { type: String, required: true }
+            maxCapacityPerYear: { type: String, required: true },
+            uom: { type: String, default: "" }
         }],
         ctoDetailsList: [{
             ctoCaaType: { type: String, enum: ['', 'Fresh', 'Renew', 'Amended'], default: "" },
@@ -348,7 +349,8 @@ const pwpSchema = new mongoose.Schema({
         ctoProducts: [{
             plantName: { type: String, default: "" },
             productName: { type: String, required: true },
-            quantity: { type: String, required: true }
+            quantity: { type: String, required: true },
+            uom: { type: String, default: "" }
         }]
     },
     documents: [documentSchema],

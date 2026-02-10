@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Input, Select } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { FaCheckCircle, FaSave, FaEdit, FaUndo, FaTrashAlt } from 'react-icons/fa';
 import { useClientContext } from '../../context/ClientContext';
+import DocumentViewerModal from '../DocumentViewerModal';
 
 const CteCtoCca = ({
     cteDetailRows,
@@ -51,6 +52,16 @@ const CteCtoCca = ({
     setHazardousWasteRegulationsRows
 }) => {
     const { formData, handleChange, handleFileChange } = useClientContext();
+    
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState('');
+    const [viewerName, setViewerName] = useState('');
+
+    const handleViewDocument = (url, name) => {
+        setViewerUrl(url);
+        setViewerName(name);
+        setViewerOpen(true);
+    };
 
     return (
         <div className="space-y-6 animate-fadeIn">
@@ -205,23 +216,21 @@ const CteCtoCca = ({
                                                                     : (row.documentFile?.name || 'Uploaded')}
                                                             </span>
                                                             {typeof row.documentFile === 'string' ? (
-                                                                <a
-                                                                    href={(row.documentFile.startsWith('http://') || row.documentFile.startsWith('https://'))
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleViewDocument((row.documentFile.startsWith('http://') || row.documentFile.startsWith('https://'))
                                                                         ? row.documentFile
-                                                                        : new URL(row.documentFile, API_URL).toString()}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-xs text-primary-700 underline ml-2"
+                                                                        : new URL(row.documentFile, API_URL).toString(), 'CTE Document')}
+                                                                    className="text-xs text-primary-700 underline ml-2 bg-transparent border-0 p-0 cursor-pointer"
                                                                 >
                                                                     View
-                                                                </a>
+                                                                </button>
                                                             ) : (
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => {
                                                                         const url = URL.createObjectURL(row.documentFile);
-                                                                        window.open(url, '_blank');
-                                                                        setTimeout(() => URL.revokeObjectURL(url), 5000);
+                                                                        handleViewDocument(url, row.documentFile.name);
                                                                     }}
                                                                     className="text-xs text-primary-700 underline ml-2"
                                                                 >
@@ -300,6 +309,7 @@ const CteCtoCca = ({
                                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/3">Plant Name</th>
                                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/3">Product Name</th>
                                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/4">Quantity</th>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-24">UOM</th>
                                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-28">Actions</th>
                                     </tr>
                                 </thead>
@@ -350,6 +360,22 @@ const CteCtoCca = ({
                                                     <span className="block px-2 py-1 text-sm text-gray-700">{row.maxCapacityPerYear}</span>
                                                 )}
                                             </td>
+                                            <td className="px-4 py-3">
+                                                {row.isEditing ? (
+                                                    <select
+                                                        value={row.uom || ''}
+                                                        onChange={(e) => handleCteProductionChange(index, 'uom', e.target.value)}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                                                    >
+                                                        <option value="">Select UOM</option>
+                                                        <option value="MT/Year">MT/Year</option>
+                                                        <option value="KG/Year">KG/Year</option>
+                                                        <option value="Units/Year">Units/Year</option>
+                                                    </select>
+                                                ) : (
+                                                    <span className="block px-2 py-1 text-sm text-gray-700">{row.uom || '-'}</span>
+                                                )}
+                                            </td>
                                             <td className="px-4 py-3 text-center">
                                                 <div className="flex items-center justify-center space-x-2">
                                                     {/* Save/Edit Button */}
@@ -391,7 +417,7 @@ const CteCtoCca = ({
                                     ))}
                                     {cteProductionRows.length === 0 && (
                                         <tr>
-                                            <td colSpan="4" className="px-3 py-4 text-center text-gray-400 italic">
+                                            <td colSpan="5" className="px-3 py-4 text-center text-gray-400 italic">
                                                 No production details added
                                             </td>
                                         </tr>
@@ -581,23 +607,21 @@ const CteCtoCca = ({
                                                                     : (row.documentFile?.name || 'Uploaded')}
                                                             </span>
                                                             {typeof row.documentFile === 'string' ? (
-                                                                <a
-                                                                    href={(row.documentFile.startsWith('http://') || row.documentFile.startsWith('https://'))
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleViewDocument((row.documentFile.startsWith('http://') || row.documentFile.startsWith('https://'))
                                                                         ? row.documentFile
-                                                                        : new URL(row.documentFile, API_URL).toString()}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-xs text-primary-700 underline ml-2"
+                                                                        : new URL(row.documentFile, API_URL).toString(), 'CTO Document')}
+                                                                    className="text-xs text-primary-700 underline ml-2 bg-transparent border-0 p-0 cursor-pointer"
                                                                 >
                                                                     View
-                                                                </a>
+                                                                </button>
                                                             ) : (
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => {
                                                                         const url = URL.createObjectURL(row.documentFile);
-                                                                        window.open(url, '_blank');
-                                                                        setTimeout(() => URL.revokeObjectURL(url), 5000);
+                                                                        handleViewDocument(url, row.documentFile.name);
                                                                     }}
                                                                     className="text-xs text-primary-700 underline ml-2"
                                                                 >
@@ -678,6 +702,7 @@ const CteCtoCca = ({
                                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/3">Plant Name</th>
                                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/3">Product Name</th>
                                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/4">Quantity</th>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-24">UOM</th>
                                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-28">Actions</th>
                                     </tr>
                                 </thead>
@@ -728,6 +753,22 @@ const CteCtoCca = ({
                                                     <span className="block px-2 py-1 text-sm text-gray-700">{row.quantity}</span>
                                                 )}
                                             </td>
+                                            <td className="px-4 py-3">
+                                                {row.isEditing ? (
+                                                    <select
+                                                        value={row.uom || ''}
+                                                        onChange={(e) => handleCtoProductChange(index, 'uom', e.target.value)}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                                                    >
+                                                        <option value="">Select UOM</option>
+                                                        <option value="MT">MT</option>
+                                                        <option value="KG">KG</option>
+                                                        <option value="Units">Units</option>
+                                                    </select>
+                                                ) : (
+                                                    <span className="block px-2 py-1 text-sm text-gray-700">{row.uom || '-'}</span>
+                                                )}
+                                            </td>
                                             <td className="px-4 py-3 text-center">
                                                 <div className="flex items-center justify-center space-x-2">
                                                     {/* Save/Edit Button */}
@@ -769,7 +810,7 @@ const CteCtoCca = ({
                                     ))}
                                     {ctoProductRows.length === 0 && (
                                         <tr>
-                                            <td colSpan="4" className="px-3 py-4 text-center text-gray-400 italic">
+                                            <td colSpan="5" className="px-3 py-4 text-center text-gray-400 italic">
                                                 No product details added
                                             </td>
                                         </tr>
@@ -854,23 +895,21 @@ const CteCtoCca = ({
                                                         : (formData.cgwaNocDocument?.name || 'Uploaded')}
                                                 </span>
                                                 {typeof formData.cgwaNocDocument === 'string' ? (
-                                                    <a
-                                                        href={(formData.cgwaNocDocument.startsWith('http://') || formData.cgwaNocDocument.startsWith('https://'))
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleViewDocument((formData.cgwaNocDocument.startsWith('http://') || formData.cgwaNocDocument.startsWith('https://'))
                                                             ? formData.cgwaNocDocument
-                                                            : new URL(formData.cgwaNocDocument, API_URL).toString()}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-xs text-primary-700 underline ml-2"
+                                                            : new URL(formData.cgwaNocDocument, API_URL).toString(), 'CGWA NOC Document')}
+                                                        className="text-xs text-primary-700 underline ml-2 bg-transparent border-0 p-0 cursor-pointer"
                                                     >
                                                         View
-                                                    </a>
+                                                    </button>
                                                 ) : (
                                                     <button
                                                         type="button"
                                                         onClick={() => {
                                                             const url = URL.createObjectURL(formData.cgwaNocDocument);
-                                                            window.open(url, '_blank');
-                                                            setTimeout(() => URL.revokeObjectURL(url), 5000);
+                                                            handleViewDocument(url, formData.cgwaNocDocument.name);
                                                         }}
                                                         className="text-xs text-primary-700 underline ml-2"
                                                     >
@@ -1022,13 +1061,16 @@ const CteCtoCca = ({
                                                             {isViewMode ? (
                                                                 <span className="block px-2 py-1 text-sm text-gray-600">{row.uom || '-'}</span>
                                                             ) : (
-                                                                <input
-                                                                    type="text"
+                                                                <select
                                                                     value={row.uom || ''}
                                                                     onChange={(e) => updateWaterRegulationRow(idx, 'uom', e.target.value)}
                                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
-                                                                    placeholder="UOM"
-                                                                />
+                                                                >
+                                                                    <option value="">Select UOM</option>
+                                                                    <option value="KLD">KLD</option>
+                                                                    <option value="CMD">CMD</option>
+                                                                    <option value="Liters/Day">Liters/Day</option>
+                                                                </select>
                                                             )}
                                                         </td>
                                                         {!isViewMode && (
@@ -1122,13 +1164,16 @@ const CteCtoCca = ({
                                                             {isViewMode ? (
                                                                 <span className="block px-2 py-1 text-sm text-gray-600">{row.uom || '-'}</span>
                                                             ) : (
-                                                                <input
-                                                                    type="text"
+                                                                <select
                                                                     value={row.uom || ''}
                                                                     onChange={(e) => updateAirRegulationRow(idx, 'uom', e.target.value)}
                                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
-                                                                    placeholder="UOM"
-                                                                />
+                                                                >
+                                                                    <option value="">Select UOM</option>
+                                                                    <option value="mg/Nm3">mg/Nm3</option>
+                                                                    <option value="ppm">ppm</option>
+                                                                    <option value="kg/hr">kg/hr</option>
+                                                                </select>
                                                             )}
                                                         </td>
                                                         {!isViewMode && (
@@ -1238,13 +1283,15 @@ const CteCtoCca = ({
                                                             {isViewMode ? (
                                                                 <span className="block px-2 py-1 text-sm text-gray-600">{row.uom || '-'}</span>
                                                             ) : (
-                                                                <input
-                                                                    type="text"
+                                                                <select
                                                                     value={row.uom || ''}
                                                                     onChange={(e) => updateHazardousWasteRegulationRow(idx, 'uom', e.target.value)}
                                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
-                                                                    placeholder="UOM"
-                                                                />
+                                                                >
+                                                                    <option value="">Select UOM</option>
+                                                                    <option value="MT/Year">MT/Year</option>
+                                                                    <option value="KG/Year">KG/Year</option>
+                                                                </select>
                                                             )}
                                                         </td>
                                                         {!isViewMode && (
@@ -1270,6 +1317,13 @@ const CteCtoCca = ({
                     </div>
                 </div>
             )}
+
+            <DocumentViewerModal
+                isOpen={viewerOpen}
+                onClose={() => setViewerOpen(false)}
+                documentUrl={viewerUrl}
+                documentName={viewerName}
+            />
         </div>
     );
 };

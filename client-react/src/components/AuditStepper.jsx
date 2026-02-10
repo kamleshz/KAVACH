@@ -55,7 +55,11 @@ const AuditStepper = ({ steps, currentStep, onStepChange }) => {
             >
               <div className="flex items-center gap-3">
                 <div className={iconCircleClasses}>
-                  <i className={`${step.icon || 'fas fa-circle-user'} text-lg`} />
+                  {typeof step.icon === 'string' ? (
+                    <i className={`${step.icon || 'fas fa-circle-user'} text-lg`} />
+                  ) : (
+                    step.icon
+                  )}
                 </div>
                 <div>
                   <p className={titleClasses}>{step.title}</p>

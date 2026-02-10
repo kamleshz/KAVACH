@@ -7,8 +7,6 @@ import cookieParser from 'cookie-parser'
 import morgan from 'morgan'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
-import mongoSanitize from 'express-mongo-sanitize'
-import xss from 'xss-clean'
 import hpp from 'hpp'
 import connectDB from './config/connectDB.js';
 import authRouter from './routes/auth.route.js';
@@ -16,6 +14,7 @@ import clientRouter from './routes/client.route.js';
 import adminRouter from './routes/admin.route.js';
 import userRouter from './routes/user.route.js';
 import aiRouter from './routes/ai.route.js';
+import analysisRouter from './routes/analysis.route.js';
 import { seedRoles } from './utils/roleSeeder.js';
 import { initAuditCron } from './cron/auditCron.js';
 import logger from './utils/logger.js';
@@ -92,23 +91,18 @@ app.use((req, res, next) => {
     next();
 });
 
-// app.use(mongoSanitize());
-
-// Data sanitization against XSS
-// app.use(xss());
+// Rate Limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 500, // Limit each IP to 500 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+app.use('/api', limiter);
 
 // Prevent parameter pollution
 // app.use(hpp());
-
-// Rate limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // Limit each IP to 1000 requests per windowMs
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-    message: 'Too many requests from this IP, please try again after 15 minutes'
-})
-app.use(limiter)
 
 app.use('/uploads', express.static('uploads'));
 
@@ -125,6 +119,7 @@ app.use('/api/client', clientRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/user', userRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/analysis', analysisRouter);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
@@ -132,11 +127,15 @@ app.use((err, req, res, next) => {
     const statusCode = err.statusCode || 500;
     const message = err.message || 'Internal Server Error';
     
+    // In production, send generic message for 500 errors, but specific message for operational errors (4xx)
+    const isProduction = process.env.NODE_ENV === 'production';
+    const responseMessage = (isProduction && statusCode === 500) ? 'Internal Server Error' : message;
+
     res.status(statusCode).json({
         success: false,
         error: true,
-        message: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : message,
-        stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
+        message: responseMessage,
+        stack: isProduction ? undefined : err.stack
     });
 });
 
