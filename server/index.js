@@ -18,9 +18,24 @@ import analysisRouter from './routes/analysis.route.js';
 import { seedRoles } from './utils/roleSeeder.js';
 import { initAuditCron } from './cron/auditCron.js';
 import logger from './utils/logger.js';
+import fs from 'fs';
+import path from 'path';
 
 const app = express()
 app.set('trust proxy', 1); // Trust first proxy (Render/Vercel) for secure cookies
+
+// Ensure uploads directory exists at startup
+try {
+    const uploadDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+        logger.info(`[Startup] Created uploads directory at: ${uploadDir}`);
+    } else {
+        logger.info(`[Startup] Uploads directory exists at: ${uploadDir}`);
+    }
+} catch (error) {
+    logger.error(`[Startup] Failed to create uploads directory: ${error.message}`);
+}
 
 // Debug Environment Variables
 if (!process.env.SECRET_KEY_ACCESS_TOKEN) {
