@@ -31,7 +31,7 @@ export const verifyLoginOtpSchema = z.object({
   body: z.object({
     email: z.string().email('Invalid email address'),
     otp: z.string().min(1, 'OTP is required'),
-    photo: z.string().min(1, 'Live photo capture is required for login'),
+    photo: z.string().optional(),
     location: z.object({
         latitude: z.number().optional(),
         longitude: z.number().optional()

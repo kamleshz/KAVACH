@@ -10,7 +10,8 @@ async function connectDB() {
     await mongoose.connect(uri, {
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
-      family: 4     // ← THIS FIXES 80% OF WINDOWS ETIMEOUT ISSUES
+      family: 4,     // ← THIS FIXES 80% OF WINDOWS ETIMEOUT ISSUES
+      maxPoolSize: 10 // Maintain up to 10 socket connections
     });
 
     console.log("MongoDB connected successfully");

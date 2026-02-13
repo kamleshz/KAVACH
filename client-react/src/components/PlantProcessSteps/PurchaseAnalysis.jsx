@@ -56,18 +56,26 @@ const PurchaseAnalysis = ({ clientId, type, itemId }) => {
 
         // 3. Populate Data
         rows.forEach(row => {
-            const cat = row.plasticCategory || '';
+            const cat = (row.plasticCategory || '').toString().toUpperCase(); // Normalize input
             const fy = row.financialYear || 'Unknown';
             const regType = (row.registrationType || '').toLowerCase();
             const qty = parseFloat(row.totalPlasticQty) || 0;
 
             let matchedCat = null;
             if (cat) {
-                 if (cat.includes('Cat-I') && !cat.includes('Cat-II') && !cat.includes('Cat-III') && !cat.includes('Cat-IV')) matchedCat = 'Cat-I';
-                 else if (cat.includes('Cat-II') && !cat.includes('Cat-III')) matchedCat = 'Cat-II';
-                 else if (cat.includes('Cat-III')) matchedCat = 'Cat-III';
-                 else if (cat.includes('Cat-IV')) matchedCat = 'Cat-IV';
-                 else if (aggregation[cat]) matchedCat = cat;
+                 // Priority matching for Roman Numerals (IV > III > II > I)
+                 if (cat.includes("IV") || cat.includes("CAT-IV") || cat.includes("CAT IV") || cat.includes("CATEGORY IV")) matchedCat = "Cat-IV";
+                 else if (cat.includes("III") || cat.includes("CAT-III") || cat.includes("CAT III") || cat.includes("CATEGORY III")) matchedCat = "Cat-III";
+                 else if (cat.includes("II") || cat.includes("CAT-II") || cat.includes("CAT II") || cat.includes("CATEGORY II")) matchedCat = "Cat-II";
+                 
+                 // Check for Cat I variations, including "Cat I (Containers...)"
+                 else if (cat.includes("CAT-I") || cat.includes("CAT I") || cat.includes("CATEGORY I") || (cat.includes("I") && cat.includes("CONTAINER"))) matchedCat = "Cat-I";
+                 
+                 // Fallback: Check if it just contains "I" but ensure it's not part of II, III, IV
+                 else if (/\bI\b/.test(cat) || /CAT.*I/.test(cat)) matchedCat = "Cat-I";
+                 
+                 // Fallback to direct match if defined in aggregation
+                 else if (aggregation[row.plasticCategory]) matchedCat = row.plasticCategory;
             }
 
             if (matchedCat && aggregation[matchedCat]) {

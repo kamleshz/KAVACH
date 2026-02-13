@@ -2,64 +2,88 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { toAbsUrl, loadImageForPdf } from '../../../utils/pdfHelpers';
 
-export const buildPolymerProcurementSummary = (raw, filters) => {
-    const polymerMap = {};
+export const buildPolymerProcurementSummary = (rows, filters, viewMode = 'Month') => {
+    const summaryMap = new Map();
 
-    raw.forEach((row) => {
+    rows.forEach((row) => {
+        // Apply Filters
         const rowYear = row.financialYear || '';
         if (filters.year && rowYear !== filters.year) return;
 
         const rowMonth = row.month || '';
         if (filters.month && rowMonth !== filters.month) return;
 
-        const polymer = row.polymer || 'Unknown';
-        if (!polymerMap[polymer]) {
-            polymerMap[polymer] = {
-                polymer,
-                monthlyPurchaseMt: 0,
-                recycledQty: 0
-            };
-        }
+        // Additional array-based filters (if coming from new filter UI)
+        if (Array.isArray(filters.quarter) && filters.quarter.length > 0 && !filters.quarter.includes(row.quarter)) return;
+        if (Array.isArray(filters.half) && filters.half.length > 0 && !filters.half.includes(row.half)) return;
+        // Check if category filter is applied (even for polymer summary, we might filter by category)
+        if (Array.isArray(filters.category) && filters.category.length > 0 && !filters.category.includes(row.category)) return;
+        // Polymer filter
+        if (Array.isArray(filters.polymer) && filters.polymer.length > 0 && !filters.polymer.includes(row.polymer)) return;
 
-        polymerMap[polymer].monthlyPurchaseMt += Number(row.monthlyPurchaseMt) || 0;
-        polymerMap[polymer].recycledQty += Number(row.recycledQty) || 0;
+        // Group by Polymer
+        const key = row.polymer || 'Unknown';
+        const label = key;
+
+        const current = summaryMap.get(key) || {
+            label: label,
+            monthlyPurchaseMt: 0,
+            recycledQty: 0
+        };
+        
+        current.monthlyPurchaseMt += (Number(row.monthlyPurchaseMt) || 0);
+        current.recycledQty += (Number(row.recycledQty) || 0);
+        
+        summaryMap.set(key, current);
     });
 
-    return Object.values(polymerMap).sort((a, b) => {
-        const totalA = a.monthlyPurchaseMt + a.recycledQty;
-        const totalB = b.monthlyPurchaseMt + b.recycledQty;
-        return totalB - totalA;
-    });
+    const summaryArray = Array.from(summaryMap.values());
+    // Sort alphabetically by polymer name
+    summaryArray.sort((a, b) => a.label.localeCompare(b.label));
+    
+    return { data: summaryArray, keys: ['monthlyPurchaseMt', 'recycledQty'] };
 };
 
-export const buildCategoryProcurementSummary = (raw, filters) => {
-    const categoryMap = {};
+export const buildCategoryProcurementSummary = (rows, filters, viewMode = 'Month') => {
+    const summaryMap = new Map();
 
-    raw.forEach((row) => {
+    rows.forEach((row) => {
+        // Apply Filters
         const rowYear = row.financialYear || '';
         if (filters.year && rowYear !== filters.year) return;
 
         const rowMonth = row.month || '';
         if (filters.month && rowMonth !== filters.month) return;
 
-        const category = row.category || 'Unknown';
-        if (!categoryMap[category]) {
-            categoryMap[category] = {
-                category,
-                monthlyPurchaseMt: 0,
-                recycledQty: 0
-            };
-        }
+        // Additional array-based filters
+        if (Array.isArray(filters.quarter) && filters.quarter.length > 0 && !filters.quarter.includes(row.quarter)) return;
+        if (Array.isArray(filters.half) && filters.half.length > 0 && !filters.half.includes(row.half)) return;
+        // Category filter
+        if (Array.isArray(filters.category) && filters.category.length > 0 && !filters.category.includes(row.category)) return;
+        // Check if polymer filter is applied
+        if (Array.isArray(filters.polymer) && filters.polymer.length > 0 && !filters.polymer.includes(row.polymer)) return;
 
-        categoryMap[category].monthlyPurchaseMt += Number(row.monthlyPurchaseMt) || 0;
-        categoryMap[category].recycledQty += Number(row.recycledQty) || 0;
+        // Group by Category
+        const key = row.category || 'Unknown';
+        const label = key;
+
+        const current = summaryMap.get(key) || {
+            label: label,
+            monthlyPurchaseMt: 0,
+            recycledQty: 0
+        };
+        
+        current.monthlyPurchaseMt += (Number(row.monthlyPurchaseMt) || 0);
+        current.recycledQty += (Number(row.recycledQty) || 0);
+        
+        summaryMap.set(key, current);
     });
 
-    return Object.values(categoryMap).sort((a, b) => {
-        const totalA = a.monthlyPurchaseMt + a.recycledQty;
-        const totalB = b.monthlyPurchaseMt + b.recycledQty;
-        return totalB - totalA;
-    });
+    const summaryArray = Array.from(summaryMap.values());
+    // Sort alphabetically by category name
+    summaryArray.sort((a, b) => a.label.localeCompare(b.label));
+    
+    return { data: summaryArray, keys: ['monthlyPurchaseMt', 'recycledQty'] };
 };
 
 export const generateMarkingLabellingReport = async ({

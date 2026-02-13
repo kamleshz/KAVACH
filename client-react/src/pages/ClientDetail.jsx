@@ -2,7 +2,22 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
-import { FaChevronDown } from 'react-icons/fa';
+import { 
+  FaChevronDown,
+  FaUser,
+  FaMapMarkerAlt,
+  FaIdCard,
+  FaIndustry,
+  FaListAlt,
+  FaFileContract,
+  FaFile,
+  FaEye,
+  FaDownload,
+  FaFolderOpen,
+  FaBuilding,
+  FaCheckCircle,
+  FaClipboardCheck
+} from 'react-icons/fa';
 import AuditStepper from '../components/AuditStepper';
 import DocumentViewerModal from '../components/DocumentViewerModal';
 import { 
@@ -120,10 +135,10 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
   }
 
   const allTabs = [
-    { number: 1, title: 'Client Basic Info', description: 'Legal & Trade Details', icon: 'fas fa-user' },
-    { number: 2, title: 'Company Address Details', description: 'Registered & Communication', icon: 'fas fa-map-marker-alt' },
-    { number: 3, title: 'Company Documents', description: 'GST, PAN, CIN, etc.', icon: 'fas fa-id-card' },
-    { number: 4, title: 'CTE & CTO/CCA Details', description: 'Consent Details', icon: 'fas fa-industry' }
+    { number: 1, title: 'Client Basic Info', description: 'Legal & Trade Details', icon: <FaUser /> },
+    { number: 2, title: 'Company Address Details', description: 'Registered & Communication', icon: <FaMapMarkerAlt /> },
+    { number: 3, title: 'Company Documents', description: 'GST, PAN, CIN, etc.', icon: <FaIdCard /> },
+    { number: 4, title: 'CTE & CTO/CCA Details', description: 'Consent Details', icon: <FaIndustry /> }
   ];
 
   const tabs = isProcessMode ? allTabs.filter(t => t.number === 4) : allTabs;
@@ -216,7 +231,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
               <div className="rounded-xl border border-gray-200 bg-white">
                 <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl">
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                    <i className="fas fa-list-alt text-primary-600"></i>
+                    <FaListAlt className="text-primary-600" />
                     Overview
                   </span>
                 </div>
@@ -305,7 +320,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
               <div className="rounded-xl border border-gray-200 bg-white">
                 <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl">
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                    <i className="fas fa-map-marker-alt text-primary-600"></i>
+                    <FaMapMarkerAlt className="text-primary-600" />
                     Company Address Details
                   </span>
                 </div>
@@ -330,7 +345,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
               <div className="rounded-xl border border-gray-200 bg-white">
                 <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl">
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                    <i className="fas fa-file-shield text-primary-600"></i>
+                    <FaFileContract className="text-primary-600" />
                     Company Documents
                   </span>
                 </div>
@@ -340,7 +355,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                     .map((doc, i) => (
                       <div key={i} className="flex items-center justify-between bg-gray-50 border rounded-lg p-4">
                         <div className="flex items-center gap-4">
-                          <i className="fas fa-file text-primary-600 text-xl"></i>
+                          <FaFile className="text-primary-600 text-xl" />
                           <div>
                             <p className="font-semibold text-gray-900 text-sm">{doc.documentType}</p>
                             <p className="text-xs text-gray-600">
@@ -353,7 +368,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                             onClick={() => handleViewDocument(doc.filePath, doc.documentType, doc.documentType)}
                             className="px-3 py-1.5 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition-colors text-sm flex items-center gap-1"
                           >
-                            <i className="fas fa-eye text-xs"></i>
+                            <FaEye className="text-xs" />
                             View
                           </button>
                           <a
@@ -362,7 +377,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                             rel="noopener noreferrer"
                             className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm flex items-center gap-1"
                           >
-                            <i className="fas fa-download text-xs"></i>
+                            <FaDownload className="text-xs" />
                             Download
                           </a>
                         </div>
@@ -370,7 +385,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                     ))}
                   {(client.documents || []).filter(d => ['PAN', 'GST', 'CIN', 'Factory License', 'EPR Certificate', 'IEC Certificate', 'DIC/DCSSI Certificate'].includes(d.documentType)).length === 0 && (
                       <div className="text-center py-8 bg-gray-50 rounded-xl border">
-                      <i className="fas fa-folder-open text-gray-300 text-4xl mb-3"></i>
+                      <FaFolderOpen className="text-gray-300 text-4xl mb-3 mx-auto" />
                       <p className="text-gray-500 text-sm">No certificates uploaded</p>
                     </div>
                   )}
@@ -461,7 +476,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                     return (
                         <div className="text-center py-12 bg-white rounded-xl border border-gray-200 shadow-sm">
                             <div className="bg-gray-50 rounded-full h-20 w-20 flex items-center justify-center mx-auto mb-4">
-                                <i className="fas fa-industry text-3xl text-gray-400"></i>
+                                <FaIndustry className="text-3xl text-gray-400" />
                             </div>
                             <h3 className="text-lg font-medium text-gray-900">No Plant Details Found</h3>
                             <p className="text-gray-500 mt-1">There are no CTE or CTO/CCA details available for any plant.</p>
@@ -522,9 +537,9 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                     }
 
                     const buttonContent = buttonIsComplete ? (
-                        <><i className="fas fa-check-circle"></i> Audit Done</>
+                        <><FaCheckCircle /> Audit Done</>
                     ) : (
-                        <><i className="fas fa-clipboard-check"></i> {buttonProgress === 0 ? 'Start Audit' : `Resume (${Math.round(buttonProgress)}%)`}</>
+                        <><FaClipboardCheck /> {buttonProgress === 0 ? 'Start Audit' : `Resume (${Math.round(buttonProgress)}%)`}</>
                     );
 
                     return (
@@ -537,7 +552,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                                     aria-expanded={isPlantExpanded}
                                 >
                                     <div className="h-10 w-10 rounded-lg bg-primary-50 flex items-center justify-center text-primary-600">
-                                        <i className="fas fa-building text-xl"></i>
+                                        <FaBuilding className="text-xl" />
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <div>
@@ -649,7 +664,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                                                                     <td className="p-3">
                                                                         {r.documentFile ? (
                                                                             <button onClick={() => handleViewDocument(r.documentFile, 'CTE Document', `CTE_${r.consentNo}`)} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                                                                                <i className="fas fa-eye mr-1"></i> View
+                                                                                <FaEye className="mr-1" /> View
                                                                             </button>
                                                                         ) : (
                                                                             <span className="text-gray-400 text-xs italic">No Doc</span>
@@ -659,7 +674,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                                                                         {r.verification?.status === 'Verified' ? (
                                                                             <div className="flex flex-col items-center">
                                                                                 <span className="text-xs text-green-600 font-semibold flex items-center justify-center gap-1">
-                                                                                    <i className="fas fa-check-circle"></i> Verified
+                                                                                    <FaCheckCircle /> Verified
                                                                                 </span>
                                                                                 {r.verification?.verifiedBy && (
                                                                                     <span className="text-[10px] text-gray-500 mt-0.5">by {r.verification.verifiedBy.name || 'User'}</span>
@@ -740,7 +755,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                                                                     <td className="p-3">
                                                                         {r.documentFile ? (
                                                                             <button onClick={() => handleViewDocument(r.documentFile, 'CTO Document', `CTO_${r.consentOrderNo}`)} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                                                                                <i className="fas fa-eye mr-1"></i> View
+                                                                                <FaEye className="mr-1" /> View
                                                                             </button>
                                                                         ) : (
                                                                             <span className="text-gray-400 text-xs italic">No Doc</span>
@@ -750,7 +765,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                                                                         {r.verification?.status === 'Verified' ? (
                                                                             <div className="flex flex-col items-center">
                                                                                 <span className="text-xs text-green-600 font-semibold flex items-center justify-center gap-1">
-                                                                                    <i className="fas fa-check-circle"></i> Verified
+                                                                                    <FaCheckCircle /> Verified
                                                                                 </span>
                                                                                 {r.verification?.verifiedBy && (
                                                                                     <span className="text-[10px] text-gray-500 mt-0.5">

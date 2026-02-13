@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Pre-validation Report</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 10mm;
+        }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            color: #333;
+            line-height: 1.4;
+            margin: 0;
+            font-size: 11px;
+        }
+        
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 {
+            margin: 0 0 10px 0;
+            color: #166534; /* green-800 */
+        }
+        
+        .text-green { color: #16a34a; }
+        .text-gray { color: #6b7280; }
+        .font-bold { font-weight: bold; }
+        .uppercase { text-transform: uppercase; }
+        .text-sm { font-size: 10px; }
+        .text-xs { font-size: 9px; }
+        
+        /* Layout */
+        .page-break { page-break-after: always; }
+        .section { margin-bottom: 25px; }
+        
+        /* Header */
+        .report-header {
+            background-color: #f0fdf4; /* green-50 */
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #16a34a;
+            margin-bottom: 20px;
+        }
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #15803d; /* green-700 */
+            margin-bottom: 5px;
+        }
+        .report-title {
+            font-size: 14px;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* Section Titles */
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #15803d;
+            border-bottom: 1px solid #16a34a;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            background: #fff;
+            table-layout: fixed; /* Fix column widths */
+        }
+        th {
+            background-color: #f0fdf4;
+            color: #166534;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 9px;
+            padding: 8px;
+            border: 1px solid #e5e7eb;
+            text-align: left;
+            word-wrap: break-word;
+        }
+        td {
+            padding: 8px;
+            border: 1px solid #e5e7eb;
+            font-size: 10px;
+            vertical-align: top;
+            word-wrap: break-word;
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        
+        /* Engagement Letter */
+        .engagement-letter {
+            font-family: 'Times New Roman', serif;
+            font-size: 11px; /* Reduced font size to fit on one page */
+            line-height: 1.4; /* Tighter line height */
+            white-space: pre-wrap;
+            padding: 10px 20px; /* Reduced padding */
+            text-align: justify;
+        }
+        
+        /* Grid Layouts */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+        }
+        .card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .card-label {
+            font-size: 9px;
+            font-weight: bold;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .card-value {
+            font-size: 11px;
+            color: #111827;
+            font-weight: 500;
+        }
+        
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 10px 20px;
+            font-size: 8px;
+            color: #9ca3af;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            background: #fff;
+        }
+
+        /* Plant Header */
+        .plant-header {
+            background: linear-gradient(to right, #f9fafb, #fff);
+            padding: 10px;
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid #16a34a;
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 12px;
+            color: #111827;
+        }
+
+        /* SKU Section */
+        .sku-header-box {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            border: 1px solid #fb923c; /* Orange border */
+            border-radius: 6px;
+            padding: 10px;
+            background: #fff7ed; /* Orange-50 */
+        }
+        .sku-table {
+            flex: 2;
+        }
+        .sku-image-box {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 5px;
+        }
+        .sku-image {
+            max-width: 100%;
+            max-height: 150px;
+            object-fit: contain;
+        }
+
+        /* Component Visuals */
+        .visual-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .visual-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .visual-img-container {
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 10px;
+        }
+        .visual-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .visual-content {
+            padding: 10px;
+        }
+        .visual-title {
+            font-weight: bold;
+            font-size: 10px;
+            color: #111827;
+            margin-bottom: 5px;
+        }
+        .visual-remark {
+            font-size: 9px;
+            color: #d97706; /* Orange-600 */
+            background: #fff7ed;
+            padding: 5px;
+            border-radius: 4px;
+            border-left: 2px solid #f97316;
+        }
+        
+        /* Component Table Header Color override */
+        .comp-table th {
+            background-color: #fff7ed; /* Orange-50 */
+            color: #9a3412; /* Orange-800 */
+            border-color: #fed7aa;
+        }
+    </style>
+    <style>
+        /* Table of Contents Styles */
+        .toc-container {
+            padding: 20px 40px;
+            font-family: 'Helvetica', 'Arial', sans-serif;
+        }
+        .toc-item {
+            margin-bottom: 12px;
+            border-bottom: 1px dotted #e5e7eb;
+            padding-bottom: 5px;
+        }
+        .toc-main-link {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            text-decoration: none;
+            color: #166534; /* green-800 */
+            font-weight: bold;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+        .toc-sub-list {
+            margin-top: 8px;
+            padding-left: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .toc-sub-link {
+            text-decoration: none;
+            color: #4b5563; /* gray-600 */
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+        }
+        .toc-sub-link:before {
+            content: "•";
+            margin-right: 8px;
+            color: #9ca3af;
+        }
+        .toc-page-num {
+            color: #9ca3af;
+            font-size: 11px;
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PAGE 1: TABLE OF CONTENTS -->
+    <div class="page-break">
+        <div class="report-header">
+            <div class="company-name">{{basicInfo.clientName}}</div>
+            <div class="report-title">Table of Contents</div>
+        </div>
+
+        <div class="toc-container">
+            <!-- 1. Engagement Letter -->
+            <div class="toc-item">
+                <a href="#engagement" class="toc-main-link">
+                    <span>1. Engagement Letter</span>
+                </a>
+            </div>
+
+            <!-- 2. Client Data -->
+            <div class="toc-item">
+                <a href="#client-data" class="toc-main-link">
+                    <span>2. Client Data</span>
+                </a>
+                <div class="toc-sub-list">
+                    <a href="#client-basic-info" class="toc-sub-link">2.1 Client Basic Information</a>
+                    <a href="#address-details" class="toc-sub-link">2.2 Address Details</a>
+                    <a href="#msme-details" class="toc-sub-link">2.3 MSME Details</a>
+                    <a href="#company-documents" class="toc-sub-link">2.4 Company Documents</a>
+                </div>
+            </div>
+
+            <!-- 3. Plant & Consent Details -->
+            <div class="toc-item">
+                <a href="#plant-details" class="toc-main-link">
+                    <span>3. Plant & Consent Details</span>
+                </a>
+            </div>
+
+            <!-- 4. Industry Category -->
+            <div class="toc-item">
+                <a href="#industry-category" class="toc-main-link">
+                    <span>4. Industry Category Wise Details (SKU & Component Analysis)</span>
+                </a>
+            </div>
+
+            <!-- 5. Marking and Labeling -->
+            {{#if markingLabelingData.length}}
+            <div class="toc-item">
+                <a href="#marking-labeling" class="toc-main-link">
+                    <span>5. Marking and Labeling Report</span>
+                </a>
+            </div>
+            {{/if}}
+
+            <!-- 6. Summary Report -->
+            <div class="toc-item">
+                <a href="#summary-report" class="toc-main-link">
+                    <span>6. Summary Report</span>
+                </a>
+                <div class="toc-sub-list">
+                    <a href="#sales-summary" class="toc-sub-link">6.1 Sales Summary</a>
+                    <a href="#procurement-summary" class="toc-sub-link">6.2 Procurement Summary</a>
+                    <a href="#pre-post-analysis" class="toc-sub-link">6.3 Pre vs Post Consumer Waste Analysis</a>
+                    <a href="#epr-targets" class="toc-sub-link">6.4 EPR Targets</a>
+                </div>
+            </div>
+
+            <!-- 7. Auditor Insights -->
+            <div class="toc-item">
+                <a href="#auditor-insights" class="toc-main-link">
+                    <span>7. Auditor Insights</span>
+                </a>
+            </div>
+        </div>
+        
+        <div class="footer" style="position: absolute; bottom: 20px;">
+            <span>AnantTattva EPR Kavach System</span>
+            <span>Index</span>
+        </div>
+    </div>
+
+    <!-- PAGE 2: ENGAGEMENT LETTER -->
+    {{#if engagementContent}}
+    <div class="page-break" id="engagement">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <h2 style="color: #166534; text-decoration: underline;">ENGAGEMENT LETTER</h2>
+        </div>
+        <div class="engagement-letter">
+{{engagementContent}}
+        </div>
+        
+        <!-- Footer for Page 2 -->
+        <div class="footer" style="position: absolute; bottom: 20px;">
+            <span>AnantTattva EPR Kavach System</span>
+            <span>Engagement Letter</span>
+        </div>
+    </div>
+    {{/if}}
+
+    <!-- PAGE 3: PRE-VALIDATION REPORT START -->
+    <div class="report-header" id="client-data">
+        <div class="company-name">{{basicInfo.clientName}}</div>
+        <div class="report-title">Pre-validation Report</div>
+        <div style="font-size: 10px; color: #6b7280; margin-top: 5px;">Generated on: {{generatedDate}}</div>
+    </div>
+
+    <!-- 1. Client Information -->
+    <div class="section" id="client-basic-info">
+        <div class="section-title">1. Client Information</div>
+        <div class="grid-2">
+            <table style="margin: 0;">
+                <tr>
+                    <th width="30%">Client Name</th>
+                    <td>{{basicInfo.clientName}}</td>
+                </tr>
+                <tr>
+                    <th>Trade Name</th>
+                    <td>{{basicInfo.tradeName}}</td>
+                </tr>
+                <tr>
+                    <th>Group Name</th>
+                    <td>{{basicInfo.groupName}}</td>
+                </tr>
+                <tr>
+                    <th>Entity/Producer Type</th>
+                    <td>{{basicInfo.entityType}}</td>
+                </tr>
+            </table>
+            <table style="margin: 0;">
+                <tr>
+                    <th width="30%">Auth. Person</th>
+                    <td>
+                        {{basicInfo.authPerson.name}}<br>
+                        <span class="text-gray text-xs">{{basicInfo.authPerson.designation}}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Auth. Contact</th>
+                    <td>{{basicInfo.authPerson.number}} / {{basicInfo.authPerson.email}}</td>
+                </tr>
+                <tr>
+                    <th>Coord. Person</th>
+                    <td>{{basicInfo.coordPerson.name}}</td>
+                </tr>
+                <tr>
+                    <th>Coord. Contact</th>
+                    <td>{{basicInfo.coordPerson.number}} / {{basicInfo.coordPerson.email}}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- 2. Address Details -->
+    <div class="section" id="address-details">
+        <div class="section-title">2. Address Details</div>
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-label">Registered Address</div>
+                <div class="card-value">{{addressDetails.registered}}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Communication Address</div>
+                <div class="card-value">{{addressDetails.communication}}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. MSME Details -->
+    <div class="section" id="msme-details">
+        <div class="section-title">3. MSME Details</div>
+        <div class="grid-3" style="margin-bottom: 15px;">
+            <div class="card">
+                <div class="card-label">Status</div>
+                <div class="card-value">{{msmeDetails.status}}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">MSME Number</div>
+                <div class="card-value">{{msmeDetails.number}}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Enterprise Type</div>
+                <div class="card-value">{{msmeDetails.type}}</div>
+            </div>
+        </div>
+        
+        {{#if msmeDetails.history.length}}
+        <div style="font-size: 10px; font-weight: bold; margin-bottom: 5px; color: #4b5563;">MSME History</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Year</th>
+                    <th>Status</th>
+                    <th>Major Activity</th>
+                    <th>Udyam Number</th>
+                    <th>Turnover (Cr.)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each msmeDetails.history}}
+                <tr>
+                    <td>{{this.year}}</td>
+                    <td>{{this.status}}</td>
+                    <td>{{this.activity}}</td>
+                    <td>{{this.udyam}}</td>
+                    <td>{{this.turnover}}</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+        {{/if}}
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- 4. Company Documents -->
+    <div class="section" id="company-documents">
+        <div class="section-title">4. Company Documents</div>
+        {{#if companyDocuments.length}}
+        <table>
+            <thead>
+                <tr>
+                    <th>Document Type</th>
+                    <th>Certificate Number</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each companyDocuments}}
+                <tr>
+                    <td>{{this.type}}</td>
+                    <td>{{this.number}}</td>
+                    <td>{{this.date}}</td>
+                    <td>{{this.status}}</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+        {{else}}
+        <div class="card" style="text-align: center; color: #6b7280;">No required documents uploaded.</div>
+        {{/if}}
+    </div>
+
+    <!-- 5. Plant & Consent Details -->
+    <div class="section" id="plant-details">
+        <div class="section-title">5. Plant & Consent Details</div>
+        
+        {{#if plants.length}}
+            {{#each plants}}
+            <div class="section" style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; page-break-inside: avoid;">
+                <div class="plant-header">Plant Unit: {{this.name}}</div>
+                
+                <!-- CTE Table -->
+                {{#if this.cte.length}}
+                <div style="margin-bottom: 10px;">
+                    <div class="text-sm font-bold text-gray mb-2">CTE Details</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Consent No</th>
+                                <th>Issue Date</th>
+                                <th>Valid Upto</th>
+                                <th>Location</th>
+                                <th>Address</th>
+                                <th>Remark</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each this.cte}}
+                            <tr>
+                                <td>{{this.consentNo}}</td>
+                                <td>{{this.issueDate}}</td>
+                                <td>{{this.validUpto}}</td>
+                                <td>{{this.location}}</td>
+                                <td>{{this.address}}</td>
+                                <td style="color: #d97706;">{{this.remark}}</td>
+                            </tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
+                </div>
+                {{/if}}
+
+                <!-- CTO Table -->
+                {{#if this.cto.length}}
+                <div>
+                    <div class="text-sm font-bold text-gray mb-2">CTO Details</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Industry</th>
+                                <th>Category</th>
+                                <th>Order No</th>
+                                <th>Issue Date</th>
+                                <th>Valid Upto</th>
+                                <th>Location</th>
+                                <th>Remark</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each this.cto}}
+                            <tr>
+                                <td>{{this.type}}</td>
+                                <td>{{this.industryType}}</td>
+                                <td>{{this.category}}</td>
+                                <td>{{this.orderNo}}</td>
+                                <td>{{this.issueDate}}</td>
+                                <td>{{this.validUpto}}</td>
+                                <td>{{this.location}}</td>
+                                <td style="color: #d97706;">{{this.remark}}</td>
+                            </tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
+                </div>
+                {{/if}}
+            </div>
+            {{/each}}
+            
+            <!-- Additional CTO Details (Global for now as backend sends one set) -->
+            <!-- Note: ClientValidation.jsx logic implies these are facility-wide or aggregated. -->
+            <div class="page-break"></div>
+            <div class="section">
+                <div class="section-title">
+                    CTO Additional Details & Regulations
+                    {{#if additionalDetails.additionalRemark}}
+                    <span style="font-size: 10px; color: #d97706; margin-left: 10px; font-weight: normal;">Remark: {{additionalDetails.additionalRemark}}</span>
+                    {{/if}}
+                </div>
+                
+                <div class="grid-3" style="margin-bottom: 20px;">
+                    <div class="card">
+                        <div class="card-label">Total Capital Investment (Lakhs)</div>
+                        <div class="card-value">{{additionalDetails.investment}}</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">Ground/Bore Well Water Usage</div>
+                        <div class="card-value">{{additionalDetails.waterUsage}}</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">CGWA NOC Requirement</div>
+                        <div class="card-value">{{additionalDetails.cgwaNocReq}}</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <span class="font-bold text-sm">Regulations Covered:</span>
+                    <span class="text-sm" style="background: #ecfdf5; color: #047857; padding: 2px 8px; border-radius: 4px; margin-left: 10px;">
+                        {{additionalDetails.regulations}}
+                    </span>
+                    {{#if additionalDetails.regulationsRemark}}
+                    <span style="font-size: 10px; color: #d97706; margin-left: 10px;">Remark: {{additionalDetails.regulationsRemark}}</span>
+                    {{/if}}
+                </div>
+
+                {{#if additionalDetails.hasWater}}
+                <div style="margin-bottom: 20px;">
+                    <div class="text-sm font-bold text-green mb-2">
+                        Water Regulations
+                        {{#if additionalDetails.waterRemark}}
+                        <span style="font-size: 10px; color: #d97706; margin-left: 10px; font-weight: normal;">Remark: {{additionalDetails.waterRemark}}</span>
+                        {{/if}}
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th width="10%">SR No</th>
+                                <th>Description</th>
+                                <th>Permitted Quantity</th>
+                                <th>UOM</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each additionalDetails.waterRegs}}
+                            <tr>
+                                <td>{{this.sr}}</td>
+                                <td>{{this.desc}}</td>
+                                <td>{{this.qty}}</td>
+                                <td>{{this.uom}}</td>
+                            </tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
+                </div>
+                {{/if}}
+
+                {{#if additionalDetails.hasAir}}
+                <div style="margin-bottom: 20px;">
+                    <div class="text-sm font-bold text-green mb-2">
+                        Air Regulations
+                        {{#if additionalDetails.airRemark}}
+                        <span style="font-size: 10px; color: #d97706; margin-left: 10px; font-weight: normal;">Remark: {{additionalDetails.airRemark}}</span>
+                        {{/if}}
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th width="10%">SR No</th>
+                                <th>Parameters</th>
+                                <th>Permissible Limit</th>
+                                <th>UOM</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each additionalDetails.airRegs}}
+                            <tr>
+                                <td>{{this.sr}}</td>
+                                <td>{{this.param}}</td>
+                                <td>{{this.limit}}</td>
+                                <td>{{this.uom}}</td>
+                            </tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
+                </div>
+                {{/if}}
+
+                {{#if additionalDetails.hasHazardous}}
+                <div style="margin-bottom: 20px;">
+                    <div class="text-sm font-bold text-green mb-2">
+                        Hazardous Waste Regulations
+                        {{#if additionalDetails.hazardousRemark}}
+                        <span style="font-size: 10px; color: #d97706; margin-left: 10px; font-weight: normal;">Remark: {{additionalDetails.hazardousRemark}}</span>
+                        {{/if}}
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th width="10%">SR No</th>
+                                <th>Name of Hazardous Waste</th>
+                                <th>Facility & Mode of Disposal</th>
+                                <th>Quantity MT/YR</th>
+                                <th>UOM</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each additionalDetails.hazardousRegs}}
+                            <tr>
+                                <td>{{this.sr}}</td>
+                                <td>{{this.name}}</td>
+                                <td>{{this.disposal}}</td>
+                                <td>{{this.qty}}</td>
+                                <td>{{this.uom}}</td>
+                            </tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
+                </div>
+                {{/if}}
+            </div>
+
+        {{else}}
+        <div class="card" style="text-align: center; color: #6b7280;">No plant details available.</div>
+        {{/if}}
+    </div>
+
+    <!-- 6. Phase 2: Industry Category Details -->
+    {{#if industryCategories.length}}
+        <div class="page-break"></div>
+        <div class="page-break" id="industry-category">
+            <div class="report-header" style="background-color: #fff7ed; border-bottom-color: #f97316;">
+                <div class="company-name" style="color: #c2410c;">Industry Category Wise Details</div>
+                <div class="report-title">SKU & Component Analysis</div>
+            </div>
+
+            {{#each industryCategories}}
+                <div class="section">
+                    <h3 style="color: #c2410c; border-bottom: 2px solid #f97316; padding-bottom: 5px; margin-bottom: 20px;">
+                        {{this.name}}
+                    </h3>
+
+                    {{#each this.skus}}
+                        <div style="margin-bottom: 30px; page-break-inside: avoid;">
+                            <!-- SKU Header Box -->
+                            <div class="sku-header-box">
+                                <div class="sku-table">
+                                    <table style="margin: 0; border: none;">
+                                        <tr>
+                                            <th style="width: 30%; background: #fed7aa; color: #9a3412;">Field</th>
+                                            <th style="background: #fed7aa; color: #9a3412;">Value</th>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: bold;">SKU Code</td>
+                                            <td>{{this.skuCode}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: bold;">SKU Description</td>
+                                            <td>{{this.skuDescription}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: bold;">SKU UOM</td>
+                                            <td>{{this.skuUom}}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="sku-image-box">
+                                    {{#if this.productImage}}
+                                        <img src="{{this.productImage}}" class="sku-image" alt="Product Image">
+                                    {{else}}
+                                        <div style="color: #9ca3af; font-size: 10px;">No Product Image</div>
+                                    {{/if}}
+                                </div>
+                            </div>
+
+                            <!-- Component Table -->
+                            <table class="comp-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 8%;">Comp Code</th>
+                                        <th style="width: 15%;">Description</th>
+                                        <th style="width: 10%;">Supplier</th>
+                                        <th style="width: 8%;">Supplier Status</th>
+                                        <th style="width: 8%;">Polymer</th>
+                                        <th style="width: 8%;">Category</th>
+                                        <th style="width: 8%;">Thickness</th>
+                                        <th style="width: 8%;">Compliance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{#each this.components}}
+                                    <tr>
+                                        <td>{{this.componentCode}}</td>
+                                        <td>{{this.componentDescription}}</td>
+                                        <td>{{this.supplierName}}</td>
+                                        <td>{{this.supplierStatus}}</td>
+                                        <td>{{this.componentPolymer}}</td>
+                                        <td>{{this.category}}</td>
+                                        <td>{{this.thickness}}</td>
+                                        <td>
+                                            <span style="
+                                                padding: 2px 4px; border-radius: 4px; font-weight: bold; font-size: 8px;
+                                                {{#if (eq this.status 'Compliant')}}
+                                                    background: #dcfce7; color: #166534;
+                                                {{else if (eq this.status 'Partial Compliant')}}
+                                                    background: #ffedd5; color: #9a3412;
+                                                {{else if (eq this.status 'Non-Compliant')}}
+                                                    background: #fee2e2; color: #991b1b;
+                                                {{else}}
+                                                    background: #f3f4f6; color: #374151;
+                                                {{/if}}
+                                            ">
+                                                {{this.status}}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {{/each}}
+                                </tbody>
+                            </table>
+
+                            <!-- Auditor Remarks Section -->
+                            <div style="margin-top: 15px; margin-bottom: 20px;">
+                                <div style="font-weight: bold; color: #c2410c; margin-bottom: 5px; font-size: 11px;">Auditor Remarks</div>
+                                {{#each this.components}}
+                                    {{#if (ne this.auditorRemarks '-')}}
+                                    <div style="margin-bottom: 8px; padding: 8px; background: #fff7ed; border-left: 3px solid #f97316; font-size: 10px;">
+                                        <strong>{{this.componentCode}}:</strong> {{this.auditorRemarks}}
+                                    </div>
+                                    {{/if}}
+                                {{/each}}
+                            </div>
+
+                            <div class="page-break"></div>
+
+                            <!-- Component Visuals (Grid) -->
+                            <h4 style="color: #c2410c; margin-bottom: 15px;">Component Images</h4>
+                            <div class="visual-grid">
+                                {{#each this.components}}
+                                <div class="visual-card">
+                                    <div class="visual-img-container">
+                                        {{#if this.componentImage}}
+                                            <img src="{{this.componentImage}}" class="visual-img" alt="Comp Image">
+                                        {{else}}
+                                            <div style="color: #9ca3af; font-size: 10px;">No Image</div>
+                                        {{/if}}
+                                    </div>
+                                    <div class="visual-content" style="text-align: center;">
+                                        <div class="visual-title">{{this.componentCode}}</div>
+                                        <div style="font-size: 9px; color: #6b7280;">{{this.componentDescription}}</div>
+                                        <div style="font-size: 9px; font-weight: bold; color: #15803d; margin-top: 2px;">{{this.componentPolymer}}</div>
+                                    </div>
+                                </div>
+                                {{/each}}
+                            </div>
+                            
+                        </div>
+                        <div class="page-break"></div>
+                    {{/each}}
+                </div>
+            {{/each}}
+        {{/if}}
+
+    <!-- Marking and Labeling Report -->
+    {{#if markingLabelingData.length}}
+    <div class="page-break" id="marking-labeling">
+        <div class="report-header" style="background-color: #f0fdf4; border-bottom-color: #16a34a;">
+            <div class="company-name" style="color: #15803d;">Marking and Labeling Report</div>
+            <div class="report-title">Detailed Packaging Assessment</div>
+        </div>
+
+        <div class="section">
+            {{#each markingLabelingData}}
+            <div style="margin-bottom: 20px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; page-break-inside: avoid;">
+                <div style="display: flex; gap: 20px; margin-bottom: 15px;">
+                    <!-- Left: Data Table -->
+                    <div style="flex: 2;">
+                        <table style="margin-bottom: 10px;">
+                            <tr>
+                                <th style="width: 30%; background: #fed7aa; color: #9a3412;">Field</th>
+                                <th style="background: #fed7aa; color: #9a3412;">Value</th>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">SKU Code</td>
+                                <td>{{this.skuCode}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">SKU Description</td>
+                                <td>{{this.skuDescription}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">SKU UOM</td>
+                                <td>{{this.skuUom}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">Brand Owner</td>
+                                <td>{{this.brandOwner}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">EPR Cert (Brand)</td>
+                                <td>{{this.eprCertBrandOwner}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">EPR Cert (Producer)</td>
+                                <td>{{this.eprCertProducer}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">Thickness</td>
+                                <td>{{this.thicknessMentioned}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">Polymer</td>
+                                <td>{{this.polymerUsed}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">Recycled %</td>
+                                <td>{{this.recycledPercent}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: bold;">Status</td>
+                                <td>
+                                    <span style="
+                                        padding: 2px 4px; border-radius: 4px; font-weight: bold; font-size: 8px;
+                                        {{#if (eq this.complianceStatus 'Compliant')}}
+                                            background: #dcfce7; color: #166534;
+                                        {{else if (eq this.complianceStatus 'Partial Compliant')}}
+                                            background: #ffedd5; color: #9a3412;
+                                        {{else if (eq this.complianceStatus 'Non-Compliant')}}
+                                            background: #fee2e2; color: #991b1b;
+                                        {{else}}
+                                            background: #f3f4f6; color: #374151;
+                                        {{/if}}
+                                    ">
+                                        {{this.complianceStatus}}
+                                    </span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Right: Product Image -->
+                    <div style="flex: 1; display: flex; align-items: center; justify-content: center; border: 1px solid #e5e7eb; border-radius: 4px; padding: 10px; background: #fff;">
+                        {{#if this.productImage}}
+                            <img src="{{this.productImage}}" style="max-width: 100%; max-height: 150px; object-fit: contain;">
+                        {{else}}
+                            <span style="color: #9ca3af; font-size: 10px;">No Product Image</span>
+                        {{/if}}
+                    </div>
+                </div>
+
+                <!-- Separate Section for Remarks & Marking Images -->
+                <div style="display: flex; gap: 20px; margin-top: 10px; border-top: 1px solid #e5e7eb; padding-top: 10px;">
+                    <div style="flex: 1; border-right: 1px solid #e5e7eb; padding-right: 10px;">
+                        <div style="font-weight: bold; color: #0c4a6e; font-size: 10px; margin-bottom: 5px;">Marking Photos</div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                            {{#if this.markingImages.length}}
+                                {{#each this.markingImages}}
+                                    <img src="{{this}}" style="width: 60px; height: 60px; object-fit: cover; border: 1px solid #ddd; border-radius: 4px;">
+                                {{/each}}
+                            {{else}}
+                                <span style="font-size: 9px; color: #9ca3af; font-style: italic;">No marking photos uploaded.</span>
+                            {{/if}}
+                        </div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: bold; color: #9a3412; font-size: 10px; margin-bottom: 5px;">Remarks</div>
+                        
+                        <div style="font-size: 9px; margin-bottom: 8px;">
+                            <strong style="color: #4b5563;">Auditor Remarks:</strong>
+                            <div style="background: #fff7ed; padding: 5px; border-radius: 4px; margin-top: 2px; white-space: pre-wrap;">{{this.auditorRemarks}}</div>
+                        </div>
+
+                        {{#if (ne this.complianceRemarks '-')}}
+                        <div style="font-size: 9px;">
+                            <strong style="color: #4b5563;">Compliance Remarks:</strong>
+                            <div style="background: #f0fdf4; padding: 5px; border-radius: 4px; margin-top: 2px; white-space: pre-wrap;">{{this.complianceRemarks}}</div>
+                        </div>
+                        {{/if}}
+                    </div>
+                </div>
+            </div>
+            {{/each}}
+        </div>
+    </div>
+    {{/if}}
+
+    <!-- 7. Phase 3: Summary Reports -->
+    <div class="page-break" id="summary-report">
+        <div class="report-header">
+            <div class="company-name">Summary Report</div>
+            <div class="report-title">Sales, Procurement & Consumption Analysis</div>
+        </div>
+
+        <!-- Sales Summary -->
+        <div class="section" id="sales-summary">
+            <div class="section-title">Sales Summary</div>
+            {{#if salesSummary.data.length}}
+            <table>
+                <thead>
+                    <tr>
+                        <th rowspan="2">Category</th>
+                        <th colspan="{{salesSummary.years.length}}" style="text-align: center;">Registered Sales (MT)</th>
+                        <th rowspan="2" style="text-align: center;">Total Reg.</th>
+                        <th colspan="{{salesSummary.years.length}}" style="text-align: center;">Unregistered Sales (MT)</th>
+                        <th rowspan="2" style="text-align: center;">Total Unreg.</th>
+                    </tr>
+                    <tr>
+                        {{#each salesSummary.years}}
+                        <th>{{this}}</th>
+                        {{/each}}
+                        {{#each salesSummary.years}}
+                        <th>{{this}}</th>
+                        {{/each}}
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each salesSummary.data}}
+                    <tr>
+                        <td>{{this.category}}</td>
+                        <!-- Registered Columns -->
+                        {{#each ../salesSummary.years}}
+                            <td>{{lookup .. (concat 'regY' (add @index 1))}}</td>
+                        {{/each}}
+                        <td style="font-weight: bold;">{{this.regTotal}}</td>
+                        
+                        <!-- Unregistered Columns -->
+                        {{#each ../salesSummary.years}}
+                            <td>{{lookup .. (concat 'unregY' (add @index 1))}}</td>
+                        {{/each}}
+                        <td style="font-weight: bold;">{{this.unregTotal}}</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="card" style="text-align: center;">No Sales Data Available</div>
+            {{/if}}
+        </div>
+
+        <!-- Purchase Summary -->
+        <div class="section" id="procurement-summary">
+            <div class="section-title">Procurement Summary</div>
+            {{#if purchaseSummary.data.length}}
+            <table>
+                <thead>
+                    <tr>
+                        <th rowspan="2">Category</th>
+                        <th colspan="{{purchaseSummary.years.length}}" style="text-align: center;">Registered Purchase (MT)</th>
+                        <th rowspan="2" style="text-align: center;">Total Reg.</th>
+                        <th colspan="{{purchaseSummary.years.length}}" style="text-align: center;">Unregistered Purchase (MT)</th>
+                        <th rowspan="2" style="text-align: center;">Total Unreg.</th>
+                    </tr>
+                    <tr>
+                        {{#each purchaseSummary.years}}
+                        <th>{{this}}</th>
+                        {{/each}}
+                        {{#each purchaseSummary.years}}
+                        <th>{{this}}</th>
+                        {{/each}}
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each purchaseSummary.data}}
+                    <tr>
+                        <td>{{this.category}}</td>
+                        <!-- Registered Columns -->
+                        {{#each ../purchaseSummary.years}}
+                            <td>{{lookup .. (concat 'regY' (add @index 1))}}</td>
+                        {{/each}}
+                        <td style="font-weight: bold;">{{this.regTotal}}</td>
+                        
+                        <!-- Unregistered Columns -->
+                        {{#each ../purchaseSummary.years}}
+                            <td>{{lookup .. (concat 'unregY' (add @index 1))}}</td>
+                        {{/each}}
+                        <td style="font-weight: bold;">{{this.unregTotal}}</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="card" style="text-align: center;">No Procurement Data Available</div>
+            {{/if}}
+        </div>
+
+        <!-- Pre/Post Consumption Summary -->
+        <div class="section" id="pre-post-analysis">
+            <div class="section-title">Pre vs Post Consumer Waste Analysis</div>
+            {{#if prePostSummary.length}}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Total Purchase</th>
+                        <th>Total Consumption</th>
+                        <th>Difference (%)</th>
+                        <th>Export</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each prePostSummary}}
+                    <tr>
+                        <td>{{this.category}}</td>
+                        <td>{{this.purchase}}</td>
+                        <td>{{this.consumption}}</td>
+                        <td style="{{#if this.isHighDiff}}color: #dc2626; font-weight: bold;{{else}}color: #16a34a;{{/if}}">
+                            {{this.difference}}%
+                        </td>
+                        <td>{{this.export}}</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="card" style="text-align: center;">No Analysis Data Available</div>
+            {{/if}}
+        </div>
+
+        <!-- Target Tables -->
+        {{#if targetTables.length}}
+            <div id="epr-targets">
+            {{#each targetTables}}
+            <div class="section">
+                <div class="section-title">{{this.title}}</div>
+                <table>
+                    <thead>
+                        <tr>
+                            {{#each this.columns}}
+                            <th>{{this}}</th>
+                            {{/each}}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{#each this.data}}
+                        <tr>
+                            {{#each this}}
+                            <td>{{this}}</td>
+                            {{/each}}
+                        </tr>
+                        {{/each}}
+                    </tbody>
+                </table>
+            </div>
+            {{/each}}
+            </div>
+        {{/if}}
+    </div>
+
+    <!-- Auditor Insights -->
+    <div class="section" id="auditor-insights" style="background: #f0f9ff; border: 1px solid #bae6fd; padding: 15px; border-radius: 6px;">
+        <h4 style="color: #0369a1; border-bottom: 1px solid #7dd3fc; padding-bottom: 5px; margin-bottom: 10px;">Auditor Insights</h4>
+        
+        <div style="margin-bottom: 10px;">
+            <strong style="color: #0c4a6e; font-size: 10px;">Validation:</strong>
+            <p style="margin: 2px 0; color: #334155; font-size: 10px;">{{auditorInsights.validation}}</p>
+        </div>
+        
+        <div style="margin-bottom: 10px;">
+            <strong style="color: #0c4a6e; font-size: 10px;">Targets:</strong>
+            <p style="margin: 2px 0; color: #334155; font-size: 10px;">{{auditorInsights.targets}}</p>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+            <strong style="color: #0c4a6e; font-size: 10px;">Sales:</strong>
+            <p style="margin: 2px 0; color: #334155; font-size: 10px;">{{auditorInsights.sales}}</p>
+        </div>
+
+        <div>
+            <strong style="color: #0c4a6e; font-size: 10px;">Procurement:</strong>
+            <p style="margin: 2px 0; color: #334155; font-size: 10px;">{{auditorInsights.purchase}}</p>
+        </div>
+    </div>
+
+</body>
+</html>

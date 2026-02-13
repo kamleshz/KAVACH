@@ -825,16 +825,13 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
     const handleSaveAll = async () => {
         setLoading(true);
         try {
-            // Use bulk update endpoint or just loop? 
-            // Original code used api.put on the whole array.
-            // But if we want to support files, we should probably stick to row-by-row or a bulk endpoint that handles it?
-            // For now, let's stick to the simple bulk update for "Save All" if no files are changed, 
-            // or just use the PUT method which overwrites everything.
-            // BUT, if we have mixed files, PUT might lose file data if not handled carefully.
-            // Let's use the existing PUT for bulk save as it is faster, assuming files are already uploaded via row-save.
-            
-            const updatePath = `productionFacility.${type}.${index}.productComplianceRows`;
-            await api.put(API_ENDPOINTS.CLIENT.UPDATE(client._id), { [updatePath]: rows });
+            // Use bulk endpoint
+            const payload = {
+                type,
+                itemId: index,
+                rows: rows
+            };
+            await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(client._id), payload);
             toast.success("All data saved successfully");
             
             setLastSavedRows(rows.map(r => ({ ...r })));
@@ -1054,8 +1051,8 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
                 itemId: index,
                 rows: []
             };
-            // Use specific endpoint for delete all if available, or just PUT empty array
-            await api.put(API_ENDPOINTS.CLIENT.UPDATE(client._id), { [`productionFacility.${type}.${index}.productComplianceRows`]: [] });
+            // Use specific endpoint for delete all (overwrite with empty array)
+            await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(client._id), payload);
             setRows([]);
             setLastSavedRows([]);
             toast.success("All rows deleted");
@@ -1573,8 +1570,12 @@ const SupplierComplianceTable = ({ client, type, index, initialData, refreshData
     const handleSaveAll = async () => {
         setLoading(true);
         try {
-            const updatePath = `productionFacility.${type}.${index}.productSupplierCompliance`;
-            await api.put(API_ENDPOINTS.CLIENT.UPDATE(client._id), { [updatePath]: rows });
+            const payload = {
+                type,
+                itemId: index,
+                rows: rows
+            };
+            await api.post(API_ENDPOINTS.CLIENT.PRODUCT_SUPPLIER_COMPLIANCE(client._id), payload);
             toast.success("All data saved successfully");
             setLastSavedRows(rows.map(r => ({ ...r })));
             refreshData();
@@ -1848,8 +1849,13 @@ const ComponentDetailsTable = ({ client, type, index, initialData, refreshData }
     const handleSaveAll = async () => {
         setLoading(true);
         try {
-            const updatePath = `productionFacility.${type}.${index}.productComponentDetails`;
-            await api.put(API_ENDPOINTS.CLIENT.UPDATE(client._id), { [updatePath]: rows });
+            // Use bulk update endpoint
+            const payload = {
+                type,
+                itemId: index,
+                rows: rows
+            };
+            await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPONENT_DETAILS(client._id), payload);
             toast.success("All data saved successfully");
             setLastSavedRows(rows.map(r => ({ ...r })));
             refreshData();
@@ -2199,11 +2205,10 @@ const RecycledQuantityTable = ({ client, type, index, initialData, refreshData, 
                 type,
                 itemId: index,
                 rowIndex: idx,
-                table: 'Recycled Quantity Used',
                 row
             };
             
-            const res = await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE_ROW_SAVE(client._id), payload);
+            const res = await api.post(API_ENDPOINTS.CLIENT.RECYCLED_QUANTITY_USED(client._id), payload);
             // If backend returns the saved row (e.g. with formatted values), use it. Otherwise use current row.
             const savedRowForHistory = res.data?.data?.row || row;
 
@@ -2227,8 +2232,12 @@ const RecycledQuantityTable = ({ client, type, index, initialData, refreshData, 
     const handleSaveAll = async () => {
         setLoading(true);
         try {
-            const updatePath = `productionFacility.${type}.${index}.productRecycledQuantity`;
-            await api.put(API_ENDPOINTS.CLIENT.UPDATE(client._id), { [updatePath]: rows });
+            const payload = {
+                type,
+                itemId: index,
+                rows: rows
+            };
+            await api.post(API_ENDPOINTS.CLIENT.RECYCLED_QUANTITY_USED(client._id), payload);
             
             setLastSavedRows([...rows]);
             toast.success("All Recycled Quantity data saved successfully");
@@ -2414,16 +2423,20 @@ const RecycledQuantityTable = ({ client, type, index, initialData, refreshData, 
         { label: "Annual Cons (MT)", field: "annualConsumptionMt", readOnly: true },
         { label: "Used Recycled %", field: "usedRecycledPercent", render: (row, idx) => (
             <input 
-                type="number" 
-                step="0.01"
-                min="0"
-                max="100"
+                type="text" 
                 value={row.usedRecycledPercent === 0 ? '0' : (row.usedRecycledPercent || '')}
-                onChange={(e) => handleRowChange(idx, 'usedRecycledPercent', e.target.value)}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    // Allow only numbers and decimal point
+                    if (/^[0-9.]*$/.test(val)) {
+                        handleRowChange(idx, 'usedRecycledPercent', val);
+                    }
+                }}
                 onBlur={() => handlePercentBlur(idx)}
                 className="w-full p-1 border rounded text-xs"
                 readOnly={isManager}
                 disabled={isManager}
+                placeholder="0.00"
             />
         )},
         { label: "Used Recycled Qty (MT)", field: "usedRecycledQtyMt", readOnly: true }

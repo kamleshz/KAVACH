@@ -6,7 +6,9 @@ import api from '../../../services/api';
 import { API_ENDPOINTS } from '../../../services/apiEndpoints';
 import { useExcelImport } from '../../../hooks/useExcelImport';
 import BulkUploadControl from '../../../components/common/BulkUploadControl';
+import { E_WASTE_DATA } from '../constants/EWasteData';
 import { STORAGE_AUDIT_TEMPLATE } from '../../../constants/excelTemplates';
+import dayjs from 'dayjs';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -22,6 +24,31 @@ const EWasteStorage = ({ clientId }) => {
     const [additionalRows, setAdditionalRows] = useState([]);
     
     const { importData, downloadTemplate, isLoading: isImporting } = useExcelImport();
+
+    // Flatten E-Waste Data for Dropdown
+    const eeeOptions = Object.values(E_WASTE_DATA).flat().map((item, index) => {
+        // Extract product name for display and selection
+        let pName = item.description;
+        if (pName) {
+            if (pName.includes(':')) {
+                pName = pName.split(':')[1];
+            } else if (pName.includes(' – ')) {
+                pName = pName.split(' – ')[1];
+            } else if (pName.includes(' - ')) {
+                pName = pName.split(' - ')[1];
+            }
+        }
+        const productName = pName ? pName.trim() : '';
+
+        return {
+            key: `${item.code}-${index}`,
+            code: item.code,
+            description: item.description,
+            productName: productName,
+            dropdownLabel: `${item.code} - ${productName}`,
+            selectionLabel: item.code
+        };
+    });
 
     useEffect(() => {
         if (clientId) {
@@ -199,17 +226,31 @@ const EWasteStorage = ({ clientId }) => {
     // --- Audit Logic ---
     const handleAuditExcelUpload = (e) => {
         importData(e, (data) => {
-            const newRows = data.map((row, index) => ({
-                key: Date.now() + index,
-                eeeCode: row["EEE Code"] || '',
-                productName: row["Product Name"] || '',
-                listEEE: row["List of EEE"] || '',
-                dateOfStorage: row["Date of Storage"] || '',
-                endDate: row["End Date"] || '',
-                difference: row["Difference"] || '',
-                quantity: row["Quantity (MT)"] || '',
-                remarks: row["Remarks"] || ''
-            }));
+            const newRows = data.map((row, index) => {
+                const start = row["Date of Storage"] || '';
+                const end = row["Date of Audit"] || row["Date of audit"] || row["End Date"] || '';
+                let diff = row["Difference"] || '';
+
+                if (!diff && start && end) {
+                    const dStart = dayjs(start);
+                    const dEnd = dayjs(end);
+                    if (dStart.isValid() && dEnd.isValid()) {
+                        diff = `${dEnd.diff(dStart, 'days')} Days`;
+                    }
+                }
+
+                return {
+                    key: Date.now() + index,
+                    eeeCode: row["EEE Code"] || '',
+                    productName: row["Product Name"] || '',
+                    listEEE: row["List of EEE"] || '',
+                    dateOfStorage: start,
+                    dateOfAudit: end,
+                    difference: diff,
+                    quantity: row["Quantity in (MT)"] || row["Quantity (MT)"] || row["Quantity"] || '',
+                    remarks: row["Remarks"] || ''
+                };
+            });
             setAuditRows(prev => [...prev, ...newRows]);
         });
     };
@@ -223,14 +264,78 @@ const EWasteStorage = ({ clientId }) => {
         }
     };
 
+    const handleDateChange = (value, key, field) => {
+        const newRows = [...auditRows];
+        const index = newRows.findIndex(item => item.key === key);
+        if (index > -1) {
+            newRows[index][field] = value;
+            
+            // Calculate Difference if both dates are present
+            const start = field === 'dateOfStorage' ? value : newRows[index].dateOfStorage;
+            const end = field === 'dateOfAudit' ? value : newRows[index].dateOfAudit;
+            
+            if (start && end) {
+                const diff = dayjs(end).diff(dayjs(start), 'days');
+                newRows[index].difference = `${diff} Days`;
+            } else {
+                newRows[index].difference = '';
+            }
+            
+            setAuditRows(newRows);
+        }
+    };
+
     const auditColumns = [
-        { title: 'EEE Code', dataIndex: 'eeeCode', key: 'eeeCode', render: (t, r) => <Input value={t} onChange={e => handleAuditChange(e.target.value, r.key, 'eeeCode')} /> },
-        { title: 'Product Name', dataIndex: 'productName', key: 'productName', render: (t, r) => <Input value={t} onChange={e => handleAuditChange(e.target.value, r.key, 'productName')} /> },
-        { title: 'Date of Storage', dataIndex: 'dateOfStorage', key: 'dateOfStorage', render: (t, r) => <Input type="date" value={t} onChange={e => handleAuditChange(e.target.value, r.key, 'dateOfStorage')} /> },
-        { title: 'Quantity (MT)', dataIndex: 'quantity', key: 'quantity', render: (t, r) => <Input value={t} onChange={e => handleAuditChange(e.target.value, r.key, 'quantity')} /> },
+        { 
+            title: 'EEE Code', 
+            dataIndex: 'eeeCode', 
+            key: 'eeeCode', 
+            width: 250,
+            render: (text, record) => (
+                <Select 
+                    showSearch
+                    value={text} 
+                    style={{ width: '100%' }}
+                    placeholder="Select Code"
+                    optionFilterProp="children"
+                    optionLabelProp="label"
+                    onChange={(val, option) => {
+                        const newRows = [...auditRows];
+                        const index = newRows.findIndex(item => item.key === record.key);
+                        if (index > -1) {
+                            newRows[index].eeeCode = val;
+                            newRows[index].listEEE = option.desc;
+                            newRows[index].productName = option.pname || '';
+                            setAuditRows(newRows);
+                        }
+                    }}
+                >
+                    {eeeOptions.map(opt => (
+                        <Option 
+                            key={opt.key} 
+                            value={opt.code} 
+                            desc={opt.description} 
+                            pname={opt.productName}
+                            label={opt.selectionLabel}
+                        >
+                            {opt.dropdownLabel}
+                        </Option>
+                    ))}
+                </Select>
+            )
+        },
+        { title: 'Product Name', dataIndex: 'productName', key: 'productName', width: 150, render: (t, r) => <Input value={t} onChange={e => handleAuditChange(e.target.value, r.key, 'productName')} /> },
+        { title: 'List of EEE', dataIndex: 'listEEE', key: 'listEEE', width: 200, render: (t, r) => <Input value={t} readOnly className="bg-gray-50" /> },
+        { title: 'Date of Storage', dataIndex: 'dateOfStorage', key: 'dateOfStorage', width: 150, render: (t, r) => <Input type="date" value={t} onChange={e => handleDateChange(e.target.value, r.key, 'dateOfStorage')} /> },
+        { title: 'Date of Audit', dataIndex: 'dateOfAudit', key: 'dateOfAudit', width: 150, render: (t, r) => <Input type="date" value={t} onChange={e => handleDateChange(e.target.value, r.key, 'dateOfAudit')} /> },
+        { title: 'Difference', dataIndex: 'difference', key: 'difference', width: 120, render: (t, r) => <Input value={t} readOnly className="bg-gray-50" /> },
+        { title: 'Quantity in (MT)', dataIndex: 'quantity', key: 'quantity', width: 120, render: (t, r) => <Input value={t} onChange={e => handleAuditChange(e.target.value, r.key, 'quantity')} /> },
+        { title: 'Remarks', dataIndex: 'remarks', key: 'remarks', width: 150, render: (t, r) => <Input value={t} onChange={e => handleAuditChange(e.target.value, r.key, 'remarks')} /> },
         { 
             title: 'Action', 
             key: 'action', 
+            width: 80,
+            fixed: 'right',
             render: (_, r) => (
                 <Button type="text" danger icon={<DeleteOutlined />} onClick={() => setAuditRows(auditRows.filter(row => row.key !== r.key))} />
             ) 

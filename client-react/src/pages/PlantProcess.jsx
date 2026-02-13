@@ -2343,6 +2343,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
   const handleComponentTemplateDownload = () => {
     const headers = [
         !isManager ? 'System Code' : null,
+        'SKU Code',
         'Component Code',
         'Component Description',
         'Supplier Name',
@@ -2399,6 +2400,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
 
             return {
                 systemCode: getValue([/system.*code/i]),
+                skuCode: getValue([/sku.*code/i, /^sku$/i]),
                 componentCode: getValue([/component.*code/i, /^code$/i]),
                 componentDescription: getValue([/component.*desc/i, /^description$/i]),
                 supplierName: getValue([/supplier.*name/i, /^supplier$/i]),
@@ -4363,10 +4365,13 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         {activeTab === 'tab5' && (
             <SummaryReport
                 clientId={clientId}
+                type={type}
+                itemId={itemId}
                 handleNext={handleNext}
                 isSaving={isSaving}
                 productRows={productRows}
                 monthlyRows={monthlyRows}
+                recycledRows={recycledRows}
                 resolveUrl={resolveUrl}
                 supplierRows={supplierRows}
                 componentRows={componentRows}

@@ -200,7 +200,8 @@ class AuthService {
         user.forgot_password_otp = otp;
         user.forgot_password_expiry = otpExpiry;
         
-        if (!user.last_login_date) user.last_login_date = null;
+        // Removed redundant last_login_date check to prevent potential validation issues
+        // if (!user.last_login_date) user.last_login_date = null;
 
         try {
             await user.save();
@@ -256,27 +257,26 @@ class AuthService {
 
         // Store login log with photo if provided
         if (photo) {
-            if (photo.length < 1000) { 
-                 throw new ApiError(400, "Invalid photo captured. Please try again.");
-            }
+            // Check for black screen if photo is long enough to be a valid base64 image
+            if (photo.length > 1000) {
+                try {
+                    const base64Data = photo.replace(/^data:image\/\w+;base64,/, "");
+                    const imgBuffer = Buffer.from(base64Data, 'base64');
+                    
+                    const stats = await sharp(imgBuffer).stats();
+                    const { channels } = stats;
+                    const isBlack = channels.every(c => c.mean < 10);
 
-            // Check for black screen
-            try {
-                const base64Data = photo.replace(/^data:image\/\w+;base64,/, "");
-                const imgBuffer = Buffer.from(base64Data, 'base64');
-                
-                const stats = await sharp(imgBuffer).stats();
-                const { channels } = stats;
-                const isBlack = channels.every(c => c.mean < 10);
-
-                if (isBlack) {
-                    console.warn(`[AUTH] Login blocked: Black screen detected for ${email}`);
-                    throw new ApiError(400, "Photo is too dark or blocked. Please ensure your face is visible.");
+                    if (isBlack) {
+                        console.warn(`[AUTH] Login blocked: Black screen detected for ${email}`);
+                        // throw new ApiError(400, "Photo is too dark or blocked. Please ensure your face is visible.");
+                        console.log("Allowing black screen for now (User request to skip photo)");
+                    }
+                } catch (imgError) {
+                    console.error("Image analysis failed:", imgError);
+                    // If it was our ApiError, rethrow it
+                    if (imgError instanceof ApiError) throw imgError;
                 }
-            } catch (imgError) {
-                console.error("Image analysis failed:", imgError);
-                // If it was our ApiError, rethrow it
-                if (imgError instanceof ApiError) throw imgError;
             }
 
             console.log(`[AUTH] Received login photo for ${email}. Size: ${photo.length} chars`);
@@ -294,13 +294,30 @@ class AuthService {
                 }
 
                 await LoginLogModel.create(logData);
-                user.last_login_photo = photo;
+                // Optional: Don't save large photo to user model to prevent BSON size issues
+                // user.last_login_photo = photo; 
                 
             } catch (logError) {
                 console.error("Failed to save login photo log:", logError);
             }
         } else {
-             throw new ApiError(400, "Live photo capture is required for login");
+             console.log(`[AUTH] Login without photo for ${email} (Skipped by user)`);
+             // Create a log entry even without photo
+             try {
+                const logData = {
+                    userId: user._id,
+                    photo: "SKIPPED_BY_USER", // Valid string to satisfy required: true
+                    ipAddress,
+                    userAgent,
+                };
+                if (location && location.latitude && location.longitude) {
+                    logData.latitude = location.latitude;
+                    logData.longitude = location.longitude;
+                }
+                await LoginLogModel.create(logData);
+             } catch (logError) {
+                 console.error("Failed to save login log:", logError);
+             }
         }
 
         if (location && location.latitude && location.longitude) {

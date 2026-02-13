@@ -13,86 +13,100 @@ import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 
 export const uploadClientDocumentController = asyncHandler(async (req, res) => {
-    const { clientId } = req.params;
-    const { documentType, documentName, certificateNumber, certificateDate } = req.body;
+    try {
+        const { clientId } = req.params;
+        const { documentType, documentName, certificateNumber, certificateDate } = req.body;
 
-    if (!req.file) {
-        throw new ApiError(400, "No document file uploaded");
+        if (!req.file) {
+            throw new ApiError(400, "No document file uploaded");
+        }
+
+        const result = await ClientService.uploadDocument(clientId, req.file, {
+            documentType,
+            documentName,
+            certificateNumber,
+            certificateDate
+        });
+
+        return res.status(200).json({
+            message: "Document uploaded successfully",
+            error: false,
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, "Failed to upload document: " + (error.message || "Unknown error"));
     }
-
-    const result = await ClientService.uploadDocument(clientId, req.file, {
-        documentType,
-        documentName,
-        certificateNumber,
-        certificateDate
-    });
-
-    return res.status(200).json({
-        message: "Document uploaded successfully",
-        error: false,
-        success: true,
-        data: result
-    });
 });
 
 export const deleteClientDocumentController = asyncHandler(async (req, res) => {
-    const { clientId, docId } = req.params;
+    try {
+        const { clientId, docId } = req.params;
 
-    await ClientService.deleteDocument(clientId, docId);
+        await ClientService.deleteDocument(clientId, docId);
 
-    return res.status(200).json({
-        message: "Document deleted successfully",
-        error: false,
-        success: true
-    });
+        return res.status(200).json({
+            message: "Document deleted successfully",
+            error: false,
+            success: true
+        });
+    } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, "Failed to delete document: " + (error.message || "Unknown error"));
+    }
 });
 
 export const getAllClientsController = asyncHandler(async (req, res) => {
-    const user = await UserModel.findById(req.userId).populate('role');
-    const isUserAdmin = user?.role?.name === 'ADMIN';
-    let query = isUserAdmin ? {} : {
-        $or: [
-            { assignedTo: req.userId },
-            { assignedManager: req.userId }
-        ]
-    };
-
-    if (req.query.search) {
-        const searchRegex = new RegExp(req.query.search, 'i');
-        query = {
-            ...query,
+    try {
+        const user = await UserModel.findById(req.userId).populate('role');
+        const isUserAdmin = user?.role?.name === 'ADMIN';
+        let query = isUserAdmin ? {} : {
             $or: [
-                { clientName: searchRegex },
-                { companyGroupName: searchRegex },
-                { entityType: searchRegex }
+                { assignedTo: req.userId },
+                { assignedManager: req.userId }
             ]
         };
+
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search, 'i');
+            query = {
+                ...query,
+                $or: [
+                    { clientName: searchRegex },
+                    { companyGroupName: searchRegex },
+                    { entityType: searchRegex }
+                ]
+            };
+        }
+
+        if (req.query.validationStatus) {
+            query.validationStatus = req.query.validationStatus;
+        }
+
+        const clients = await ClientModel.find(query)
+            .populate('assignedTo', 'name email')
+            .populate('assignedManager', 'name email')
+            .populate('createdBy', 'name email')
+            .sort({ createdAt: -1 });
+
+        const pwps = await PWPModel.find(query)
+            .populate('assignedTo', 'name email')
+            .populate('assignedManager', 'name email')
+            .populate('createdBy', 'name email')
+            .sort({ createdAt: -1 });
+
+        const allClients = [...clients, ...pwps].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        return res.status(200).json({
+            message: "Clients fetched successfully",
+            error: false,
+            success: true,
+            data: allClients
+        });
+    } catch (error) {
+        throw new ApiError(500, "Failed to fetch clients: " + (error.message || "Unknown error"));
     }
-
-    if (req.query.validationStatus) {
-        query.validationStatus = req.query.validationStatus;
-    }
-
-    const clients = await ClientModel.find(query)
-        .populate('assignedTo', 'name email')
-        .populate('assignedManager', 'name email')
-        .populate('createdBy', 'name email')
-        .sort({ createdAt: -1 });
-
-    const pwps = await PWPModel.find(query)
-        .populate('assignedTo', 'name email')
-        .populate('assignedManager', 'name email')
-        .populate('createdBy', 'name email')
-        .sort({ createdAt: -1 });
-
-    const allClients = [...clients, ...pwps].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    return res.status(200).json({
-        message: "Clients fetched successfully",
-        error: false,
-        success: true,
-        data: allClients
-    });
 });
 
 export const createClientController = asyncHandler(async (req, res) => {
@@ -109,7 +123,17 @@ export const createClientController = asyncHandler(async (req, res) => {
         createdBy: userId
     });
 
-    await newClient.save();
+    try {
+        await newClient.save();
+    } catch (error) {
+        if (error.code === 11000) {
+            throw new ApiError(409, "Client/PWP with this name already exists");
+        }
+        if (error.name === 'ValidationError') {
+            throw new ApiError(400, "Validation Error: " + error.message);
+        }
+        throw new ApiError(500, "Failed to create client: " + error.message);
+    }
 
     return res.status(201).json({
         message: "Client created successfully",
@@ -120,111 +144,24 @@ export const createClientController = asyncHandler(async (req, res) => {
 });
 
 export const updatePlantProcessProgressController = asyncHandler(async (req, res) => {
-    const { clientId } = req.params;
-    const { type, itemId, completedSteps } = req.body;
+    try {
+        const { clientId } = req.params;
+        const { type, itemId, completedSteps } = req.body;
 
-    if (!type || !itemId || !completedSteps) {
-        throw new ApiError(400, "Missing required fields: type, itemId, completedSteps");
-    }
-
-    const client = await ClientService.findClientOrPwp(clientId);
-
-    const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
-    const item = client.productionFacility[listKey].id(itemId);
-
-    if (!item) {
-        throw new ApiError(404, `${type} detail not found`);
-    }
-
-    // Parse steps if string
-    let steps = completedSteps;
-    if (typeof steps === 'string') {
-        try {
-            steps = JSON.parse(steps);
-        } catch (e) {
-            steps = [];
+        if (!type || !itemId || !completedSteps) {
+            throw new ApiError(400, "Missing required fields: type, itemId, completedSteps");
         }
-    }
-    if (!Array.isArray(steps)) {
-        steps = [];
-    }
 
-    // Update completed steps
-    item.completedSteps = steps;
+        const client = await ClientService.findClientOrPwp(clientId);
 
-    await client.save();
+        const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
+        const item = client.productionFacility[listKey].id(itemId);
 
-    return res.status(200).json({
-        message: "Progress updated successfully",
-        error: false,
-        success: true,
-        data: { completedSteps: item.completedSteps }
-    });
-});
-
-export const verifyFacilityController = asyncHandler(async (req, res) => {
-    const { clientId } = req.params;
-    const { type, itemId, verificationStatus, verificationRemark, completedSteps } = req.body; // type: 'CTE' or 'CTO'
-
-    // If we are just saving steps, we don't strictly need a file or status.
-    // If completedSteps is provided, we skip the strict file check for verificationStatus
-    if (!completedSteps && !req.file && verificationStatus !== 'Rejected') {
-        throw new ApiError(400, "No verification document uploaded");
-    }
-
-    const client = await ClientService.findClientOrPwp(clientId);
-
-    let fileUrl = '';
-    if (req.file) {
-        try {
-            const ext = path.extname(req.file.originalname).toLowerCase();
-            const isDoc = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'].includes(ext);
-            const filenameOverride = `verify_${type}_${itemId}_${Date.now()}`;
-            
-            fileUrl = await uploadToCloudinary(req.file.path, 'eprkavach/verification', filenameOverride, isDoc);
-        } catch (err) {
-            throw new ApiError(500, "Cloud upload failed: " + (err.message || 'Unknown error'));
+        if (!item) {
+            throw new ApiError(404, `${type} detail not found`);
         }
-    }
 
-    // Determine target array and find item
-    const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
-    const item = client.productionFacility[listKey].id(itemId);
-
-    if (!item) {
-        throw new ApiError(404, `${type} detail not found`);
-    }
-
-    // --- HISTORY TRACKING PREPARE ---
-    let historyDoc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
-    if (!historyDoc) {
-        historyDoc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [] });
-    }
-    if (!Array.isArray(historyDoc.changeHistory)) historyDoc.changeHistory = [];
-
-    const toText = (v) => {
-        if (v === null || v === undefined) return '';
-        if (typeof v === 'string') return v;
-        return String(v);
-    };
-
-    const beforeStatus = toText(item.verification?.status);
-    const beforeRemark = toText(item.verification?.remark);
-    const beforeDoc = toText(item.verification?.document);
-    const beforeSteps = Array.isArray(item.completedSteps) ? item.completedSteps.join(', ') : '';
-    // --------------------------------
-
-    // Update fields
-    if (verificationStatus) {
-        item.verification.status = verificationStatus;
-        item.verification.verifiedBy = req.userId;
-        item.verification.verifiedAt = new Date();
-    }
-    if (verificationRemark) item.verification.remark = verificationRemark;
-    if (fileUrl) item.verification.document = fileUrl;
-    
-    // Update completedSteps if provided
-    if (completedSteps) {
+        // Parse steps if string
         let steps = completedSteps;
         if (typeof steps === 'string') {
             try {
@@ -236,74 +173,176 @@ export const verifyFacilityController = asyncHandler(async (req, res) => {
         if (!Array.isArray(steps)) {
             steps = [];
         }
+
+        // Update completed steps
         item.completedSteps = steps;
-    }
 
-    // --- HISTORY TRACKING SAVE ---
-    const afterStatus = toText(item.verification?.status);
-    const afterRemark = toText(item.verification?.remark);
-    const afterDoc = toText(item.verification?.document);
-    const afterSteps = Array.isArray(item.completedSteps) ? item.completedSteps.join(', ') : '';
+        await client.save();
 
-    const changes = [];
-    if (beforeStatus !== afterStatus) changes.push({ field: 'Verification Status', prev: beforeStatus, curr: afterStatus });
-    if (beforeRemark !== afterRemark) changes.push({ field: 'Verification Remark', prev: beforeRemark, curr: afterRemark });
-    if (beforeDoc !== afterDoc) changes.push({ field: 'Verification Document', prev: beforeDoc, curr: afterDoc });
-    if (beforeSteps !== afterSteps) changes.push({ field: 'Completed Steps', prev: beforeSteps, curr: afterSteps });
-
-    if (changes.length > 0) {
-        const at = new Date();
-        changes.forEach(c => {
-            historyDoc.changeHistory.push({
-                table: 'Verification',
-                row: 0,
-                field: c.field,
-                prev: c.prev || '-',
-                curr: c.curr || '-',
-                user: req.userId || null,
-                userName: '',
-                at
-            });
+        return res.status(200).json({
+            message: "Progress updated successfully",
+            error: false,
+            success: true,
+            data: { completedSteps: item.completedSteps }
         });
-        if (historyDoc.changeHistory.length > 5000) historyDoc.changeHistory = historyDoc.changeHistory.slice(-5000);
-        historyDoc.updatedBy = req.userId;
-        await historyDoc.save();
+    } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, "Failed to update progress: " + (error.message || "Unknown error"));
     }
-    // -----------------------------
+});
 
-    await client.save();
+export const verifyFacilityController = asyncHandler(async (req, res) => {
+    try {
+        const { clientId } = req.params;
+        const { type, itemId, verificationStatus, verificationRemark, completedSteps } = req.body; // type: 'CTE' or 'CTO'
 
-    return res.status(200).json({
-        message: "Verification updated successfully",
-        error: false,
-        success: true,
-        data: client
-    });
+        // If we are just saving steps, we don't strictly need a file or status.
+        // If completedSteps is provided, we skip the strict file check for verificationStatus
+        if (!completedSteps && !req.file && verificationStatus !== 'Rejected') {
+            throw new ApiError(400, "No verification document uploaded");
+        }
+
+        const client = await ClientService.findClientOrPwp(clientId);
+
+        let fileUrl = '';
+        if (req.file) {
+            try {
+                const ext = path.extname(req.file.originalname).toLowerCase();
+                const isDoc = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'].includes(ext);
+                const filenameOverride = `verify_${type}_${itemId}_${Date.now()}`;
+                
+                fileUrl = await uploadToCloudinary(req.file.path, 'eprkavach/verification', filenameOverride, isDoc);
+            } catch (err) {
+                throw new ApiError(500, "Cloud upload failed: " + (err.message || 'Unknown error'));
+            }
+        }
+
+        // Determine target array and find item
+        const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
+        const item = client.productionFacility[listKey].id(itemId);
+
+        if (!item) {
+            throw new ApiError(404, `${type} detail not found`);
+        }
+
+        // --- HISTORY TRACKING PREPARE ---
+        let historyDoc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
+        if (!historyDoc) {
+            historyDoc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [] });
+        }
+        if (!Array.isArray(historyDoc.changeHistory)) historyDoc.changeHistory = [];
+
+        const toText = (v) => {
+            if (v === null || v === undefined) return '';
+            if (typeof v === 'string') return v;
+            return String(v);
+        };
+
+        const beforeStatus = toText(item.verification?.status);
+        const beforeRemark = toText(item.verification?.remark);
+        const beforeDoc = toText(item.verification?.document);
+        const beforeSteps = Array.isArray(item.completedSteps) ? item.completedSteps.join(', ') : '';
+        // --------------------------------
+
+        // Update fields
+        if (verificationStatus) {
+            item.verification.status = verificationStatus;
+            item.verification.verifiedBy = req.userId;
+            item.verification.verifiedAt = new Date();
+        }
+        if (verificationRemark) item.verification.remark = verificationRemark;
+        if (fileUrl) item.verification.document = fileUrl;
+        
+        // Update completedSteps if provided
+        if (completedSteps) {
+            let steps = completedSteps;
+            if (typeof steps === 'string') {
+                try {
+                    steps = JSON.parse(steps);
+                } catch (e) {
+                    steps = [];
+                }
+            }
+            if (!Array.isArray(steps)) {
+                steps = [];
+            }
+            item.completedSteps = steps;
+        }
+
+        // --- HISTORY TRACKING SAVE ---
+        const afterStatus = toText(item.verification?.status);
+        const afterRemark = toText(item.verification?.remark);
+        const afterDoc = toText(item.verification?.document);
+        const afterSteps = Array.isArray(item.completedSteps) ? item.completedSteps.join(', ') : '';
+
+        const changes = [];
+        if (beforeStatus !== afterStatus) changes.push({ field: 'Verification Status', prev: beforeStatus, curr: afterStatus });
+        if (beforeRemark !== afterRemark) changes.push({ field: 'Verification Remark', prev: beforeRemark, curr: afterRemark });
+        if (beforeDoc !== afterDoc) changes.push({ field: 'Verification Document', prev: beforeDoc, curr: afterDoc });
+        if (beforeSteps !== afterSteps) changes.push({ field: 'Completed Steps', prev: beforeSteps, curr: afterSteps });
+
+        if (changes.length > 0) {
+            const at = new Date();
+            changes.forEach(c => {
+                historyDoc.changeHistory.push({
+                    table: 'Verification',
+                    row: 0,
+                    field: c.field,
+                    prev: c.prev || '-',
+                    curr: c.curr || '-',
+                    user: req.userId || null,
+                    userName: '',
+                    at
+                });
+            });
+            if (historyDoc.changeHistory.length > 5000) historyDoc.changeHistory = historyDoc.changeHistory.slice(-5000);
+            historyDoc.updatedBy = req.userId;
+            await historyDoc.save();
+        }
+        // -----------------------------
+
+        await client.save();
+
+        return res.status(200).json({
+            message: "Verification updated successfully",
+            error: false,
+            success: true,
+            data: client
+        });
+    } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, "Failed to verify facility: " + (error.message || "Unknown error"));
+    }
 });
 
 export const saveProductComplianceController = asyncHandler(async (req, res) => {
-    const { clientId } = req.params;
-    const { type, itemId, rows, rowIndex, row } = req.body;
-    const userId = req.userId;
-    const emitter = req.app.get('realtimeEmitter');
-    
-    const result = await ClientService.saveProductCompliance(
-        clientId, 
-        type, 
-        itemId, 
-        rows, 
-        rowIndex, 
-        row, 
-        userId, 
-        emitter
-    );
+    try {
+        const { clientId } = req.params;
+        const { type, itemId, rows, rowIndex, row } = req.body;
+        const userId = req.userId;
+        const emitter = req.app.get('realtimeEmitter');
+        
+        const result = await ClientService.saveProductCompliance(
+            clientId, 
+            type, 
+            itemId, 
+            rows, 
+            rowIndex, 
+            row, 
+            userId, 
+            emitter
+        );
 
-    return res.status(200).json({
-        message: "Product compliance saved",
-        error: false,
-        success: true,
-        data: result
-    });
+        return res.status(200).json({
+            message: "Product compliance saved",
+            error: false,
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, "Failed to save product compliance: " + (error.message || "Unknown error"));
+    }
 });
 
 export const getProductComplianceController = async (req, res) => {
@@ -541,28 +580,33 @@ export const uploadProductComplianceRowController = async (req, res) => {
 };
 
 export const saveProductComponentDetailsController = asyncHandler(async (req, res) => {
-    const { clientId } = req.params;
-    const { type, itemId, rows, rowIndex, row } = req.body;
-    const userId = req.userId;
-    const emitter = req.app.get('realtimeEmitter');
-    
-    const result = await ClientService.saveProductComponentDetails(
-        clientId, 
-        type, 
-        itemId, 
-        rows, 
-        rowIndex, 
-        row, 
-        userId, 
-        emitter
-    );
+    try {
+        const { clientId } = req.params;
+        const { type, itemId, rows, rowIndex, row } = req.body;
+        const userId = req.userId;
+        const emitter = req.app.get('realtimeEmitter');
+        
+        const result = await ClientService.saveProductComponentDetails(
+            clientId, 
+            type, 
+            itemId, 
+            rows, 
+            rowIndex, 
+            row, 
+            userId, 
+            emitter
+        );
 
-    return res.status(200).json({
-        message: "Component details saved",
-        error: false,
-        success: true,
-        data: result
-    });
+        return res.status(200).json({
+            message: "Component details saved",
+            error: false,
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, "Failed to save component details: " + (error.message || "Unknown error"));
+    }
 });
 
 export const getProductComponentDetailsController = async (req, res) => {
@@ -586,28 +630,33 @@ export const getProductComponentDetailsController = async (req, res) => {
 };
 
 export const saveProductSupplierComplianceController = asyncHandler(async (req, res) => {
-    const { clientId } = req.params;
-    const { type, itemId, rows, rowIndex, row } = req.body;
-    const userId = req.userId;
-    const emitter = req.app.get('realtimeEmitter');
+    try {
+        const { clientId } = req.params;
+        const { type, itemId, rows, rowIndex, row } = req.body;
+        const userId = req.userId;
+        const emitter = req.app.get('realtimeEmitter');
 
-    const result = await ClientService.saveSupplierCompliance(
-        clientId, 
-        type, 
-        itemId, 
-        rows, 
-        rowIndex, 
-        row, 
-        userId, 
-        emitter
-    );
+        const result = await ClientService.saveSupplierCompliance(
+            clientId, 
+            type, 
+            itemId, 
+            rows, 
+            rowIndex, 
+            row, 
+            userId, 
+            emitter
+        );
 
-    return res.status(200).json({
-        message: "Supplier compliance saved",
-        error: false,
-        success: true,
-        data: result
-    });
+        return res.status(200).json({
+            message: "Supplier compliance saved",
+            error: false,
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, "Failed to save supplier compliance: " + (error.message || "Unknown error"));
+    }
 });
 
 export const getProductSupplierComplianceController = async (req, res) => {
@@ -703,26 +752,31 @@ export const importProductComplianceHistoryController = async (req, res) => {
 };
 
 export const saveRecycledQuantityUsedController = asyncHandler(async (req, res) => {
-    const { clientId } = req.params;
-    const { type, itemId, rows, rowIndex, row } = req.body;
-    const userId = req.userId;
+    try {
+        const { clientId } = req.params;
+        const { type, itemId, rows, rowIndex, row } = req.body;
+        const userId = req.userId;
 
-    const result = await ClientService.saveRecycledQuantityUsed(
-        clientId, 
-        type, 
-        itemId, 
-        rows, 
-        rowIndex, 
-        row, 
-        userId
-    );
+        const result = await ClientService.saveRecycledQuantityUsed(
+            clientId, 
+            type, 
+            itemId, 
+            rows, 
+            rowIndex, 
+            row, 
+            userId
+        );
 
-    return res.status(200).json({
-        message: "Recycled quantity used saved",
-        error: false,
-        success: true,
-        data: result
-    });
+        return res.status(200).json({
+            message: "Recycled quantity used saved",
+            error: false,
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, "Failed to save recycled quantity: " + (error.message || "Unknown error"));
+    }
 });
 
 export const getRecycledQuantityUsedController = async (req, res) => {
@@ -746,73 +800,87 @@ export const getRecycledQuantityUsedController = async (req, res) => {
 };
 
 export const saveMonthlyProcurementController = asyncHandler(async (req, res) => {
-    const { clientId } = req.params;
-    const { type, itemId, rows, rowIndex, row } = req.body;
-    const userId = req.userId;
+    try {
+        const { clientId } = req.params;
+        const { type, itemId, rows, rowIndex, row } = req.body;
+        const userId = req.userId;
 
-    const result = await ClientService.saveMonthlyProcurement(
-        clientId, 
-        type, 
-        itemId, 
-        rows, 
-        rowIndex, 
-        row, 
-        userId
-    );
+        const result = await ClientService.saveMonthlyProcurement(
+            clientId, 
+            type, 
+            itemId, 
+            rows, 
+            rowIndex, 
+            row, 
+            userId
+        );
 
-    return res.status(200).json({
-        message: "Monthly procurement saved",
-        error: false,
-        success: true,
-        data: result
-    });
+        return res.status(200).json({
+            message: "Monthly procurement saved",
+            error: false,
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(500, "Failed to save monthly procurement: " + (error.message || "Unknown error"));
+    }
 });
 
 export const getMonthlyProcurementController = asyncHandler(async (req, res) => {
-    const { clientId } = req.params;
-    const { type, itemId } = req.query;
-    const doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
-    return res.status(200).json({
-        message: "Monthly procurement fetched",
-        error: false,
-        success: true,
-        data: doc?.procurementDetails || []
-    });
+    try {
+        const { clientId } = req.params;
+        const { type, itemId } = req.query;
+        const doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
+        return res.status(200).json({
+            message: "Monthly procurement fetched",
+            error: false,
+            success: true,
+            data: doc?.procurementDetails || []
+        });
+    } catch (error) {
+        throw new ApiError(500, "Failed to fetch monthly procurement: " + (error.message || "Unknown error"));
+    }
 });
+
 export const cleanupProductComplianceFieldsController = asyncHandler(async (req, res) => {
-    // Remove deprecated fields from ProductComplianceModel rows
-    await ProductComplianceModel.updateMany({}, {
-        $unset: {
-            'rows.$[].polymerType': 1,
-            'rows.$[].category': 1,
-            'rows.$[].layerType': 1,
-            'rows.$[].supplierStatus': 1,
-            'rows.$[].eprRegNumber': 1,
-            'rows.$[].polymerCodeOnProduct': 1
-        }
-    });
-    // Remove deprecated fields from embedded productComplianceRows in ClientModel (CTE and CTO lists)
-    await ClientModel.updateMany({}, {
-        $unset: {
-            'productionFacility.cteDetailsList.$[].productComplianceRows.$[].polymerType': 1,
-            'productionFacility.cteDetailsList.$[].productComplianceRows.$[].category': 1,
-            'productionFacility.cteDetailsList.$[].productComplianceRows.$[].layerType': 1,
-            'productionFacility.cteDetailsList.$[].productComplianceRows.$[].supplierStatus': 1,
-            'productionFacility.cteDetailsList.$[].productComplianceRows.$[].eprRegNumber': 1,
-            'productionFacility.cteDetailsList.$[].productComplianceRows.$[].polymerCodeOnProduct': 1,
-            'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].polymerType': 1,
-            'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].category': 1,
-            'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].layerType': 1,
-            'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].supplierStatus': 1,
-            'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].eprRegNumber': 1,
-            'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].polymerCodeOnProduct': 1
-        }
-    });
-    return res.status(200).json({
-        message: "Deprecated product compliance fields cleaned up",
-        error: false,
-        success: true
-    });
+    try {
+        // Remove deprecated fields from ProductComplianceModel rows
+        await ProductComplianceModel.updateMany({}, {
+            $unset: {
+                'rows.$[].polymerType': 1,
+                'rows.$[].category': 1,
+                'rows.$[].layerType': 1,
+                'rows.$[].supplierStatus': 1,
+                'rows.$[].eprRegNumber': 1,
+                'rows.$[].polymerCodeOnProduct': 1
+            }
+        });
+        // Remove deprecated fields from embedded productComplianceRows in ClientModel (CTE and CTO lists)
+        await ClientModel.updateMany({}, {
+            $unset: {
+                'productionFacility.cteDetailsList.$[].productComplianceRows.$[].polymerType': 1,
+                'productionFacility.cteDetailsList.$[].productComplianceRows.$[].category': 1,
+                'productionFacility.cteDetailsList.$[].productComplianceRows.$[].layerType': 1,
+                'productionFacility.cteDetailsList.$[].productComplianceRows.$[].supplierStatus': 1,
+                'productionFacility.cteDetailsList.$[].productComplianceRows.$[].eprRegNumber': 1,
+                'productionFacility.cteDetailsList.$[].productComplianceRows.$[].polymerCodeOnProduct': 1,
+                'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].polymerType': 1,
+                'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].category': 1,
+                'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].layerType': 1,
+                'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].supplierStatus': 1,
+                'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].eprRegNumber': 1,
+                'productionFacility.ctoDetailsList.$[].productComplianceRows.$[].polymerCodeOnProduct': 1
+            }
+        });
+        return res.status(200).json({
+            message: "Deprecated product compliance fields cleaned up",
+            error: false,
+            success: true
+        });
+    } catch (error) {
+        throw new ApiError(500, "Failed to cleanup fields: " + (error.message || "Unknown error"));
+    }
 });
 
 export const getClientByIdController = async (req, res) => {

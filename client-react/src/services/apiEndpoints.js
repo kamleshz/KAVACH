@@ -75,7 +75,8 @@ export const API_ENDPOINTS = {
     ANALYSIS: {
         PLASTIC_PREPOST: '/api/analysis/plastic-prepost',
         SALES: '/api/analysis/sales-analysis',
-        PURCHASE: '/api/analysis/purchase-analysis'
+        PURCHASE: '/api/analysis/purchase-analysis',
+        COMPLIANCE_REPORT: (id) => `/api/analysis/plastic-compliance-report/${id}`
     }
 };
 

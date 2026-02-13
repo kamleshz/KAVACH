@@ -31,20 +31,20 @@ export const STORAGE_AUDIT_TEMPLATE = {
     "Product Name",
     "List of EEE",
     "Date of Storage",
-    "End Date",
+    "Date of Audit",
     "Difference",
-    "Quantity (MT)",
+    "Quantity in (MT)",
     "Remarks"
   ],
   sampleData: [
     {
-      "EEE Code": "EEE/001",
+      "EEE Code": "ITEW1",
       "Product Name": "Sample Product",
-      "List of EEE": "IT Equipment",
+      "List of EEE": "Centralized Data Processing: Mainframe",
       "Date of Storage": "2023-01-01",
-      "End Date": "2023-01-15",
+      "Date of Audit": "2023-01-15",
       "Difference": "14 Days",
-      "Quantity (MT)": "1.5",
+      "Quantity in (MT)": "1.5",
       "Remarks": "Stored safely"
     }
   ]

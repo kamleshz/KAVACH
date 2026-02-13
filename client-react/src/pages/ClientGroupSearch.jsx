@@ -1,5 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Input } from 'antd';
+import { 
+  FaSearch, 
+  FaTimes, 
+  FaSpinner, 
+  FaExclamationCircle, 
+  FaEye, 
+  FaCog 
+} from 'react-icons/fa';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 
@@ -57,22 +66,16 @@ const ClientGroupSearch = ({ onProcess, isEmbedded = false }) => {
                         Company Name
                     </label>
                     <div className="relative">
-                        <input
-                            type="text"
+                        <Input
+                            size="large"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="Enter company name..."
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all outline-none"
+                            allowClear
+                            prefix={<FaSearch className="text-gray-400" />}
+                            className="rounded-xl"
+                            style={{ height: '50px' }}
                         />
-                        {searchTerm && (
-                            <button
-                                type="button"
-                                onClick={handleClear}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                                <i className="fas fa-times"></i>
-                            </button>
-                        )}
                     </div>
                 </div>
                 <button
@@ -80,7 +83,7 @@ const ClientGroupSearch = ({ onProcess, isEmbedded = false }) => {
                     disabled={loading || !searchTerm.trim()}
                     className="px-8 py-3 bg-primary-600 text-white font-semibold rounded-xl hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                    {loading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-search"></i>}
+                    {loading ? <FaSpinner className="animate-spin" /> : <FaSearch />}
                     Search
                 </button>
             </form>
@@ -118,7 +121,7 @@ const ClientGroupSearch = ({ onProcess, isEmbedded = false }) => {
                                                     </span>
                                                     {new Date(client.auditEndDate) < new Date() && (
                                                         <span className="text-red-500 text-xs font-bold mt-1 bg-red-50 px-2 py-1 rounded w-fit flex items-center gap-1">
-                                                            <i className="fas fa-exclamation-circle"></i>
+                                                            <FaExclamationCircle />
                                                             Audit Period Expired
                                                         </span>
                                                     )}
@@ -134,7 +137,7 @@ const ClientGroupSearch = ({ onProcess, isEmbedded = false }) => {
                                                     className="w-8 h-8 rounded-full bg-primary-50 text-primary-600 hover:bg-primary-100 hover:text-primary-700 flex items-center justify-center transition-colors"
                                                     title="View Details"
                                                 >
-                                                    <i className="fas fa-eye"></i>
+                                                    <FaEye />
                                                 </button>
                                                 <button
                                                     onClick={() => {
@@ -150,7 +153,7 @@ const ClientGroupSearch = ({ onProcess, isEmbedded = false }) => {
                                                     }}
                                                     className="px-3 py-1.5 bg-primary-50 text-primary-700 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors text-sm font-medium flex items-center gap-1"
                                                 >
-                                                    <i className="fas fa-cog"></i>
+                                                    <FaCog />
                                                     Click to Process
                                                 </button>
                                             </div>
@@ -161,7 +164,7 @@ const ClientGroupSearch = ({ onProcess, isEmbedded = false }) => {
                                 <tr>
                                     <td colSpan="4" className="p-8 text-center text-gray-500">
                                         <div className="flex flex-col items-center justify-center">
-                                            <i className="fas fa-search text-4xl text-gray-200 mb-3"></i>
+                                            <FaSearch className="text-4xl text-gray-200 mb-3" />
                                             <p>No clients found matching "{searchTerm}"</p>
                                         </div>
                                     </td>

@@ -1,6 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FaEdit, FaClipboardCheck, FaTrashAlt } from 'react-icons/fa';
+import { Input, Select } from 'antd';
+import { 
+  FaEdit, 
+  FaClipboardCheck, 
+  FaTrashAlt, 
+  FaExclamationTriangle, 
+  FaSpinner, 
+  FaPlus, 
+  FaUsers, 
+  FaSearch, 
+  FaFilter, 
+  FaChevronDown, 
+  FaPhoneAlt 
+} from 'react-icons/fa';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 import useAuth from '../hooks/useAuth';
@@ -18,7 +31,7 @@ const DeleteModal = ({ isOpen, onClose, onConfirm, clientName, isDeleting }) => 
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="sm:flex sm:items-start">
               <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                <i className="fas fa-exclamation-triangle text-red-600"></i>
+                <FaExclamationTriangle className="text-red-600" />
               </div>
               <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
                 <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
@@ -41,7 +54,7 @@ const DeleteModal = ({ isOpen, onClose, onConfirm, clientName, isDeleting }) => 
             >
               {isDeleting ? (
                 <>
-                  <i className="fas fa-spinner fa-spin mr-2"></i>
+                  <FaSpinner className="animate-spin mr-2" />
                   Deleting...
                 </>
               ) : (
@@ -235,7 +248,7 @@ const Clients = () => {
             onClick={() => navigate('/dashboard/add-client')}
             className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-sm font-semibold rounded-xl shadow-lg text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-300 transform hover:-translate-y-0.5"
           >
-            <i className="fas fa-plus mr-2.5"></i>
+            <FaPlus className="mr-2.5" />
             Add New Client
           </button>
         </div>
@@ -244,7 +257,7 @@ const Clients = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg p-6 flex items-center text-white transform hover:scale-[1.02] transition-transform duration-300">
                 <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mr-5 shadow-inner">
-                    <i className="fas fa-users text-2xl"></i>
+                    <FaUsers className="text-2xl" />
                 </div>
                 <div>
                     <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">Total Clients</p>
@@ -253,7 +266,7 @@ const Clients = () => {
             </div>
             <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-lg p-6 flex items-center text-white transform hover:scale-[1.02] transition-transform duration-300">
                 <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mr-5 shadow-inner">
-                    <i className="fas fa-clipboard-check text-2xl"></i>
+                    <FaClipboardCheck className="text-2xl" />
                 </div>
                 <div>
                     <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider">Active Audits</p>
@@ -262,7 +275,7 @@ const Clients = () => {
             </div>
             <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl shadow-lg p-6 flex items-center text-white transform hover:scale-[1.02] transition-transform duration-300">
                 <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mr-5 shadow-inner">
-                    <i className="fas fa-exclamation-triangle text-2xl"></i>
+                    <FaExclamationTriangle className="text-2xl" />
                 </div>
                 <div>
                     <p className="text-amber-100 text-sm font-medium uppercase tracking-wider">Pending Actions</p>
@@ -274,36 +287,30 @@ const Clients = () => {
         {/* Filters & Search */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="relative w-full md:w-96 group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <i className="fas fa-search text-gray-400 group-focus-within:text-primary-500 transition-colors"></i>
-            </div>
-            <input
-              type="text"
+            <Input
+              prefix={<FaSearch className="text-gray-400 group-focus-within:text-primary-500 transition-colors" />}
               placeholder="Search clients..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl leading-5 bg-gray-50 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary-100 focus:border-primary-500 transition-all duration-200 sm:text-sm"
+              className="w-full rounded-xl py-2"
+              size="large"
             />
           </div>
           
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:flex-none">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <i className="fas fa-filter text-gray-400"></i>
-                </div>
-                <select
+            <div className="relative flex-1 md:flex-none min-w-[200px]">
+                <Select
                     value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value)}
-                    className="block w-full pl-10 pr-10 py-3 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-100 focus:border-primary-500 bg-white cursor-pointer hover:bg-gray-50 transition-colors appearance-none font-medium text-gray-700"
+                    onChange={(value) => setTypeFilter(value)}
+                    className="w-full"
+                    size="large"
+                    suffixIcon={<FaChevronDown className="text-xs text-gray-400" />}
                 >
-                    <option value="All">All Types</option>
+                    <Select.Option value="All">All Types</Select.Option>
                     {uniqueEntityTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
+                    <Select.Option key={type} value={type}>{type}</Select.Option>
                     ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
-                    <i className="fas fa-chevron-down text-xs"></i>
-                </div>
+                </Select>
             </div>
           </div>
         </div>
@@ -312,7 +319,7 @@ const Clients = () => {
         {filteredClients.length === 0 ? (
           <div className="text-center py-24 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center">
             <div className="bg-blue-50 rounded-full h-24 w-24 flex items-center justify-center mb-6 animate-pulse">
-               <i className="fas fa-search text-4xl text-blue-300"></i>
+               <FaSearch className="text-4xl text-blue-300" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">No clients found</h3>
             <p className="text-gray-500 max-w-md mx-auto mb-8">
@@ -325,7 +332,7 @@ const Clients = () => {
                 onClick={() => navigate('/dashboard/add-client')}
                 className="inline-flex items-center px-6 py-3 border border-transparent shadow-lg shadow-blue-500/30 text-base font-medium rounded-xl text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 transition-all transform hover:-translate-y-0.5"
               >
-                <i className="fas fa-plus mr-2"></i>
+                <FaPlus className="mr-2" />
                 Add Client
               </button>
             )}
@@ -357,7 +364,7 @@ const Clients = () => {
                             <div className="text-base font-bold text-gray-900 group-hover:text-primary-600 transition-colors">{client.clientName}</div>
                             <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
                                 <span className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                                    <i className="fas fa-phone-alt text-gray-400"></i>
+                                    <FaPhoneAlt className="text-gray-400" />
                                     {client.contactPerson?.mobile || 'N/A'}
                                 </span>
                             </div>

@@ -2219,7 +2219,7 @@ const AddClientContent = () => {
       return summaryArray;
   };
 
-  const buildPolymerProcurementSummary = (rows, filters) => {
+  const buildPolymerProcurementSummary = (rows, filters, viewMode = 'Month') => {
       const summaryMap = new Map();
 
       rows.forEach((row) => {
@@ -2228,23 +2228,30 @@ const AddClientContent = () => {
           if (Array.isArray(filters.half) && filters.half.length > 0 && !filters.half.includes(row.half)) return;
           if (Array.isArray(filters.polymer) && filters.polymer.length > 0 && !filters.polymer.includes(row.polymer)) return;
 
+          // For Polymer-wise summary, we ignore viewMode for grouping and always group by Polymer
           const key = row.polymer || 'Unknown';
+          const label = key;
+
           const current = summaryMap.get(key) || {
-              polymer: key,
+              label: label,
               monthlyPurchaseMt: 0,
-              recycledQty: 0,
+              recycledQty: 0
           };
-          current.monthlyPurchaseMt += row.monthlyPurchaseMt || 0;
-          current.recycledQty += row.recycledQty || 0;
+          
+          current.monthlyPurchaseMt += (Number(row.monthlyPurchaseMt) || 0);
+          current.recycledQty += (Number(row.recycledQty) || 0);
+          
           summaryMap.set(key, current);
       });
 
       const summaryArray = Array.from(summaryMap.values());
-      summaryArray.sort((a, b) => a.polymer.localeCompare(b.polymer));
-      return summaryArray;
+      // Sort alphabetically by polymer name
+      summaryArray.sort((a, b) => a.label.localeCompare(b.label));
+      
+      return { data: summaryArray, keys: ['monthlyPurchaseMt', 'recycledQty'] };
   };
 
-  const buildCategoryProcurementSummary = (rows, filters) => {
+  const buildCategoryProcurementSummary = (rows, filters, viewMode = 'Month') => {
       const summaryMap = new Map();
 
       rows.forEach((row) => {
@@ -2253,20 +2260,27 @@ const AddClientContent = () => {
           if (Array.isArray(filters.half) && filters.half.length > 0 && !filters.half.includes(row.half)) return;
           if (Array.isArray(filters.category) && filters.category.length > 0 && !filters.category.includes(row.category)) return;
 
+          // For Category-wise summary, we ignore viewMode for grouping and always group by Category
           const key = row.category || 'Unknown';
+          const label = key;
+
           const current = summaryMap.get(key) || {
-              category: key,
+              label: label,
               monthlyPurchaseMt: 0,
-              recycledQty: 0,
+              recycledQty: 0
           };
-          current.monthlyPurchaseMt += row.monthlyPurchaseMt || 0;
-          current.recycledQty += row.recycledQty || 0;
+
+          current.monthlyPurchaseMt += (Number(row.monthlyPurchaseMt) || 0);
+          current.recycledQty += (Number(row.recycledQty) || 0);
+
           summaryMap.set(key, current);
       });
 
       const summaryArray = Array.from(summaryMap.values());
-      summaryArray.sort((a, b) => a.category.localeCompare(b.category));
-      return summaryArray;
+      // Sort alphabetically by category name
+      summaryArray.sort((a, b) => a.label.localeCompare(b.label));
+      
+      return { data: summaryArray, keys: ['monthlyPurchaseMt', 'recycledQty'] };
   };
 
   const fetchMonthlyProcurementSummary = async () => {

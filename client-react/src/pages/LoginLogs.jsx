@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
+import { Input } from 'antd';
+import { 
+  FaHistory, 
+  FaSearch, 
+  FaMapMarkerAlt, 
+  FaChevronLeft, 
+  FaChevronRight 
+} from 'react-icons/fa';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 import useAuth from '../hooks/useAuth';
@@ -84,19 +92,16 @@ const LoginLogs = () => {
         <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
            <div className="flex items-center gap-2">
                <div className="h-8 w-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                   <i className="fas fa-history text-sm"></i>
+                   <FaHistory className="text-sm" />
                </div>
                <h3 className="text-base font-semibold text-gray-800">Audit Trail</h3>
            </div>
            
            <div className="relative w-full sm:w-auto">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                  <i className="fas fa-search text-xs"></i>
-                </span>
-                <input
-                  type="text"
+                <Input
+                  prefix={<FaSearch className="text-gray-400 text-xs mr-2" />}
                   placeholder="Search user, email, IP..."
-                  className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-72 bg-white shadow-sm"
+                  className="w-full sm:w-72 shadow-sm rounded-lg"
                   value={searchTerm}
                   onChange={handleSearch}
                 />
@@ -131,7 +136,7 @@ const LoginLogs = () => {
                   <td colSpan="6" className="px-6 py-12 text-center text-gray-500 bg-white">
                     <div className="flex flex-col items-center justify-center">
                         <div className="h-12 w-12 rounded-full bg-gray-50 flex items-center justify-center mb-3">
-                            <i className="fas fa-search text-gray-300"></i>
+                            <FaSearch className="text-gray-300" />
                         </div>
                         <p className="text-sm font-medium">No logs found</p>
                         <p className="text-xs text-gray-400 mt-1">Try adjusting your search</p>
@@ -160,7 +165,7 @@ const LoginLogs = () => {
                     <td className="px-6 py-4">
                         {log.city || log.country ? (
                             <div className="flex items-center gap-1.5">
-                                <i className="fas fa-map-marker-alt text-red-400 text-xs"></i>
+                                <FaMapMarkerAlt className="text-red-400 text-xs" />
                                 <span className="text-sm text-gray-700">
                                     {log.city ? `${log.city}, ` : ''}{log.country}
                                 </span>
@@ -203,7 +208,7 @@ const LoginLogs = () => {
                         disabled={pagination.page === 1}
                         className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                        <i className="fas fa-chevron-left text-xs"></i>
+                        <FaChevronLeft className="text-xs" />
                     </button>
                     <span className="text-sm font-medium text-gray-700 px-2">
                         Page {pagination.page} of {pagination.pages}
@@ -213,7 +218,7 @@ const LoginLogs = () => {
                         disabled={pagination.page === pagination.pages}
                         className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                        <i className="fas fa-chevron-right text-xs"></i>
+                        <FaChevronRight className="text-xs" />
                     </button>
                 </div>
             </div>

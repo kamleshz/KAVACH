@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { FaCheck, FaUserCircle } from 'react-icons/fa';
 
 const getStatus = (stepNumber, currentStep) => {
   if (stepNumber < currentStep) return 'completed';
@@ -58,7 +59,7 @@ const AuditStepper = ({ steps, currentStep, onStepChange }) => {
                   {typeof step.icon === 'string' ? (
                     <i className={`${step.icon || 'fas fa-circle-user'} text-lg`} />
                   ) : (
-                    step.icon
+                    step.icon || <FaUserCircle className="text-lg" />
                   )}
                 </div>
                 <div>
@@ -71,7 +72,7 @@ const AuditStepper = ({ steps, currentStep, onStepChange }) => {
               <div className="flex items-center justify-center pl-4">
                 {isCompleted && (
                   <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white">
-                    <i className="fas fa-check text-xs" />
+                    <FaCheck className="text-xs" />
                   </div>
                 )}
                 {isActive && (

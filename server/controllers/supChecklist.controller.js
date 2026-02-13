@@ -1,4 +1,4 @@
-import SingleUsePlasticChecklistModel from "../models/SingleUsePlasticChecklist.model.js";
+import SingleUsePlasticChecklistModel from "../models/singleUsePlasticChecklist.model.js";
 
 export const getSingleUsePlasticChecklistController = async (req, res) => {
     try {

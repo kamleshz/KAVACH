@@ -1,14 +1,19 @@
 import React, { useMemo, useState } from 'react';
-import { Table, Image, Tabs } from 'antd';
-import { UploadOutlined, CheckOutlined, LoadingOutlined, SaveOutlined } from '@ant-design/icons';
+import { Table, Image, Tabs, message } from 'antd';
+import { UploadOutlined, CheckOutlined, LoadingOutlined, SaveOutlined, DownloadOutlined } from '@ant-design/icons';
 import MarkingLabeling from './MarkingLabeling';
+import api from '../../services/api';
+import { API_ENDPOINTS } from '../../services/apiEndpoints';
 
 const SummaryReport = ({
     clientId,
+    type,
+    itemId,
     handleNext,
     isSaving,
     productRows = [],
     monthlyRows = [],
+    recycledRows = [],
     resolveUrl,
     supplierRows = [],
     componentRows = [],
@@ -20,6 +25,32 @@ const SummaryReport = ({
     savingRow,
     onlyTable = false
 }) => {
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownloadReport = async () => {
+        try {
+            setIsDownloading(true);
+            const response = await api.get(API_ENDPOINTS.ANALYSIS.COMPLIANCE_REPORT(clientId) + `?type=${type}&itemId=${itemId}`, {
+                responseType: 'blob'
+            });
+            
+            // Create blob link to download
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Plastic_Compliance_Report_${clientId}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            
+            message.success("Report downloaded successfully");
+        } catch (error) {
+            console.error("Download failed:", error);
+            message.error("Failed to download report");
+        } finally {
+            setIsDownloading(false);
+        }
+    };
     
     // Process and aggregate data
     const tableData = useMemo(() => {
@@ -54,11 +85,6 @@ const SummaryReport = ({
         return Array.from(groupedBySku.values()).map((group, index) => {
             const { skuCode, skuDescription, industryCategory, productImage, componentCodes, products } = group;
 
-            // Collect all related procurement records for this SKU to calculate totals
-            const relatedProcurement = monthlyRows.filter(m => 
-                componentCodes.has((m.componentCode || '').trim())
-            );
-
             let details = [];
             
             // Iterate over each component in this SKU
@@ -66,6 +92,11 @@ const SummaryReport = ({
                 // Find all matching monthly procurement records for this component
                 const procurementRecords = monthlyRows.filter(m => 
                     (m.componentCode || '').trim() === compCode
+                );
+
+                // Find all matching recycled records for this component
+                const matchingRecycledRows = recycledRows.filter(r => 
+                    (r.componentCode || '').trim() === compCode
                 );
 
                 if (procurementRecords.length > 0) {
@@ -80,25 +111,30 @@ const SummaryReport = ({
                         
                         const productRow = products.find(p => (p.componentCode || '').trim() === compCode) || {};
 
+                        // Try to find matching recycled row by supplier
+                        const recycledRow = matchingRecycledRows.find(r => 
+                            (r.supplierName || '').trim().toLowerCase() === (procurement.supplierName || '').trim().toLowerCase()
+                        ) || matchingRecycledRows[0] || {};
+
                         return {
                             key: `${skuCode}-${compCode}-${idx}`,
                             skuCode: skuCode,
                             componentCode: compCode,
                             componentImage: productRow.componentImage,
-                            componentDescription: procurement.componentDescription || componentRow.componentDescription || productRow.componentDescription || '-',
+                            componentDescription: componentRow.componentDescription || procurement.componentDescription || productRow.componentDescription || '-',
                             supplierName: procurement.supplierName || '-',
                             supplierStatus: supplierRow.supplierStatus || '-',
                             eprCertificateNumber: supplierRow.eprCertificateNumber || '-',
-                            polymerType: procurement.polymerType || componentRow.polymerType || '-',
-                            componentPolymer: procurement.componentPolymer || componentRow.componentPolymer || '-',
-                            category: procurement.category || componentRow.category || '-',
+                            polymerType: componentRow.polymerType || procurement.polymerType || '-',
+                            componentPolymer: componentRow.componentPolymer || procurement.componentPolymer || '-',
+                            category: componentRow.category || procurement.category || '-',
                             categoryIIType: componentRow.categoryIIType || '-',
                             containerCapacity: componentRow.containerCapacity || '-',
                             layerType: componentRow.layerType || '-',
                             thickness: componentRow.thickness || '-',
                             monthlyPurchaseMt: procurement.monthlyPurchaseMt || '0',
-                            recycledPercent: procurement.recycledPercent || '0',
-                            recycledQty: procurement.recycledQty || '0',
+                            recycledPercent: recycledRow.usedRecycledPercent || procurement.recycledPercent || '0',
+                            recycledQty: recycledRow.usedRecycledQtyMt || procurement.recycledQty || '0',
                             recycledAmount: procurement.recycledQrtAmount || '0',
                             virginQty: procurement.virginQty || '0',
                             virginAmount: procurement.virginQtyAmount || '0',
@@ -113,9 +149,12 @@ const SummaryReport = ({
                     // If NO procurement data, create a stub row for the component
                     const componentRow = componentRows.find(c => (c.componentCode || '').trim() === compCode) || {};
                     const productRow = products.find(p => (p.componentCode || '').trim() === compCode) || {};
-                    // Try to find any supplier info if available in supplierRows (even if no monthly data)
-                    // Or just list it without supplier
                     
+                    // Aggregate recycled data if multiple rows exist for this component (since we only show 1 stub)
+                    const totalRecycledQtyForComp = matchingRecycledRows.reduce((sum, r) => sum + (parseFloat(r.usedRecycledQtyMt) || 0), 0);
+                    // For percent, we can't easily sum. Use average or first? Use first non-zero.
+                    const recycledPercentForComp = matchingRecycledRows.find(r => parseFloat(r.usedRecycledPercent) > 0)?.usedRecycledPercent || '0';
+
                     details.push({
                         key: `${skuCode}-${compCode}-stub`,
                         skuCode: skuCode,
@@ -133,8 +172,8 @@ const SummaryReport = ({
                         layerType: componentRow.layerType || '-',
                         thickness: componentRow.thickness || '-',
                         monthlyPurchaseMt: '0',
-                        recycledPercent: '0',
-                        recycledQty: '0',
+                        recycledPercent: recycledPercentForComp,
+                        recycledQty: totalRecycledQtyForComp > 0 ? totalRecycledQtyForComp.toFixed(3) : '0',
                         recycledAmount: '0',
                         virginQty: '0',
                         virginAmount: '0',
@@ -146,12 +185,12 @@ const SummaryReport = ({
                 }
             });
 
-            // Aggregate values
-            const totalRecycledQty = relatedProcurement.reduce((sum, item) => sum + (parseFloat(item.recycledQty) || 0), 0);
-            const totalRecycledAmount = relatedProcurement.reduce((sum, item) => sum + (parseFloat(item.recycledQrtAmount) || 0), 0);
-            const totalVirginQty = relatedProcurement.reduce((sum, item) => sum + (parseFloat(item.virginQty) || 0), 0);
-            const totalVirginAmount = relatedProcurement.reduce((sum, item) => sum + (parseFloat(item.virginQtyAmount) || 0), 0);
-            const totalPurchaseMt = relatedProcurement.reduce((sum, item) => sum + (parseFloat(item.monthlyPurchaseMt) || 0), 0);
+            // Aggregate values from details (now containing recycled data)
+            const totalRecycledQty = details.reduce((sum, item) => sum + (parseFloat(item.recycledQty) || 0), 0);
+            const totalRecycledAmount = details.reduce((sum, item) => sum + (parseFloat(item.recycledAmount) || 0), 0);
+            const totalVirginQty = details.reduce((sum, item) => sum + (parseFloat(item.virginQty) || 0), 0);
+            const totalVirginAmount = details.reduce((sum, item) => sum + (parseFloat(item.virginAmount) || 0), 0);
+            const totalPurchaseMt = details.reduce((sum, item) => sum + (parseFloat(item.monthlyPurchaseMt) || 0), 0);
 
             // Calculate weighted average Recycled % or derived %
             const recycledPercent = totalPurchaseMt > 0 
@@ -159,6 +198,15 @@ const SummaryReport = ({
                 : '0.00';
 
             const firstProduct = products[0] || {};
+
+            // Derived Product Compliance Status
+            // Logic: If ANY component is Non-Compliant -> Product is Non-Compliant
+            // Else if ANY component has status -> Product is Compliant
+            // Else -> empty
+            const isAnyNonCompliant = details.some(d => d.componentComplianceStatus === 'Non-Compliant');
+            const hasAnyStatus = details.some(d => d.componentComplianceStatus && d.componentComplianceStatus !== 'Select'); // Check for valid status
+            
+            const derivedProductStatus = isAnyNonCompliant ? 'Non-Compliant' : (hasAnyStatus ? 'Compliant' : '');
 
             return {
                 key: index,
@@ -172,7 +220,7 @@ const SummaryReport = ({
                 virginQty: totalVirginQty.toFixed(3),
                 virginAmount: totalVirginAmount.toFixed(2),
                 details: details, // Pass details for nested table
-                productComplianceStatus: firstProduct.productComplianceStatus || '',
+                productComplianceStatus: derivedProductStatus,
                 // productAuditorRemarks removed as per request, using computedRemarks instead
                 computedRemarks: details.map(d => d.auditorRemarks).filter(Boolean).join('\n'), 
                 clientRemarks: firstProduct.clientRemarks || '',
@@ -180,7 +228,7 @@ const SummaryReport = ({
                 managerRemarks: firstProduct.managerRemarks || ''
             };
         });
-    }, [productRows, monthlyRows, supplierRows, componentRows]);
+    }, [productRows, monthlyRows, supplierRows, componentRows, recycledRows]);
 
     const columns = [
         {
@@ -241,27 +289,14 @@ const SummaryReport = ({
             dataIndex: 'productComplianceStatus',
             key: 'productComplianceStatus',
             width: 150,
-            render: (val, record) => (
-                onlyTable ? (
-                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                        val === 'Compliant' ? 'bg-green-100 text-green-700' :
-                        val === 'Non-Compliant' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-700'
-                    }`}>
-                        {val || '-'}
-                    </span>
-                ) : (
-                    <select
-                        className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
-                        value={val}
-                        onChange={(e) => handleSummaryChange && handleSummaryChange(record.skuCode, 'productComplianceStatus', e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <option value="">Select</option>
-                        <option value="Compliant">Compliant</option>
-                        <option value="Non-Compliant">Non-Compliant</option>
-                    </select>
-                )
+            render: (val) => (
+                <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                    val === 'Compliant' ? 'bg-green-100 text-green-700' :
+                    val === 'Non-Compliant' ? 'bg-red-100 text-red-700' :
+                    'bg-gray-100 text-gray-700'
+                }`}>
+                    {val || '-'}
+                </span>
             )
         },
         {
@@ -409,7 +444,6 @@ const SummaryReport = ({
                     <span className={`px-2 py-1 rounded text-xs font-semibold ${
                         val === 'Compliant' ? 'bg-green-100 text-green-700' :
                         val === 'Non-Compliant' ? 'bg-red-100 text-red-700' :
-                        val === 'Partial Compliant' ? 'bg-amber-100 text-amber-700' :
                         'bg-gray-100 text-gray-700'
                     }`}>
                         {val || '-'}
@@ -418,12 +452,43 @@ const SummaryReport = ({
                     <select
                         className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
                         value={val}
-                        onChange={(e) => handleComponentSummaryChange && handleComponentSummaryChange(record.skuCode, record.componentCode, 'componentComplianceStatus', e.target.value)}
+                        onChange={(e) => {
+                            const newValue = e.target.value;
+                            if (handleComponentSummaryChange) {
+                                handleComponentSummaryChange(record.skuCode, record.componentCode, 'componentComplianceStatus', newValue);
+                            }
+
+                            // Auto-update Product Status in parent state
+                            // Find the SKU group in tableData to get all sibling components
+                            const skuGroup = tableData.find(g => g.skuCode === record.skuCode);
+                            if (skuGroup && skuGroup.details) {
+                                // Check if ANY component is Non-Compliant (considering the new value for the current component)
+                                const isAnyNonCompliant = skuGroup.details.some(d => {
+                                    if (d.componentCode === record.componentCode) {
+                                        return newValue === 'Non-Compliant';
+                                    }
+                                    return d.componentComplianceStatus === 'Non-Compliant';
+                                });
+                                
+                                const hasAnyStatus = skuGroup.details.some(d => {
+                                    if (d.componentCode === record.componentCode) {
+                                        return newValue && newValue !== 'Select';
+                                    }
+                                    return d.componentComplianceStatus && d.componentComplianceStatus !== 'Select';
+                                });
+
+                                const newProductStatus = isAnyNonCompliant ? 'Non-Compliant' : (hasAnyStatus ? 'Compliant' : '');
+                                
+                                // Update Product Status if it changed
+                                if (handleSummaryChange) {
+                                     handleSummaryChange(record.skuCode, 'productComplianceStatus', newProductStatus);
+                                }
+                            }
+                        }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <option value="">Select</option>
                         <option value="Compliant">Compliant</option>
-                        <option value="Partial Compliant">Partial Compliant</option>
                         <option value="Non-Compliant">Non-Compliant</option>
                     </select>
                 )
@@ -646,14 +711,24 @@ const SummaryReport = ({
                         <h2 className="text-xl font-bold text-gray-800">Summary Report</h2>
                         <p className="text-gray-500 text-sm mt-1">Review overall compliance and procurement summary</p>
                     </div>
-                    <button
-                        onClick={handleNext}
-                        disabled={isSaving}
-                        className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-bold shadow-md transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-wait"
-                    >
-                        {isSaving ? <LoadingOutlined spin /> : null}
-                        Finish <CheckOutlined />
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={handleDownloadReport}
+                            disabled={isDownloading}
+                            className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg font-semibold shadow-sm transition-all flex items-center gap-2 disabled:opacity-70"
+                        >
+                            {isDownloading ? <LoadingOutlined spin /> : <DownloadOutlined />}
+                            Download Report
+                        </button>
+                        <button
+                            onClick={handleNext}
+                            disabled={isSaving}
+                            className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-bold shadow-md transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-wait"
+                        >
+                            {isSaving ? <LoadingOutlined spin /> : null}
+                            Finish <CheckOutlined />
+                        </button>
+                    </div>
                 </div>
 
                 <Tabs defaultActiveKey="summary" items={tabItems} />

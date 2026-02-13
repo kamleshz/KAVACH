@@ -14,6 +14,15 @@ import {
   EyeInvisibleOutlined, 
   ExclamationCircleOutlined 
 } from '@ant-design/icons';
+import { 
+  FaShieldAlt, 
+  FaKey, 
+  FaSpinner, 
+  FaSignInAlt, 
+  FaArrowLeft, 
+  FaCheck, 
+  FaBan 
+} from 'react-icons/fa';
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '', otp: '' });
@@ -106,115 +115,14 @@ const Login = () => {
   };
 
   const startCameraAndCapture = async () => {
-    setIsCapturing(true);
-    setError('');
+    // SKIP CAMERA LOGIC as per user request
+    setIsCapturing(false);
+    setCapturedImage(null); 
+    setRequireOtp(true);
+    setLoading(false);
     
-    // Start getting location immediately
+    // Still try to get location if possible, but don't block
     getLocation();
-
-    // Check if mediaDevices is supported (it won't be on insecure origins like http://192.x.x.x)
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.warn("Camera API not available (likely insecure origin). Using fallback image.");
-        toast.warning("Camera not available. Using placeholder for verification.");
-        
-        // Generate a fallback "No Camera" image to satisfy backend requirements
-        if (canvasRef.current) {
-            const canvas = canvasRef.current;
-            const ctx = canvas.getContext('2d');
-            
-            // Set reasonable dimensions
-            canvas.width = 640;
-            canvas.height = 480;
-            
-            // Draw a colored background (not black to pass backend check)
-            ctx.fillStyle = '#E4E0DC'; // Light gray/beige
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Add text
-            ctx.fillStyle = '#E85D40';
-            ctx.font = '30px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('Camera Unavailable', canvas.width/2, canvas.height/2);
-            ctx.fillText('(Insecure Origin)', canvas.width/2, canvas.height/2 + 40);
-            
-            const fallbackImage = canvas.toDataURL('image/jpeg', 0.8);
-            setCapturedImage(fallbackImage);
-        }
-
-        // Proceed without real capture
-        setRequireOtp(true);
-        setIsCapturing(false);
-        setLoading(false);
-        return;
-    }
-
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        
-        if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            
-            // Wait for metadata to load
-            await new Promise((resolve) => {
-                videoRef.current.onloadedmetadata = () => {
-                    videoRef.current.play().then(resolve).catch(e => {
-                        console.error("Error playing video:", e);
-                        resolve(); // Resolve anyway to try continuing
-                    });
-                };
-            });
-
-            // Capture after a brief delay
-            setTimeout(() => {
-                if (canvasRef.current && videoRef.current) {
-                    const canvas = canvasRef.current;
-                    const context = canvas.getContext('2d');
-                    
-                    // Check if video dimensions are available
-                    if (videoRef.current.videoWidth && videoRef.current.videoHeight) {
-                        // Limit canvas size to avoid huge payloads (max 800px width)
-                        const MAX_WIDTH = 800;
-                        let width = videoRef.current.videoWidth;
-                        let height = videoRef.current.videoHeight;
-                        
-                        if (width > MAX_WIDTH) {
-                            height = height * (MAX_WIDTH / width);
-                            width = MAX_WIDTH;
-                        }
-
-                        canvas.width = width;
-                        canvas.height = height;
-                        context.drawImage(videoRef.current, 0, 0, width, height);
-                        
-                        const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
-                        setCapturedImage(imageBase64);
-                        setRequireOtp(true);
-                    } else {
-                         console.warn("Video dimensions not ready, using fallback");
-                         // Fallback to ensure we don't block login, but backend might reject if it looks fake
-                         // Better to try to capture again or fail gracefully
-                         setError("Camera capture failed. Please try logging in again.");
-                         setRequireOtp(false); // Do not proceed
-                    }
-                    
-                    // Stop stream
-                    try {
-                        stream.getTracks().forEach(track => track.stop());
-                    } catch (e) {
-                        console.error("Error stopping tracks:", e);
-                    }
-                    
-                    setIsCapturing(false);
-                    setLoading(false);
-                }
-            }, 1500); // Increased delay slightly to ensure video loads
-        }
-    } catch (err) {
-        console.error("Camera error", err);
-        setError("Camera permission is required for security verification.");
-        setIsCapturing(false);
-        setLoading(false);
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -240,13 +148,14 @@ const Login = () => {
         });
 
         if (!capturedImage) {
-            throw new Error("Photo capture failed. Please try logging in again.");
+            // throw new Error("Photo capture failed. Please try logging in again.");
+            console.log("Proceeding without photo capture");
         }
 
         const result = await verifyLoginOtp({ 
           email: formData.email, 
           otp: formData.otp,
-          photo: capturedImage,
+          photo: capturedImage || "", // Send empty string if no photo
           location: location
         }).unwrap();
         
@@ -463,7 +372,7 @@ const Login = () => {
                         <div className="space-y-4">
                              <div className="text-center mb-4">
                                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#FCE5D4] mb-3">
-                                    <i className="fas fa-shield-alt text-xl text-[#E85D40]"></i>
+                                    <FaShieldAlt className="text-xl text-[#E85D40]" />
                                 </div>
                                 <h3 className="text-lg font-bold text-[#3D2E4A]">Two-Step Verification</h3>
                                 <p className="text-xs text-[#706B77] mt-1">We sent a verification code to your email.</p>
@@ -481,7 +390,7 @@ const Login = () => {
                                     required
                                     autoFocus
                                 />
-                                <i className="fas fa-key absolute left-5 top-1/2 -translate-y-1/2 text-[#706B77] group-focus-within:text-[#E85D40] transition-colors duration-300"></i>
+                                <FaKey className="absolute left-5 top-1/2 -translate-y-1/2 text-[#706B77] group-focus-within:text-[#E85D40] transition-colors duration-300" />
                             </div>
                         </div>
                     )}
@@ -493,7 +402,7 @@ const Login = () => {
                     >
                         {loading ? (
                             <>
-                                <i className="fas fa-spinner fa-spin"></i>
+                                <FaSpinner className="animate-spin" />
                                 {isCapturing ? 'Verifying Security...' : 'Processing...'}
                             </>
                         ) : (
@@ -502,7 +411,7 @@ const Login = () => {
                                     'Verify & Login' 
                                 ) : (
                                     <>
-                                        <i className="fas fa-sign-in-alt mr-2"></i>
+                                        <FaSignInAlt className="mr-2" />
                                         Sign In
                                     </>
                                 )}
@@ -529,7 +438,7 @@ const Login = () => {
                                 onClick={() => setRequireOtp(false)}
                                 className="text-xs text-[#706B77] hover:text-[#3D2E4A] font-medium transition-colors"
                             >
-                                <i className="fas fa-arrow-left mr-1"></i>
+                                <FaArrowLeft className="mr-1 inline" />
                                 Back to Login
                             </button>
                         </div>
@@ -549,17 +458,17 @@ const Login = () => {
                         <div className="bg-red-500 animate-pulse w-3 h-3 rounded-full"></div>
                         {locationStatus === 'locating' && (
                              <div className="text-white text-xs bg-black/50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <i className="fas fa-spinner fa-spin"></i> Locating...
+                                <FaSpinner className="animate-spin" /> Locating...
                              </div>
                         )}
                         {locationStatus === 'captured' && (
                              <div className="text-green-400 text-xs bg-black/50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <i className="fas fa-check"></i> Loc. Captured
+                                <FaCheck /> Loc. Captured
                              </div>
                         )}
                         {locationStatus === 'denied' && (
                              <div className="text-red-400 text-xs bg-black/50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <i className="fas fa-ban"></i> Loc. Denied
+                                <FaBan /> Loc. Denied
                              </div>
                         )}
                       </div>

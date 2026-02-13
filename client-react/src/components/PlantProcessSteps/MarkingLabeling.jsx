@@ -75,11 +75,12 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             width: 130,
             fixed: 'left',
             className: 'bg-white',
-            render: (text, record) => (
-                <Input 
+            render: (text) => (
+                <input 
+                    type="text"
                     value={text} 
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'skuCode', e.target.value)}
-                    className="text-xs" 
+                    readOnly
+                    className="w-full border border-gray-200 rounded text-xs p-1 bg-gray-100 text-gray-600 focus:outline-none cursor-not-allowed"
                 />
             ) 
         },
@@ -88,12 +89,11 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             dataIndex: 'skuDescription', 
             key: 'skuDescription', 
             width: 220, 
-            render: (text, record) => (
-                <Input.TextArea 
+            render: (text) => (
+                <textarea 
                     value={text} 
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'skuDescription', e.target.value)}
-                    className="text-xs" 
-                    autoSize={{ minRows: 1, maxRows: 3 }}
+                    readOnly
+                    className="w-full border border-gray-200 rounded text-xs p-1 bg-gray-100 text-gray-600 focus:outline-none min-h-[32px] cursor-not-allowed"
                 />
             ) 
         },
@@ -102,11 +102,12 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             dataIndex: 'skuUm', 
             key: 'skuUm', 
             width: 100, 
-            render: (text, record) => (
-                <Input 
+            render: (text) => (
+                <input 
+                    type="text"
                     value={text} 
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'skuUm', e.target.value)}
-                    className="text-xs" 
+                    readOnly
+                    className="w-full border border-gray-200 rounded text-xs p-1 bg-gray-100 text-gray-600 focus:outline-none cursor-not-allowed"
                 />
             ) 
         },
@@ -160,16 +161,16 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'brandOwner', 
             width: 150, 
             render: (text, record) => (
-                <Select
+                <select
                     value={text}
-                    onChange={(val) => handleSkuComplianceChange(record.key, 'brandOwner', val)}
-                    className="w-full text-xs"
-                    options={[
-                        { value: 'Yes', label: 'Yes' },
-                        { value: 'No', label: 'No' },
-                        { value: 'Not Applicable', label: 'Not Applicable' }
-                    ]}
-                />
+                    onChange={(e) => handleSkuComplianceChange(record.key, 'brandOwner', e.target.value)}
+                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                >
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                    <option value="Not Applicable">Not Applicable</option>
+                </select>
             ) 
         },
         { 
@@ -178,16 +179,16 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'eprCertBrandOwner', 
             width: 200, 
             render: (text, record) => (
-                <Select
+                <select
                     value={text}
-                    onChange={(val) => handleSkuComplianceChange(record.key, 'eprCertBrandOwner', val)}
-                    className="w-full text-xs"
-                    options={[
-                        { value: 'Yes', label: 'Yes' },
-                        { value: 'No', label: 'No' },
-                        { value: 'Not Applicable', label: 'Not Applicable' }
-                    ]}
-                />
+                    onChange={(e) => handleSkuComplianceChange(record.key, 'eprCertBrandOwner', e.target.value)}
+                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                >
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                    <option value="Not Applicable">Not Applicable</option>
+                </select>
             ) 
         },
         { 
@@ -196,16 +197,16 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'eprCertProducer', 
             width: 220, 
             render: (text, record) => (
-                <Select
+                <select
                     value={text}
-                    onChange={(val) => handleSkuComplianceChange(record.key, 'eprCertProducer', val)}
-                    className="w-full text-xs"
-                    options={[
-                        { value: 'Yes', label: 'Yes' },
-                        { value: 'No', label: 'No' },
-                        { value: 'Not Applicable', label: 'Not Applicable' }
-                    ]}
-                />
+                    onChange={(e) => handleSkuComplianceChange(record.key, 'eprCertProducer', e.target.value)}
+                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                >
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                    <option value="Not Applicable">Not Applicable</option>
+                </select>
             ) 
         },
         { 
@@ -214,16 +215,16 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'thicknessMentioned', 
             width: 180, 
             render: (text, record) => (
-                <Select
+                <select
                     value={text}
-                    onChange={(val) => handleSkuComplianceChange(record.key, 'thicknessMentioned', val)}
-                    className="w-full text-xs"
-                    options={[
-                        { value: 'Yes', label: 'Yes' },
-                        { value: 'No', label: 'No' },
-                        { value: 'Not Applicable', label: 'Not Applicable' }
-                    ]}
-                />
+                    onChange={(e) => handleSkuComplianceChange(record.key, 'thicknessMentioned', e.target.value)}
+                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                >
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                    <option value="Not Applicable">Not Applicable</option>
+                </select>
             ) 
         },
         { 
@@ -276,16 +277,16 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'recycledPercent', 
             width: 220, 
             render: (text, record) => (
-                <Select
+                <select
                     value={text}
-                    onChange={(val) => handleSkuComplianceChange(record.key, 'recycledPercent', val)}
-                    className="w-full text-xs"
-                    options={[
-                        { value: 'Yes', label: 'Yes' },
-                        { value: 'No', label: 'No' },
-                        { value: 'Not Applicable', label: 'Not Applicable' }
-                    ]}
-                />
+                    onChange={(e) => handleSkuComplianceChange(record.key, 'recycledPercent', e.target.value)}
+                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                >
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                    <option value="Not Applicable">Not Applicable</option>
+                </select>
             ) 
         },
         { 
@@ -294,51 +295,75 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'compostableRegNo', 
             width: 250, 
             render: (text, record) => (
-                <Select
+                <select
                     value={text}
-                    onChange={(val) => handleSkuComplianceChange(record.key, 'compostableRegNo', val)}
-                    className="w-full text-xs"
-                    options={[
-                        { value: 'Yes', label: 'Yes' },
-                        { value: 'No', label: 'No' },
-                        { value: 'Not Applicable', label: 'Not Applicable' }
-                    ]}
-                />
+                    onChange={(e) => handleSkuComplianceChange(record.key, 'compostableRegNo', e.target.value)}
+                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                >
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                    <option value="Not Applicable">Not Applicable</option>
+                </select>
             ) 
         },
         {
             title: 'UPLOAD PHOTOS',
             dataIndex: 'markingImage',
             key: 'markingImage',
-            width: 200,
+            width: 140,
             render: (fileList, record) => (
-                <Upload
-                    listType="picture-card"
-                    fileList={fileList || []}
-                    onPreview={handlePreview}
-                    onChange={({ fileList: newFileList }) => {
-                        // Map back to URLs or keep file objects for now. 
-                        // useSkuCompliance likely handles the structure.
-                        // We just pass the newFileList.
-                        const processedList = newFileList.map(f => {
-                             if (f.response && f.response.url) return { ...f, url: f.response.url };
-                             return f;
-                        });
-                         handleSkuComplianceChange(record.key, 'markingImage', processedList);
-                    }}
-                    showUploadList={{ showRemoveIcon: true }}
-                    disabled={false}
-                    beforeUpload={() => false} // Manual upload management or let Upload middleware handle it? 
-                    // Usually we need to handle upload logic. 
-                    // But here I just enable it.
-                >
-                     {fileList?.length >= 5 ? null : (
-                        <div>
-                            <PlusOutlined />
-                            <div style={{ marginTop: 8 }}>Upload</div>
-                        </div>
-                     )}
-                </Upload>
+                <div style={{ width: '120px', margin: '0 auto' }}>
+                    <Upload
+                        listType="picture-card"
+                        fileList={fileList || []}
+                        onPreview={handlePreview}
+                        onChange={({ fileList: newFileList }) => {
+                            const processedList = newFileList.map(f => {
+                                 if (f.response && f.response.url) return { ...f, url: f.response.url };
+                                 return f;
+                            });
+                             handleSkuComplianceChange(record.key, 'markingImage', processedList);
+                        }}
+                        showUploadList={{ showRemoveIcon: true }}
+                        beforeUpload={() => false}
+                        className="custom-upload-grid"
+                    >
+                         {fileList?.length >= 5 ? null : (
+                            <div className="flex flex-col items-center justify-center">
+                                <PlusOutlined className="text-gray-400 text-sm" />
+                                <div className="text-[10px] text-gray-500 mt-0.5">Upload</div>
+                            </div>
+                         )}
+                    </Upload>
+                    <style>{`
+                        .custom-upload-grid .ant-upload-list-picture-card-container,
+                        .custom-upload-grid .ant-upload-select-picture-card {
+                            width: 48px !important;
+                            height: 48px !important;
+                            margin: 4px !important;
+                            float: left !important;
+                        }
+                        
+                        /* Ensure the container clears floats to maintain height */
+                        .custom-upload-grid::after {
+                            content: "";
+                            display: table;
+                            clear: both;
+                        }
+
+                        /* Specific fix for the item itself */
+                        .custom-upload-grid .ant-upload-list-item {
+                            padding: 2px !important;
+                            width: 100% !important;
+                            height: 100% !important;
+                        }
+
+                        .custom-upload-grid .ant-upload-list-item-thumbnail img {
+                            object-fit: cover !important;
+                        }
+                    `}</style>
+                </div>
             )
         },
         { 
@@ -350,12 +375,11 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
                 const remarks = Array.isArray(record.remarks) ? record.remarks : (record.remarks ? [record.remarks] : []);
                 const val = remarks.join('\n');
                 return (
-                    <Input.TextArea
-                        className="text-xs"
+                    <textarea
+                        className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 min-h-[50px]"
                         value={val}
                         onChange={(e) => handleSkuComplianceChange(record.key, 'remarks', e.target.value.split('\n'))}
                         placeholder="Auditor remarks..."
-                        autoSize={{ minRows: 2, maxRows: 4 }}
                         onClick={(e) => e.stopPropagation()}
                     />
                 );
@@ -384,17 +408,17 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'complianceStatus', 
             width: 200, 
             render: (text, record) => (
-                <Select
+                <select
                     value={text}
-                    onChange={(val) => handleSkuComplianceChange(record.key, 'complianceStatus', val)}
-                    className="w-full text-xs"
-                    options={[
-                        { value: 'Compliant', label: 'Compliant' },
-                        { value: 'Partially Compliant', label: 'Partially Compliant' },
-                        { value: 'Non-Compliant', label: 'Non-Compliant' },
-                        { value: 'Pending', label: 'Pending' }
-                    ]}
-                />
+                    onChange={(e) => handleSkuComplianceChange(record.key, 'complianceStatus', e.target.value)}
+                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                >
+                    <option value="">Select</option>
+                    <option value="Compliant">Compliant</option>
+                    <option value="Partially Compliant">Partially Compliant</option>
+                    <option value="Non-Compliant">Non-Compliant</option>
+                    <option value="Pending">Pending</option>
+                </select>
             ) 
         },
         {
@@ -436,23 +460,23 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
         <div className="p-4 bg-white rounded-lg">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex gap-2">
-                     <Input 
+                     <input 
+                        type="text"
                         placeholder="Search SKU..." 
                         value={skuSearchText} 
                         onChange={e => setSkuSearchText(e.target.value)}
-                        className="w-64"
+                        className="w-64 border border-gray-300 rounded text-sm p-2 focus:ring-1 focus:ring-primary-500 outline-none"
                     />
-                    <Select
+                    <select
                         value={skuStatusFilter}
-                        onChange={setSkuStatusFilter}
-                        options={[
-                            { value: 'all', label: 'All Status' },
-                            { value: 'Compliant', label: 'Compliant' },
-                            { value: 'Partially Compliant', label: 'Partially Compliant' },
-                            { value: 'Non-Compliant', label: 'Non-Compliant' }
-                        ]}
-                        className="w-40"
-                    />
+                        onChange={(e) => setSkuStatusFilter(e.target.value)}
+                        className="w-40 border border-gray-300 rounded text-sm p-2 focus:ring-1 focus:ring-primary-500 outline-none bg-white"
+                    >
+                        <option value="all">All Status</option>
+                        <option value="Compliant">Compliant</option>
+                        <option value="Partially Compliant">Partially Compliant</option>
+                        <option value="Non-Compliant">Non-Compliant</option>
+                    </select>
                 </div>
             </div>
 

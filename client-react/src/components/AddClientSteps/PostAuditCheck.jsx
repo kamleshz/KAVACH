@@ -5,7 +5,7 @@ import {
   FaExclamationCircle, FaTrashAlt, FaEdit, FaSave, FaUndo, FaCheck, FaCheckCircle,
   FaChevronDown, FaPlus, FaMinus
 } from 'react-icons/fa';
-import { UploadOutlined, LoadingOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { UploadOutlined, LoadingOutlined, DeleteOutlined, PlusOutlined, TableOutlined, BarChartOutlined } from '@ant-design/icons';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
   Legend, ResponsiveContainer, PieChart, Pie, Cell
@@ -158,14 +158,49 @@ const PostAuditCheck = ({
 }) => {
     const [plasticAnalysisTab, setPlasticAnalysisTab] = useState('prePostValidation');
     
+    // Toggle states for Polymer and Category Procurement
+    const [polymerViewMode, setPolymerViewMode] = useState('graph');
+    const [categoryViewMode, setCategoryViewMode] = useState('graph');
+    
     // Summary Report State
     const [summaryProductRows, setSummaryProductRows] = useState([]);
     const [summaryMonthlyRows, setSummaryMonthlyRows] = useState([]);
     const [summarySupplierRows, setSummarySupplierRows] = useState([]);
     const [summaryComponentRows, setSummaryComponentRows] = useState([]);
+    const [summaryRecycledRows, setSummaryRecycledRows] = useState([]);
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [savingSummary, setSavingSummary] = useState(false);
     const [savingRowIndex, setSavingRowIndex] = useState(null);
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownloadReport = async () => {
+        try {
+            setIsDownloading(true);
+            if (!applicationType || !selectedPlantId) {
+                 message.error("Missing report context (Type/Plant ID)");
+                 return;
+            }
+    
+            const response = await api.get(API_ENDPOINTS.ANALYSIS.COMPLIANCE_REPORT(clientId) + `?type=${applicationType}&itemId=${selectedPlantId}`, {
+                responseType: 'blob'
+            });
+            
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Plastic_Compliance_Report_${clientId}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            
+            message.success("Report downloaded successfully");
+        } catch (error) {
+            console.error("Download failed:", error);
+            message.error("Failed to download report");
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     // Remark Modal State
     const [remarkModalOpen, setRemarkModalOpen] = useState(false);
@@ -288,17 +323,19 @@ const PostAuditCheck = ({
                     setSummaryLoading(true);
                     const params = { type: applicationType, itemId: selectedPlantId };
                     
-                    const [prodRes, compRes, suppRes, monthlyRes] = await Promise.all([
+                    const [prodRes, compRes, suppRes, monthlyRes, recycledRes] = await Promise.all([
                          api.get(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(clientId), { params }),
                          api.get(API_ENDPOINTS.CLIENT.PRODUCT_COMPONENT_DETAILS(clientId), { params }),
                          api.get(API_ENDPOINTS.CLIENT.PRODUCT_SUPPLIER_COMPLIANCE(clientId), { params }),
-                         api.get(API_ENDPOINTS.CLIENT.MONTHLY_PROCUREMENT(clientId), { params })
+                         api.get(API_ENDPOINTS.CLIENT.MONTHLY_PROCUREMENT(clientId), { params }),
+                         api.get(API_ENDPOINTS.CLIENT.RECYCLED_QUANTITY_USED(clientId), { params })
                     ]);
             
                     if (prodRes.data?.success) setSummaryProductRows(prodRes.data.data || []);
                     if (compRes.data?.success) setSummaryComponentRows(compRes.data.data || []);
                     if (suppRes.data?.success) setSummarySupplierRows(suppRes.data.data || []);
                     if (monthlyRes.data?.success) setSummaryMonthlyRows(monthlyRes.data.data || []);
+                    if (recycledRes.data?.success) setSummaryRecycledRows(recycledRes.data.data || []);
             
                 } catch (error) {
                     console.error("Error fetching summary data", error);
@@ -383,6 +420,7 @@ const PostAuditCheck = ({
                                         { value: 'analysis', label: 'Analysis' },
                                         { value: 'analysis2', label: 'Analysis 2' },
                                         { value: 'costAnalysis', label: 'Cost Analysis' },
+                                        { value: 'auditReport', label: 'Audit Report' },
                                         ...(wasteType === 'Plastic' || wasteType === 'Plastic Waste' ? [{ value: 'plasticSpecific', label: 'Plastic Specific Analysis' }] : [])
                                     ]}
                                 />
@@ -390,7 +428,7 @@ const PostAuditCheck = ({
 
                             {/* Desktop Tab Grid */}
                             <div className="hidden md:block w-full rounded-2xl border border-gray-200 bg-gray-100 p-1">
-                                <div className={`grid ${wasteType === 'Plastic' ? 'grid-cols-7' : 'grid-cols-6'} gap-1`}>
+                                <div className={`grid ${wasteType === 'Plastic' ? 'grid-cols-9' : 'grid-cols-8'} gap-1`}>
                                     <button
                                         type="button"
                                         onClick={() => setPostValidationActiveTab('productAssessment')}
@@ -457,6 +495,17 @@ const PostAuditCheck = ({
                                     >
                                         Cost Analysis
                                     </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPostValidationActiveTab('auditReport')}
+                                        className={`w-full rounded-xl px-4 py-2 text-xs font-semibold leading-tight transition-all ${
+                                            postValidationActiveTab === 'auditReport'
+                                                ? 'bg-white text-orange-600 shadow-sm'
+                                                : 'text-gray-700 hover:bg-white/70'
+                                        }`}
+                                    >
+                                        Audit Report
+                                    </button>
                                     {(wasteType === 'Plastic' || wasteType === 'Plastic Waste') && (
                                         <button
                                             type="button"
@@ -481,14 +530,16 @@ const PostAuditCheck = ({
                                             <p className="text-gray-800 font-semibold">Product Assessment</p>
                                             <p className="text-gray-500 text-xs">Review product assessment details.</p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleSaveProductAssessment}
-                                            disabled={summaryLoading || savingSummary}
-                                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 shadow-sm transition-all"
-                                        >
-                                            {savingSummary ? <LoadingOutlined spin /> : <FaSave />} Save Changes
-                                        </button>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleSaveProductAssessment}
+                                                disabled={summaryLoading || savingSummary}
+                                                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 shadow-sm transition-all"
+                                            >
+                                                {savingSummary ? <LoadingOutlined spin /> : <FaSave />} Save Changes
+                                            </button>
+                                        </div>
                                     </div>
                                     {summaryLoading ? (
                                         <div className="flex justify-center p-8"><LoadingOutlined spin className="text-2xl text-primary-500" /></div>
@@ -499,6 +550,7 @@ const PostAuditCheck = ({
                                             monthlyRows={summaryMonthlyRows}
                                             supplierRows={summarySupplierRows}
                                             componentRows={summaryComponentRows}
+                                            recycledRows={summaryRecycledRows}
                                             resolveUrl={resolveUrl}
                                             isSaving={savingSummary}
                                             handleSummaryChange={handleSummaryChange}
@@ -1319,16 +1371,35 @@ const PostAuditCheck = ({
                                                 )}
 
                                                 {(() => {
-                                                    const polymerSummary = buildPolymerProcurementSummary(
+                                                    const polymerSummaryResult = buildPolymerProcurementSummary(
                                                         monthlyProcurementRaw,
-                                                        monthlyProcurementFilters
+                                                        monthlyProcurementFilters,
+                                                        monthlyProcurementViewMode
                                                     );
-                                                    const categorySummary = buildCategoryProcurementSummary(
+                                                    const categorySummaryResult = buildCategoryProcurementSummary(
                                                         monthlyProcurementRaw,
-                                                        monthlyProcurementFilters
+                                                        monthlyProcurementFilters,
+                                                        monthlyProcurementViewMode
                                                     );
 
-                                                    if (!polymerSummary.length && !categorySummary.length) {
+                                                    // Sanitize data to handle "-" values
+                                                    const polymerData = (polymerSummaryResult.data || []).map(row => ({
+                                                        ...row,
+                                                        monthlyPurchaseMt: row.monthlyPurchaseMt === '-' ? 0 : (Number(row.monthlyPurchaseMt) || 0),
+                                                        recycledQty: row.recycledQty === '-' ? 0 : (Number(row.recycledQty) || 0)
+                                                    }));
+                                                    const polymerKeys = polymerSummaryResult.keys || [];
+                                                    
+                                                    const categoryData = (categorySummaryResult.data || []).map(row => ({
+                                                        ...row,
+                                                        monthlyPurchaseMt: row.monthlyPurchaseMt === '-' ? 0 : (Number(row.monthlyPurchaseMt) || 0),
+                                                        recycledQty: row.recycledQty === '-' ? 0 : (Number(row.recycledQty) || 0)
+                                                    }));
+                                                    const categoryKeys = categorySummaryResult.keys || [];
+
+                                                    const STACK_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00C49F', '#FFBB28', '#FF8042', '#a05195', '#d45087', '#f95d6a', '#ff7c43', '#ffa600'];
+
+                                                    if (!polymerData.length && !categoryData.length) {
                                                         return (
                                                             <div className="text-xs text-gray-500">
                                                                 No polymer/category-wise procurement data available.
@@ -1336,222 +1407,190 @@ const PostAuditCheck = ({
                                                         );
                                                     }
 
-                                                    const maxPolymerValue = polymerSummary.reduce((max, item) => {
-                                                        const purchase = Number(item.monthlyPurchaseMt) || 0;
-                                                        const recycled = Number(item.recycledQty) || 0;
-                                                        const total = purchase + recycled;
-                                                        return total > max ? total : max;
-                                                    }, 0);
-
-                                                    const maxCategoryValue = categorySummary.reduce((max, item) => {
-                                                        const purchase = Number(item.monthlyPurchaseMt) || 0;
-                                                        const recycled = Number(item.recycledQty) || 0;
-                                                        const total = purchase + recycled;
-                                                        return total > max ? total : max;
-                                                    }, 0);
-
                                                     return (
                                                         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                            {/* Polymer Section */}
                                                             <div>
-                                                                <p className="text-xs font-semibold text-gray-700 mb-2">
-                                                                    Polymer-wise Procurement (Stacked)
-                                                                </p>
-                                                                {polymerSummary.length === 0 || !maxPolymerValue ? (
-                                                                    <div className="text-xs text-gray-500">
-                                                                        Polymer-wise procurement values are zero or unavailable.
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <p className="text-xs font-semibold text-gray-700">
+                                                                        Polymer-wise Procurement (Stacked)
+                                                                    </p>
+                                                                    <div className="inline-flex items-center rounded-lg bg-gray-100 p-0.5">
+                                                                        <button
+                                                                            onClick={() => setPolymerViewMode('table')}
+                                                                            className={`px-2 py-0.5 text-[10px] font-medium rounded transition-all flex items-center ${
+                                                                                polymerViewMode === 'table'
+                                                                                    ? 'bg-white text-gray-800 shadow-sm'
+                                                                                    : 'text-gray-500 hover:text-gray-700'
+                                                                            }`}
+                                                                        >
+                                                                            <TableOutlined className="mr-1" /> Table
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => setPolymerViewMode('graph')}
+                                                                            className={`px-2 py-0.5 text-[10px] font-medium rounded transition-all flex items-center ${
+                                                                                polymerViewMode === 'graph'
+                                                                                    ? 'bg-white text-gray-800 shadow-sm'
+                                                                                    : 'text-gray-500 hover:text-gray-700'
+                                                                            }`}
+                                                                        >
+                                                                            <BarChartOutlined className="mr-1" /> Graph
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                {polymerViewMode === 'table' ? (
+                                                                    <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                                                                        <table className="min-w-full divide-y divide-gray-200 text-xs">
+                                                                            <thead className="bg-gray-50">
+                                                                                <tr>
+                                                                                    <th className="px-3 py-2 text-left font-semibold text-gray-700 sticky left-0 bg-gray-50 z-10">Polymer</th>
+                                                                                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Purchase (MT)</th>
+                                                                                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Recycled (MT)</th>
+                                                                                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Total</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody className="divide-y divide-gray-100 bg-white">
+                                                                                {polymerData.length > 0 ? polymerData.map((row, i) => {
+                                                                                    const total = (row.monthlyPurchaseMt || 0) + (row.recycledQty || 0);
+                                                                                    return (
+                                                                                        <tr key={i}>
+                                                                                            <td className="px-3 py-1.5 text-gray-800 font-medium sticky left-0 bg-white z-10 shadow-sm">{row.label}</td>
+                                                                                            <td className="px-3 py-1.5 text-right text-gray-600">{(row.monthlyPurchaseMt || 0).toFixed(2)}</td>
+                                                                                            <td className="px-3 py-1.5 text-right text-gray-600">{(row.recycledQty || 0).toFixed(2)}</td>
+                                                                                            <td className="px-3 py-1.5 text-right text-gray-800 font-semibold">{total.toFixed(2)}</td>
+                                                                                        </tr>
+                                                                                    );
+                                                                                }) : (
+                                                                                    <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-500">No polymers found</td></tr>
+                                                                                )}
+                                                                            </tbody>
+                                                                        </table>
                                                                     </div>
                                                                 ) : (
-                                                                    <div className="overflow-x-auto">
-                                                                        <div className="min-w-[320px] max-w-xl mx-auto px-2 pt-4">
-                                                                            {(() => {
-                                                                                const step = maxPolymerValue / 4;
-                                                                                const gridValues = [0, step, step * 2, step * 3, maxPolymerValue];
-
-                                                                                return (
-                                                                                    <div className="relative h-96 w-full bg-white rounded-lg p-4 border border-gray-100 shadow-sm">
-                                                                                        {/* Grid Lines */}
-                                                                                        <div className="absolute inset-0 left-10 right-2 top-28 bottom-8 flex flex-col justify-between pointer-events-none">
-                                                                                            {[...gridValues].reverse().map((val, i) => (
-                                                                                                <div key={i} className="relative w-full h-px bg-gray-100 border-t border-dashed border-gray-200">
-                                                                                                    <span className="absolute -left-10 -top-2 w-8 text-right text-[10px] text-gray-400 font-medium">
-                                                                                                        {val >= 1000 ? `${(val/1000).toFixed(1)}k` : val.toFixed(0)}
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                            ))}
-                                                                                        </div>
-
-                                                                                        {/* Bars */}
-                                                                                        <div className="absolute inset-0 left-10 right-2 top-28 bottom-8 flex items-end justify-around gap-2 px-1">
-                                                                                            {polymerSummary.map((item) => {
-                                                                                                const purchase = Number(item.monthlyPurchaseMt) || 0;
-                                                                                                const recycled = Number(item.recycledQty) || 0;
-                                                                                                const total = purchase + recycled;
-                                                                                                const totalHeight = total && maxPolymerValue
-                                                                                                    ? (total / maxPolymerValue) * 100
-                                                                                                    : 0;
-                                                                                                const purchaseHeight = total ? (purchase / total) * 100 : 0;
-                                                                                                const recycledHeight = total ? (recycled / total) * 100 : 0;
-
-                                                                                                return (
-                                                                                                    <div
-                                                                                                        key={item.polymer}
-                                                                                                        className="group relative flex flex-col justify-end w-full max-w-[40px] h-full"
-                                                                                                    >
-                                                                                                        {/* Tooltip */}
-                                                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900/95 backdrop-blur-sm text-white text-[10px] rounded-lg py-2 px-3 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-20 shadow-xl translate-y-2 group-hover:translate-y-0">
-                                                                                                            <div className="font-bold text-xs border-b border-gray-700 pb-1 mb-1 text-gray-100">{item.polymer}</div>
-                                                                                                            <div className="space-y-1">
-                                                                                                                <div className="flex justify-between items-center">
-                                                                                                                    <span className="text-gray-400">Total:</span>
-                                                                                                                    <span className="font-mono font-bold text-white">{total.toFixed(2)}</span>
-                                                                                                                </div>
-                                                                                                                <div className="flex justify-between items-center">
-                                                                                                                    <div className="flex items-center gap-1.5">
-                                                                                                                        <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-                                                                                                                        <span className="text-gray-300">Purchase:</span>
-                                                                                                                    </div>
-                                                                                                                    <span className="font-mono text-orange-200">{purchase.toFixed(2)}</span>
-                                                                                                                </div>
-                                                                                                                <div className="flex justify-between items-center">
-                                                                                                                    <div className="flex items-center gap-1.5">
-                                                                                                                        <span className="w-2 h-2 rounded-full bg-green-400"></span>
-                                                                                                                        <span className="text-gray-300">Recycled:</span>
-                                                                                                                    </div>
-                                                                                                                    <span className="font-mono text-green-200">{recycled.toFixed(2)}</span>
-                                                                                                                </div>
-                                                                                                            </div>
-                                                                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900/95"></div>
-                                                                                                        </div>
-
-                                                                                                        {/* Stacked Bar */}
-                                                                                                        <div 
-                                                                                                            className="w-full rounded-t overflow-hidden transition-all duration-300 hover:brightness-110 shadow-sm relative group-hover:shadow-md cursor-pointer"
-                                                                                                            style={{ height: `${totalHeight}%` }}
-                                                                                                        >
-                                                                                                            <div 
-                                                                                                                className="w-full bg-gradient-to-b from-green-400 to-green-500"
-                                                                                                                style={{ height: `${recycledHeight}%` }}
-                                                                                                            ></div>
-                                                                                                            <div 
-                                                                                                                className="w-full bg-gradient-to-b from-orange-400 to-orange-500"
-                                                                                                                style={{ height: `${purchaseHeight}%` }}
-                                                                                                            ></div>
-                                                                                                        </div>
-
-                                                                                                        {/* X-Axis Label */}
-                                                                                                        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 text-[10px] font-medium text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[60px] text-center group-hover:text-gray-800 transition-colors">
-                                                                                                            {item.polymer}
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                );
-                                                                                            })}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                );
-                                                                            })()}
-                                                                        </div>
+                                                                    <div className="bg-white border border-gray-100 rounded-lg p-2 h-80 shadow-sm">
+                                                                        <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
+                                                                            <BarChart data={polymerData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                                                                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                                                                                <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                                                                                <RechartsTooltip 
+                                                                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                                                                    itemStyle={{ fontSize: '11px', padding: '1px 0' }}
+                                                                                    labelStyle={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', color: '#374151' }}
+                                                                                    cursor={{ fill: '#f9fafb' }}
+                                                                                />
+                                                                                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} iconSize={8} />
+                                                                                <Bar 
+                                                                                    dataKey="monthlyPurchaseMt" 
+                                                                                    name="Purchase (MT)" 
+                                                                                    stackId="a" 
+                                                                                    fill="#8884d8" 
+                                                                                    barSize={32}
+                                                                                />
+                                                                                <Bar 
+                                                                                    dataKey="recycledQty" 
+                                                                                    name="Recycled (MT)" 
+                                                                                    stackId="a" 
+                                                                                    fill="#82ca9d" 
+                                                                                    barSize={32}
+                                                                                    radius={[4, 4, 0, 0]}
+                                                                                />
+                                                                            </BarChart>
+                                                                        </ResponsiveContainer>
                                                                     </div>
                                                                 )}
                                                             </div>
 
+                                                            {/* Category Section */}
                                                             <div>
-                                                                <p className="text-xs font-semibold text-gray-700 mb-2">
-                                                                    Category-wise Procurement (Stacked)
-                                                                </p>
-                                                                {categorySummary.length === 0 || !maxCategoryValue ? (
-                                                                    <div className="text-xs text-gray-500">
-                                                                        Category-wise procurement values are zero or unavailable.
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <p className="text-xs font-semibold text-gray-700">
+                                                                        Category-wise Procurement (Stacked)
+                                                                    </p>
+                                                                    <div className="inline-flex items-center rounded-lg bg-gray-100 p-0.5">
+                                                                        <button
+                                                                            onClick={() => setCategoryViewMode('table')}
+                                                                            className={`px-2 py-0.5 text-[10px] font-medium rounded transition-all flex items-center ${
+                                                                                categoryViewMode === 'table'
+                                                                                    ? 'bg-white text-gray-800 shadow-sm'
+                                                                                    : 'text-gray-500 hover:text-gray-700'
+                                                                            }`}
+                                                                        >
+                                                                            <TableOutlined className="mr-1" /> Table
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => setCategoryViewMode('graph')}
+                                                                            className={`px-2 py-0.5 text-[10px] font-medium rounded transition-all flex items-center ${
+                                                                                categoryViewMode === 'graph'
+                                                                                    ? 'bg-white text-gray-800 shadow-sm'
+                                                                                    : 'text-gray-500 hover:text-gray-700'
+                                                                            }`}
+                                                                        >
+                                                                            <BarChartOutlined className="mr-1" /> Graph
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                {categoryViewMode === 'table' ? (
+                                                                    <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                                                                        <table className="min-w-full divide-y divide-gray-200 text-xs">
+                                                                            <thead className="bg-gray-50">
+                                                                                <tr>
+                                                                                    <th className="px-3 py-2 text-left font-semibold text-gray-700 sticky left-0 bg-gray-50 z-10">Category</th>
+                                                                                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Purchase (MT)</th>
+                                                                                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Recycled (MT)</th>
+                                                                                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Total</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody className="divide-y divide-gray-100 bg-white">
+                                                                                {categoryData.length > 0 ? categoryData.map((row, i) => {
+                                                                                    const total = (row.monthlyPurchaseMt || 0) + (row.recycledQty || 0);
+                                                                                    return (
+                                                                                        <tr key={i}>
+                                                                                            <td className="px-3 py-1.5 text-gray-800 font-medium sticky left-0 bg-white z-10 shadow-sm">{row.label}</td>
+                                                                                            <td className="px-3 py-1.5 text-right text-gray-600">{(row.monthlyPurchaseMt || 0).toFixed(2)}</td>
+                                                                                            <td className="px-3 py-1.5 text-right text-gray-600">{(row.recycledQty || 0).toFixed(2)}</td>
+                                                                                            <td className="px-3 py-1.5 text-right text-gray-800 font-semibold">{total.toFixed(2)}</td>
+                                                                                        </tr>
+                                                                                    );
+                                                                                }) : (
+                                                                                    <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-500">No categories found</td></tr>
+                                                                                )}
+                                                                            </tbody>
+                                                                        </table>
                                                                     </div>
                                                                 ) : (
-                                                                    <div className="overflow-x-auto">
-                                                                        <div className="min-w-[320px] max-w-xl mx-auto px-2 pt-4">
-                                                                            {(() => {
-                                                                                const step = maxCategoryValue / 4;
-                                                                                const gridValues = [0, step, step * 2, step * 3, maxCategoryValue];
-
-                                                                                return (
-                                                                                    <div className="relative h-96 w-full bg-white rounded-lg p-4 border border-gray-100 shadow-sm">
-                                                                                        {/* Grid Lines */}
-                                                                                        <div className="absolute inset-0 left-10 right-2 top-28 bottom-8 flex flex-col justify-between pointer-events-none">
-                                                                                            {[...gridValues].reverse().map((val, i) => (
-                                                                                                <div key={i} className="relative w-full h-px bg-gray-100 border-t border-dashed border-gray-200">
-                                                                                                    <span className="absolute -left-10 -top-2 w-8 text-right text-[10px] text-gray-400 font-medium">
-                                                                                                        {val >= 1000 ? `${(val/1000).toFixed(1)}k` : val.toFixed(0)}
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                            ))}
-                                                                                        </div>
-
-                                                                                        {/* Bars */}
-                                                                                        <div className="absolute inset-0 left-10 right-2 top-28 bottom-8 flex items-end justify-around gap-2 px-1">
-                                                                                            {categorySummary.map((item) => {
-                                                                                                const purchase = Number(item.monthlyPurchaseMt) || 0;
-                                                                                                const recycled = Number(item.recycledQty) || 0;
-                                                                                                const total = purchase + recycled;
-                                                                                                const totalHeight = total && maxCategoryValue
-                                                                                                    ? (total / maxCategoryValue) * 100
-                                                                                                    : 0;
-                                                                                                const purchaseHeight = total ? (purchase / total) * 100 : 0;
-                                                                                                const recycledHeight = total ? (recycled / total) * 100 : 0;
-
-                                                                                                return (
-                                                                                                    <div
-                                                                                                        key={item.category}
-                                                                                                        className="group relative flex flex-col justify-end w-full max-w-[40px] h-full"
-                                                                                                    >
-                                                                                                        {/* Tooltip */}
-                                                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900/95 backdrop-blur-sm text-white text-[10px] rounded-lg py-2 px-3 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-20 shadow-xl translate-y-2 group-hover:translate-y-0">
-                                                                                                            <div className="font-bold text-xs border-b border-gray-700 pb-1 mb-1 text-gray-100">{item.category}</div>
-                                                                                                            <div className="space-y-1">
-                                                                                                                <div className="flex justify-between items-center">
-                                                                                                                    <span className="text-gray-400">Total:</span>
-                                                                                                                    <span className="font-mono font-bold text-white">{total.toFixed(2)}</span>
-                                                                                                                </div>
-                                                                                                                <div className="flex justify-between items-center">
-                                                                                                                    <div className="flex items-center gap-1.5">
-                                                                                                                        <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-                                                                                                                        <span className="text-gray-300">Purchase:</span>
-                                                                                                                    </div>
-                                                                                                                    <span className="font-mono text-orange-200">{purchase.toFixed(2)}</span>
-                                                                                                                </div>
-                                                                                                                <div className="flex justify-between items-center">
-                                                                                                                    <div className="flex items-center gap-1.5">
-                                                                                                                        <span className="w-2 h-2 rounded-full bg-green-400"></span>
-                                                                                                                        <span className="text-gray-300">Recycled:</span>
-                                                                                                                    </div>
-                                                                                                                    <span className="font-mono text-green-200">{recycled.toFixed(2)}</span>
-                                                                                                                </div>
-                                                                                                            </div>
-                                                                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900/95"></div>
-                                                                                                        </div>
-
-                                                                                                        {/* Stacked Bar */}
-                                                                                                        <div 
-                                                                                                            className="w-full rounded-t overflow-hidden transition-all duration-300 hover:brightness-110 shadow-sm relative group-hover:shadow-md cursor-pointer"
-                                                                                                            style={{ height: `${totalHeight}%` }}
-                                                                                                        >
-                                                                                                            <div 
-                                                                                                                className="w-full bg-gradient-to-b from-green-400 to-green-500"
-                                                                                                                style={{ height: `${recycledHeight}%` }}
-                                                                                                            ></div>
-                                                                                                            <div 
-                                                                                                                className="w-full bg-gradient-to-b from-orange-400 to-orange-500"
-                                                                                                                style={{ height: `${purchaseHeight}%` }}
-                                                                                                            ></div>
-                                                                                                        </div>
-
-                                                                                                        {/* X-Axis Label */}
-                                                                                                        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 text-[10px] font-medium text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[60px] text-center group-hover:text-gray-800 transition-colors">
-                                                                                                            {item.category}
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                );
-                                                                                            })}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                );
-                                                                            })()}
-                                                                        </div>
+                                                                    <div className="bg-white border border-gray-100 rounded-lg p-2 h-80 shadow-sm">
+                                                                        <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
+                                                                            <BarChart data={categoryData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                                                                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                                                                                <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                                                                                <RechartsTooltip 
+                                                                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                                                                    itemStyle={{ fontSize: '11px', padding: '1px 0' }}
+                                                                                    labelStyle={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', color: '#374151' }}
+                                                                                    cursor={{ fill: '#f9fafb' }}
+                                                                                />
+                                                                                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} iconSize={8} />
+                                                                                <Bar 
+                                                                                    dataKey="monthlyPurchaseMt" 
+                                                                                    name="Purchase (MT)" 
+                                                                                    stackId="a" 
+                                                                                    fill="#ffc658" 
+                                                                                    barSize={32}
+                                                                                />
+                                                                                <Bar 
+                                                                                    dataKey="recycledQty" 
+                                                                                    name="Recycled (MT)" 
+                                                                                    stackId="a" 
+                                                                                    fill="#ff7300" 
+                                                                                    barSize={32}
+                                                                                    radius={[4, 4, 0, 0]}
+                                                                                />
+                                                                            </BarChart>
+                                                                        </ResponsiveContainer>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1666,15 +1705,17 @@ const PostAuditCheck = ({
                                                         </div>
                                                     );
                                                 }
-                                                const categorySummary = buildCategoryProcurementSummary(
+                                                const categorySummaryResult = buildCategoryProcurementSummary(
                                                     monthlyProcurementRaw,
                                                     monthlyProcurementFilters
                                                 );
+                                                const categorySummaryData = categorySummaryResult.data || [];
+                                                
                                                 const summaryByCategory = new Map();
-                                                categorySummary.forEach((item) => {
-                                                    summaryByCategory.set(item.category, item);
+                                                categorySummaryData.forEach((item) => {
+                                                    summaryByCategory.set(item.label, item);
                                                 });
-                                                if (!categorySummary.length) {
+                                                if (!categorySummaryData.length) {
                                                     return (
                                                         <div className="text-xs text-gray-500">
                                                             No monthly procurement data available for category-wise summary.
@@ -2088,6 +2129,57 @@ const PostAuditCheck = ({
                                             itemId={selectedPlantId}
                                         />
                                     )}
+                                </div>
+                            )}
+
+                            {postValidationActiveTab === 'auditReport' && (
+                                <div className="border border-gray-200 rounded-xl bg-white p-8">
+                                    <div className="flex flex-col items-center justify-center text-center max-w-2xl mx-auto">
+                                        <div className="h-20 w-20 bg-blue-50 rounded-full flex items-center justify-center mb-6">
+                                            <FaFilePdf className="text-blue-600 text-4xl" />
+                                        </div>
+                                        
+                                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Plastic Compliance Audit Report</h2>
+                                        <p className="text-gray-500 mb-8">
+                                            Generate and download the comprehensive audit report including company details, 
+                                            pre/post validation summary, EPR targets, and detailed compliance analysis.
+                                        </p>
+
+                                        <div className="bg-gray-50 rounded-xl p-6 w-full border border-gray-100 mb-8">
+                                            <h4 className="font-semibold text-gray-700 mb-4 text-left">Report Contents:</h4>
+                                            <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                                                <li className="flex items-center gap-2 text-sm text-gray-600">
+                                                    <FaCheckCircle className="text-green-500" /> Company & Audit Details
+                                                </li>
+                                                <li className="flex items-center gap-2 text-sm text-gray-600">
+                                                    <FaCheckCircle className="text-green-500" /> Pre/Post Validation Summary
+                                                </li>
+                                                <li className="flex items-center gap-2 text-sm text-gray-600">
+                                                    <FaCheckCircle className="text-green-500" /> EPR Target Calculation
+                                                </li>
+                                                <li className="flex items-center gap-2 text-sm text-gray-600">
+                                                    <FaCheckCircle className="text-green-500" /> Industry Category Wise Details
+                                                </li>
+                                                <li className="flex items-center gap-2 text-sm text-gray-600">
+                                                    <FaCheckCircle className="text-green-500" /> Sales & Purchase Data Overview
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleDownloadReport}
+                                            disabled={summaryLoading || isDownloading}
+                                            className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-base font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 shadow-lg hover:shadow-xl transition-all w-full md:w-auto min-w-[200px]"
+                                        >
+                                            {isDownloading ? <LoadingOutlined spin className="text-xl" /> : <FaFilePdf className="text-xl" />} 
+                                            {isDownloading ? 'Generating Report...' : 'Download Audit Report'}
+                                        </button>
+                                        
+                                        <p className="text-xs text-gray-400 mt-4">
+                                            This report is strictly confidential and generated based on the current audit data.
+                                        </p>
+                                    </div>
                                 </div>
                             )}
                         </div>

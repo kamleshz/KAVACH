@@ -4,20 +4,20 @@ import AnalysisService from '../services/analysis.service.js';
 
 export const analyzePlasticPrePost = async (req, res) => {
     try {
-        if (!req.files || !req.files.salesFile || !req.files.purchaseFile) {
-            return res.status(400).json({ message: "Both 'salesFile' and 'purchaseFile' are required." });
+        if (!req.files || !req.files.salesFile) {
+            return res.status(400).json({ message: "At least 'salesFile' is required." });
         }
 
         const { clientId, type, itemId } = req.body;
         
         const salesFile = req.files.salesFile[0];
-        const purchaseFile = req.files.purchaseFile[0];
+        const purchaseFile = req.files.purchaseFile ? req.files.purchaseFile[0] : null;
         const outputDir = path.join(process.cwd(), 'temp_analysis_output');
 
         // Use Service Layer
         const result = await AnalysisService.runPlasticAnalysis(
             salesFile.path, 
-            purchaseFile.path, 
+            purchaseFile ? purchaseFile.path : null, 
             outputDir, 
             { clientId, type, itemId }
         );
@@ -25,7 +25,7 @@ export const analyzePlasticPrePost = async (req, res) => {
         // Cleanup input files
         try {
             fs.unlinkSync(salesFile.path);
-            fs.unlinkSync(purchaseFile.path);
+            if (purchaseFile) fs.unlinkSync(purchaseFile.path);
         } catch (cleanupErr) {
             console.error("Error cleaning up input files:", cleanupErr);
         }
@@ -161,5 +161,32 @@ export const getPurchaseAnalysisController = async (req, res) => {
     } catch (error) {
         console.error("Get Purchase Analysis Error:", error);
         res.status(500).json({ message: error.message || "Error fetching purchase analysis data" });
+    }
+};
+
+export const generatePlasticComplianceReportController = async (req, res) => {
+    try {
+        const { clientId } = req.params;
+        const { type, itemId } = req.query;
+        const userId = req.userId;
+
+        if (!clientId || !type || !itemId) {
+            return res.status(400).json({ message: "Missing required parameters: clientId, type, itemId" });
+        }
+
+        const pdfBuffer = await AnalysisService.generatePlasticComplianceReport(clientId, type, itemId, userId);
+
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="Plastic_Compliance_Report_${clientId}.pdf"`,
+            'Content-Length': pdfBuffer.length
+        });
+
+        res.send(pdfBuffer);
+
+    } catch (error) {
+        console.error("Generate Report Error:", error);
+        console.error(error.stack); // Log stack trace for debugging
+        res.status(500).json({ message: error.message || "Error generating report" });
     }
 };

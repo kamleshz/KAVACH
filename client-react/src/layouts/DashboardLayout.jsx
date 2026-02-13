@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import Breadcrumbs from '../components/Breadcrumbs';
 import useAuth from '../hooks/useAuth';
 import useOnClickOutside from '../hooks/useOnClickOutside';
 import { UserOutlined, DownOutlined, LogoutOutlined } from '@ant-design/icons';
@@ -127,6 +128,7 @@ const DashboardLayout = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto bg-gray-50 p-2 md:p-4">
+          <Breadcrumbs />
           <Outlet />
         </div>
       </div>

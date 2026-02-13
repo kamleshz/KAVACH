@@ -38,3 +38,6 @@ config/serviceAccountKey.json
 *.njsproj
 *.sln
 *.sw?
+
+# Temp files
+temp_analysis_output/
