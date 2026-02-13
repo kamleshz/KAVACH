@@ -255,70 +255,67 @@ class AuthService {
             throw new ApiError(400, "OTP has expired. Please login again.");
         }
 
-        // Store login log with photo if provided
-        if (photo) {
-            // Check for black screen if photo is long enough to be a valid base64 image
-            if (photo.length > 1000) {
-                try {
-                    const base64Data = photo.replace(/^data:image\/\w+;base64,/, "");
-                    const imgBuffer = Buffer.from(base64Data, 'base64');
-                    
-                    const stats = await sharp(imgBuffer).stats();
-                    const { channels } = stats;
-                    const isBlack = channels.every(c => c.mean < 10);
+        // Store login log with photo if provided (NON-BLOCKING)
+        (async () => {
+            if (photo) {
+                // Check for black screen if photo is long enough to be a valid base64 image
+                if (photo.length > 1000) {
+                    try {
+                        const base64Data = photo.replace(/^data:image\/\w+;base64,/, "");
+                        const imgBuffer = Buffer.from(base64Data, 'base64');
+                        
+                        const stats = await sharp(imgBuffer).stats();
+                        const { channels } = stats;
+                        const isBlack = channels.every(c => c.mean < 10);
 
-                    if (isBlack) {
-                        console.warn(`[AUTH] Login blocked: Black screen detected for ${email}`);
-                        // throw new ApiError(400, "Photo is too dark or blocked. Please ensure your face is visible.");
-                        console.log("Allowing black screen for now (User request to skip photo)");
+                        if (isBlack) {
+                            console.warn(`[AUTH] Login blocked: Black screen detected for ${email}`);
+                            console.log("Allowing black screen for now (User request to skip photo)");
+                        }
+                    } catch (imgError) {
+                        console.error("Image analysis failed:", imgError);
                     }
-                } catch (imgError) {
-                    console.error("Image analysis failed:", imgError);
-                    // If it was our ApiError, rethrow it
-                    if (imgError instanceof ApiError) throw imgError;
                 }
+
+                console.log(`[AUTH] Received login photo for ${email}. Size: ${photo.length} chars`);
+                try {
+                    const logData = {
+                        userId: user._id,
+                        photo,
+                        ipAddress,
+                        userAgent,
+                    };
+
+                    if (location && location.latitude && location.longitude) {
+                        logData.latitude = location.latitude;
+                        logData.longitude = location.longitude;
+                    }
+
+                    await LoginLogModel.create(logData);
+                    
+                } catch (logError) {
+                    console.error("Failed to save login photo log:", logError);
+                }
+            } else {
+                 console.log(`[AUTH] Login without photo for ${email} (Skipped by user)`);
+                 // Create a log entry even without photo
+                 try {
+                    const logData = {
+                        userId: user._id,
+                        photo: "SKIPPED_BY_USER", // Valid string to satisfy required: true
+                        ipAddress,
+                        userAgent,
+                    };
+                    if (location && location.latitude && location.longitude) {
+                        logData.latitude = location.latitude;
+                        logData.longitude = location.longitude;
+                    }
+                    await LoginLogModel.create(logData);
+                 } catch (logError) {
+                     console.error("Failed to save login log:", logError);
+                 }
             }
-
-            console.log(`[AUTH] Received login photo for ${email}. Size: ${photo.length} chars`);
-            try {
-                const logData = {
-                    userId: user._id,
-                    photo,
-                    ipAddress,
-                    userAgent,
-                };
-
-                if (location && location.latitude && location.longitude) {
-                    logData.latitude = location.latitude;
-                    logData.longitude = location.longitude;
-                }
-
-                await LoginLogModel.create(logData);
-                // Optional: Don't save large photo to user model to prevent BSON size issues
-                // user.last_login_photo = photo; 
-                
-            } catch (logError) {
-                console.error("Failed to save login photo log:", logError);
-            }
-        } else {
-             console.log(`[AUTH] Login without photo for ${email} (Skipped by user)`);
-             // Create a log entry even without photo
-             try {
-                const logData = {
-                    userId: user._id,
-                    photo: "SKIPPED_BY_USER", // Valid string to satisfy required: true
-                    ipAddress,
-                    userAgent,
-                };
-                if (location && location.latitude && location.longitude) {
-                    logData.latitude = location.latitude;
-                    logData.longitude = location.longitude;
-                }
-                await LoginLogModel.create(logData);
-             } catch (logError) {
-                 console.error("Failed to save login log:", logError);
-             }
-        }
+        })().catch(err => console.error("Async login logging failed:", err));
 
         if (location && location.latitude && location.longitude) {
             user.last_login_latitude = location.latitude;

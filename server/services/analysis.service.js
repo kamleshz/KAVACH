@@ -752,7 +752,8 @@ class AnalysisService {
                     skuUom: row.skuUom || '-',
                     productImage: resolveImage(row.productImage),
                     // Added Product Compliance Status to the SKU object
-                    status: markingData.complianceStatus || 'Pending',
+                    // Prioritize the derived productComplianceStatus from the main table row
+                    status: row.productComplianceStatus || markingData.complianceStatus || 'Pending',
                     markingDetails: {
                         brandOwner: markingData.brandOwner || '-',
                         eprCertBrandOwner: markingData.eprCertBrandOwner || '-',

@@ -921,8 +921,9 @@ export const getClientByIdController = async (req, res) => {
 
         const isAssignedUser = client.assignedTo?._id?.toString() === req.userId;
         const isAssignedManager = client.assignedManager?._id?.toString() === req.userId;
+        const isCreator = client.createdBy?._id?.toString() === req.userId;
 
-        if (!isUserAdmin && !isAssignedUser && !isAssignedManager) {
+        if (!isUserAdmin && !isAssignedUser && !isAssignedManager && !isCreator) {
             return res.status(403).json({
                 message: "Access denied. You are not assigned to this client.",
                 error: true,

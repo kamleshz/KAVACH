@@ -410,6 +410,19 @@ class ClientService {
                 { upsert: false }
             );
 
+            // Sync productComplianceStatus to all rows with the same SKU
+            if (sanitized.skuCode && sanitized.productComplianceStatus) {
+                await ProductComplianceModel.updateOne(
+                    { client: clientId, type, itemId },
+                    { 
+                        $set: { "rows.$[elem].productComplianceStatus": sanitized.productComplianceStatus } 
+                    },
+                    {
+                        arrayFilters: [ { "elem.skuCode": sanitized.skuCode } ]
+                    }
+                );
+            }
+
             const refreshedDoc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
             const afterRow = refreshedDoc?.rows?.[idx] || {};
             const allFields = ['generate', 'systemCode', 'packagingType', 'industryCategory', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage', 'thickness', 'auditorRemarks', 'clientRemarks', 'componentComplianceStatus', 'managerRemarks'];
