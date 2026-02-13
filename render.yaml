@@ -1,12 +1,10 @@
 services:
-  # Backend Service
+  # Backend Service (Dockerized for Puppeteer support)
   - type: web
     name: eprkavach-backend
-    env: node
+    env: docker
     rootDir: server
     plan: free
-    buildCommand: npm install
-    startCommand: npm start
     envVars:
       - key: MONGODB_URI
         sync: false
@@ -19,6 +17,8 @@ services:
       - key: MAIL_USER
         sync: false
       - key: MAIL_PASS
+        sync: false
+      - key: MAIL_FROM
         sync: false
     autoDeploy: true
 
