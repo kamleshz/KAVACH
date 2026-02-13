@@ -110,11 +110,23 @@ router.put('/:clientId/product-compliance', auth, saveProductComplianceControlle
 router.post('/:clientId/product-compliance-row-save', auth, saveProductComplianceController);
 router.get('/:clientId/product-compliance', auth, getProductComplianceController);
 router.get('/:clientId/all-product-compliance-rows', auth, getAllProductComplianceRowsController);
-router.post('/:clientId/product-compliance/upload-row', auth, upload.fields([
-    { name: 'productImage', maxCount: 1 },
-    { name: 'componentImage', maxCount: 1 },
-    { name: 'additionalDocument', maxCount: 1 }
-]), uploadProductComplianceRowController);
+router.post('/:clientId/product-compliance/upload-row', auth, (req, res, next) => {
+    upload.fields([
+        { name: 'productImage', maxCount: 1 },
+        { name: 'componentImage', maxCount: 1 },
+        { name: 'additionalDocument', maxCount: 1 }
+    ])(req, res, (err) => {
+        if (err) {
+            console.error("[Multer Upload Error]", err);
+            return res.status(500).json({ 
+                message: "File upload failed: " + (err.message || "Unknown error"), 
+                error: true, 
+                success: false 
+            });
+        }
+        next();
+    });
+}, uploadProductComplianceRowController);
 
 router.post('/:clientId/sku-compliance', auth, saveSkuComplianceController);
 router.get('/:clientId/sku-compliance', auth, getSkuComplianceController);

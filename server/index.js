@@ -29,6 +29,9 @@ if (!process.env.SECRET_KEY_ACCESS_TOKEN) {
 if (!process.env.MONGODB_URI) {
     logger.error("CRITICAL: MONGODB_URI is missing in environment variables!");
 }
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    logger.error("CRITICAL: CLOUDINARY configuration is missing in environment variables!");
+}
 
 const realtimeEmitter = new EventEmitter()
 app.set('realtimeEmitter', realtimeEmitter)
