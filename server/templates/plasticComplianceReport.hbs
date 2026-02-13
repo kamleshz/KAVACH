@@ -172,6 +172,7 @@
             border-radius: 6px;
             padding: 10px;
             background: #fff7ed; /* Orange-50 */
+            page-break-inside: avoid;
         }
         .sku-table {
             flex: 2;
@@ -242,6 +243,83 @@
             background-color: #fff7ed; /* Orange-50 */
             color: #9a3412; /* Orange-800 */
             border-color: #fed7aa;
+        }
+
+        /* Industry Category Card */
+        .industry-card {
+            border: 2px solid #f97316; /* Orange border matching theme */
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: #fff;
+            padding: 0;
+            overflow: hidden;
+            margin-bottom: 30px;
+            page-break-before: always;
+        }
+        .industry-card-header {
+            background: #fff7ed; /* Light orange */
+            padding: 15px 20px;
+            border-bottom: 2px solid #f97316;
+            color: #c2410c;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .industry-card-body {
+            padding: 20px;
+        }
+        
+        /* Summary Grid Styles */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            border: 1px solid #fed7aa; /* Orange-200 */
+            border-radius: 8px;
+            overflow: hidden;
+            background: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .summary-card-header {
+            background: #fff7ed; /* Orange-50 */
+            padding: 10px 15px;
+            border-bottom: 1px solid #fed7aa;
+            color: #9a3412; /* Orange-800 */
+            font-weight: bold;
+            font-size: 11px;
+            text-align: center;
+            height: 32px; /* Fixed height for alignment */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .summary-card-body {
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .stat-block {
+            text-align: center;
+            flex: 1;
+        }
+        .stat-label {
+            font-size: 9px;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .stat-divider {
+            width: 1px;
+            height: 30px;
+            background: #e5e7eb;
+            margin: 0 5px;
         }
     </style>
     <style>
@@ -758,39 +836,52 @@
 
             <!-- Industry Category Wise Details SKU & COMPONENT ANALYSIS -->
             <div class="section" style="margin-top: 20px; margin-bottom: 30px;">
-                <h3 style="color: #c2410c; margin-bottom: 10px; border-bottom: 2px solid #f97316; padding-bottom: 5px;">Industry Category Wise Details SKU & COMPONENT ANALYSIS</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="background: #fed7aa; color: #9a3412;">Industry Category</th>
-                            <th style="background: #fed7aa; color: #9a3412;">Total SKU</th>
-                            <th style="background: #fed7aa; color: #9a3412;">Compliant SKU</th>
-                            <th style="background: #fed7aa; color: #9a3412;">Non-Compliant SKU</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {{#each industryCategories}}
-                        <tr>
-                            <td>{{this.name}}</td>
-                            <td style="text-align: center;">{{this.summary.totalSkus}}</td>
-                            <td style="text-align: center; color: #166534; font-weight: bold;">{{this.summary.skuCompliantCount}}</td>
-                            <td style="text-align: center; color: #991b1b; font-weight: bold;">{{this.summary.skuNonCompliantCount}}</td>
-                        </tr>
-                        {{/each}}
-                    </tbody>
-                </table>
+                <h3 style="color: #c2410c; margin-bottom: 20px; border-bottom: 2px solid #f97316; padding-bottom: 5px;">Industry Category Wise Details SKU & COMPONENT ANALYSIS</h3>
+                
+                <div class="summary-grid">
+                    {{#each industryCategories}}
+                    <div class="summary-card">
+                        <div class="summary-card-header">
+                            {{this.name}}
+                        </div>
+                        <div class="summary-card-body">
+                            <!-- Total SKU -->
+                            <div class="stat-block">
+                                <div class="stat-label">Total SKU</div>
+                                <div class="stat-value" style="color: #1f2937;">{{this.summary.totalSkus}}</div>
+                            </div>
+                            
+                            <div class="stat-divider"></div>
+
+                            <!-- Compliant -->
+                            <div class="stat-block">
+                                <div class="stat-label">Compliant</div>
+                                <div class="stat-value" style="color: #166534;">{{this.summary.skuCompliantCount}}</div>
+                            </div>
+
+                            <div class="stat-divider"></div>
+
+                            <!-- Non-Compliant -->
+                            <div class="stat-block">
+                                <div class="stat-label">Non-Compliant</div>
+                                <div class="stat-value" style="color: #991b1b;">{{this.summary.skuNonCompliantCount}}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {{/each}}
+                </div>
             </div>
 
             {{#each industryCategories}}
-                <div class="section">
-                    <h3 style="color: #c2410c; border-bottom: 2px solid #f97316; padding-bottom: 5px; margin-bottom: 20px;">
+                <div class="industry-card">
+                    <div class="industry-card-header">
                         {{this.name}}
-                    </h3>
-
-                    {{#each this.skus}}
-                        <div style="margin-bottom: 30px; page-break-inside: avoid;">
-                            <!-- SKU Header Box -->
-                            <div class="sku-header-box">
+                    </div>
+                    <div class="industry-card-body">
+                        {{#each this.skus}}
+                            <div style="margin-bottom: 30px;">
+                                <!-- SKU Header Box -->
+                                <div class="sku-header-box">
                                 <div class="sku-table">
                                     <table style="margin: 0; border: none;">
                                         <tr>
@@ -915,6 +1006,7 @@
                         </div>
                         <div class="page-break"></div>
                     {{/each}}
+                    </div>
                 </div>
             {{/each}}
         {{/if}}

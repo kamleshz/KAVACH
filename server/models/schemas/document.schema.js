@@ -21,6 +21,7 @@ const documentSchema = new mongoose.Schema({
             'Signed Document',
             'E-waste Registration',
             'EEE Import Authorization',
+            'MSME Certificate',
             'Other'
         ]
     },

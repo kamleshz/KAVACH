@@ -418,13 +418,13 @@ const AddClientContent = () => {
               authorisedPersonNumber: client.authorisedPerson?.number || '',
               authorisedPersonEmail: client.authorisedPerson?.email || '',
               authorisedPersonPan: client.authorisedPerson?.pan || '',
-              authorisedPersonAadhaar: client.authorisedPerson?.aadhaar || '', // Map Authorised Person Aadhaar
+              authorisedPersonAadhaar: client.authorisedPerson?.aadhaar || '',
               authorisedPersonAddress: client.authorisedPerson?.address || '', 
               coordinatingPersonName: client.coordinatingPerson?.name || '',
               coordinatingPersonNumber: client.coordinatingPerson?.number || '',
               coordinatingPersonEmail: client.coordinatingPerson?.email || '',
               coordinatingPersonPan: client.coordinatingPerson?.pan || '',
-              coordinatingPersonAadhaar: client.coordinatingPerson?.aadhaar || '', // Map Coordinating Person Aadhaar
+              coordinatingPersonAadhaar: client.coordinatingPerson?.aadhaar || '',
               coordinatingPersonAddress: client.coordinatingPerson?.address || '',
               roAddress1: client.registeredOfficeAddress?.addressLine1 || '',
               roAddress2: client.registeredOfficeAddress?.addressLine2 || '',
@@ -439,20 +439,21 @@ const AddClientContent = () => {
               coCity: client.communicationAddress?.city || '',
               coPincode: client.communicationAddress?.pincode || '',
               coSameAsRegistered: (
-                  client.registeredOfficeAddress?.addressLine1 === client.communicationAddress?.addressLine1 &&
-                  client.registeredOfficeAddress?.addressLine2 === client.communicationAddress?.addressLine2 &&
-                  client.registeredOfficeAddress?.addressLine3 === client.communicationAddress?.addressLine3 &&
-                  client.registeredOfficeAddress?.state === client.communicationAddress?.state &&
-                  client.registeredOfficeAddress?.city === client.communicationAddress?.city &&
-                  client.registeredOfficeAddress?.pincode === client.communicationAddress?.pincode
+                  (client.registeredOfficeAddress?.addressLine1 || '') === (client.communicationAddress?.addressLine1 || '') &&
+                  (client.registeredOfficeAddress?.addressLine2 || '') === (client.communicationAddress?.addressLine2 || '') &&
+                  (client.registeredOfficeAddress?.addressLine3 || '') === (client.communicationAddress?.addressLine3 || '') &&
+                  (client.registeredOfficeAddress?.state || '') === (client.communicationAddress?.state || '') &&
+                  (client.registeredOfficeAddress?.city || '') === (client.communicationAddress?.city || '') &&
+                  (client.registeredOfficeAddress?.pincode || '') === (client.communicationAddress?.pincode || '') &&
+                  (client.registeredOfficeAddress?.addressLine1 !== undefined) // Ensure we don't match on undefined
               ),
-              gstNumber: client.documents?.find(d => d.documentType === 'GST')?.certificateNumber || '',
+              gstNumber: client.documents?.find(d => d.documentType === 'GST')?.certificateNumber || client.companyDetails?.gst || '',
               gstDate: client.documents?.find(d => d.documentType === 'GST')?.certificateDate ? client.documents.find(d => d.documentType === 'GST').certificateDate.split('T')[0] : '',
               gstFilePath: client.documents?.find(d => d.documentType === 'GST')?.filePath || '',
-              cinNumber: client.documents?.find(d => d.documentType === 'CIN')?.certificateNumber || '',
+              cinNumber: client.documents?.find(d => d.documentType === 'CIN')?.certificateNumber || client.companyDetails?.cin || '',
               cinDate: client.documents?.find(d => d.documentType === 'CIN')?.certificateDate ? client.documents.find(d => d.documentType === 'CIN').certificateDate.split('T')[0] : '',
               cinFilePath: client.documents?.find(d => d.documentType === 'CIN')?.filePath || '',
-              panNumber: client.documents?.find(d => d.documentType === 'PAN')?.certificateNumber || '',
+              panNumber: client.documents?.find(d => d.documentType === 'PAN')?.certificateNumber || client.companyDetails?.pan || '',
               panDate: client.documents?.find(d => d.documentType === 'PAN')?.certificateDate ? client.documents.find(d => d.documentType === 'PAN').certificateDate.split('T')[0] : '',
               panFilePath: client.documents?.find(d => d.documentType === 'PAN')?.filePath || '',
               factoryLicenseNumber: client.documents?.find(d => d.documentType === 'Factory License')?.certificateNumber || '',
@@ -474,8 +475,8 @@ const AddClientContent = () => {
               cgwaNocRequirement: client.productionFacility?.cgwaNocRequirement || '',
               cgwaNocDocument: client.productionFacility?.cgwaNocDocument || null,
               plantLocationNumber: client.productionFacility?.plantLocationNumber ? parseInt(client.productionFacility.plantLocationNumber) : (client.productionFacility?.plantCount || 0),
-              isEwasteRegistered: client.isEwasteRegistered,
-              isImportingEEE: client.isImportingEEE,
+              isEwasteRegistered: client.isEwasteRegistered || client.companyDetails?.isEwasteRegistered || '',
+              isImportingEEE: client.isImportingEEE || client.companyDetails?.isImportingEEE || '',
               ewasteCertificateNumber: client.documents?.find(d => d.documentType === 'E-waste Registration')?.certificateNumber || '',
               ewasteCertificateDate: client.documents?.find(d => d.documentType === 'E-waste Registration')?.certificateDate ? client.documents.find(d => d.documentType === 'E-waste Registration').certificateDate.split('T')[0] : '',
               ewasteFilePath: client.documents?.find(d => d.documentType === 'E-waste Registration')?.filePath || '',
