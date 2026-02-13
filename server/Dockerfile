@@ -28,6 +28,9 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 WORKDIR /usr/src/app
 
+# Create uploads directory
+RUN mkdir -p uploads
+
 COPY package*.json ./
 RUN npm ci
 
