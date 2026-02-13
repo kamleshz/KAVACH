@@ -326,6 +326,7 @@ class ClientService {
                 auditorRemarks: r.auditorRemarks || '',
                 clientRemarks: r.clientRemarks || '',
                 componentComplianceStatus: r.componentComplianceStatus || r.complianceStatus || '',
+                productComplianceStatus: r.productComplianceStatus || '',
                 additionalDocument: typeof r.additionalDocument === 'string' ? r.additionalDocument : '',
                 managerRemarks: r.managerRemarks || ''
             };
@@ -455,6 +456,7 @@ class ClientService {
                     auditorRemarks: mergeField(incomingRow.auditorRemarks, baseRow.auditorRemarks),
                     clientRemarks: mergeField(incomingRow.clientRemarks, baseRow.clientRemarks),
                     componentComplianceStatus: mergeField(incomingRow.componentComplianceStatus, baseRow.componentComplianceStatus),
+                    productComplianceStatus: mergeField(incomingRow.productComplianceStatus, baseRow.productComplianceStatus),
                     managerRemarks: mergeField(incomingRow.managerRemarks, baseRow.managerRemarks)
                 };
             });

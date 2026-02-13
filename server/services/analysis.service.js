@@ -751,6 +751,8 @@ class AnalysisService {
                     skuDescription: row.skuDescription || '-',
                     skuUom: row.skuUom || '-',
                     productImage: resolveImage(row.productImage),
+                    // Added Product Compliance Status to the SKU object
+                    status: markingData.complianceStatus || 'Pending',
                     markingDetails: {
                         brandOwner: markingData.brandOwner || '-',
                         eprCertBrandOwner: markingData.eprCertBrandOwner || '-',
@@ -822,10 +824,17 @@ class AnalysisService {
                 sum + sku.components.reduce((cSum, c) => cSum + parseFloat(c.monthlyPurchaseMt || 0), 0)
             , 0);
             
+            // Component Level Analysis
             const allComponents = skus.flatMap(s => s.components);
-            const compliantCount = allComponents.filter(c => c.status === 'Compliant').length;
-            const nonCompliantCount = allComponents.filter(c => c.status === 'Non-Compliant').length;
-            const pendingCount = allComponents.filter(c => c.status !== 'Compliant' && c.status !== 'Non-Compliant').length;
+            const compCompliantCount = allComponents.filter(c => c.status === 'Compliant').length;
+            const compNonCompliantCount = allComponents.filter(c => c.status === 'Non-Compliant').length;
+            const compPendingCount = allComponents.filter(c => c.status !== 'Compliant' && c.status !== 'Non-Compliant').length;
+
+            // SKU Level Analysis (New Requirement)
+            const skuCompliantCount = skus.filter(s => s.status === 'Compliant').length;
+            const skuNonCompliantCount = skus.filter(s => s.status === 'Non-Compliant').length;
+            // Any status other than Compliant/Non-Compliant is treated as Pending/Other
+            const skuPendingCount = totalSkus - (skuCompliantCount + skuNonCompliantCount);
 
             return {
                 name: cat,
@@ -833,10 +842,15 @@ class AnalysisService {
                 summary: {
                     totalSkus,
                     totalMonthlyPurchase: totalMonthlyPurchase.toFixed(4),
-                    compliantCount,
-                    nonCompliantCount,
-                    pendingCount,
-                    complianceScore: allComponents.length > 0 ? ((compliantCount / allComponents.length) * 100).toFixed(1) : 0
+                    // Component Stats
+                    compliantCount: compCompliantCount,
+                    nonCompliantCount: compNonCompliantCount,
+                    pendingCount: compPendingCount,
+                    complianceScore: allComponents.length > 0 ? ((compCompliantCount / allComponents.length) * 100).toFixed(1) : 0,
+                    // SKU Stats
+                    skuCompliantCount,
+                    skuNonCompliantCount,
+                    skuPendingCount
                 }
             };
         });

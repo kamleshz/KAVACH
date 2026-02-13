@@ -230,6 +230,26 @@ const SummaryReport = ({
         });
     }, [productRows, monthlyRows, supplierRows, componentRows, recycledRows]);
 
+    // Sync derived Product Compliance Status to parent state (productRows)
+    // This ensures that the derived status is saved to the database when the user clicks Finish/Save
+    React.useEffect(() => {
+        if (!handleSummaryChange) return;
+
+        tableData.forEach(group => {
+            const { skuCode, productComplianceStatus } = group;
+            // Find the first product row for this SKU to check current status
+            const productRow = productRows.find(p => (p.skuCode || '').trim() === skuCode);
+            
+            if (productRow) {
+                const currentStatus = productRow.productComplianceStatus || '';
+                // Only update if different
+                if (currentStatus !== productComplianceStatus) {
+                    handleSummaryChange(skuCode, 'productComplianceStatus', productComplianceStatus);
+                }
+            }
+        });
+    }, [tableData, productRows, handleSummaryChange]);
+
     const columns = [
         {
             title: 'SKU Code',
@@ -637,6 +657,52 @@ const SummaryReport = ({
         );
     };
 
+    // Industry Analysis Logic
+    const industryStats = React.useMemo(() => {
+        const stats = {};
+        
+        tableData.forEach(product => {
+            const category = product.industryCategory || 'Uncategorized';
+            if (!stats[category]) {
+                stats[category] = {
+                    industryCategory: category,
+                    totalSKUs: 0,
+                    compliantSKUs: 0,
+                    nonCompliantSKUs: 0,
+                    totalComponents: 0,
+                    compliantComponents: 0,
+                    nonCompliantComponents: 0
+                };
+            }
+            
+            // SKU Stats
+            stats[category].totalSKUs++;
+            if (product.productComplianceStatus === 'Compliant') stats[category].compliantSKUs++;
+            else if (product.productComplianceStatus === 'Non-Compliant') stats[category].nonCompliantSKUs++;
+            
+            // Component Stats
+            if (product.details) {
+                product.details.forEach(comp => {
+                    stats[category].totalComponents++;
+                    if (comp.componentComplianceStatus === 'Compliant') stats[category].compliantComponents++;
+                    else if (comp.componentComplianceStatus === 'Non-Compliant') stats[category].nonCompliantComponents++;
+                });
+            }
+        });
+        
+        return Object.values(stats);
+    }, [tableData]);
+
+    const analysisColumns = [
+        { title: 'Industry Category', dataIndex: 'industryCategory', key: 'industryCategory' },
+        { title: 'Total SKUs', dataIndex: 'totalSKUs', key: 'totalSKUs', align: 'right' },
+        { title: 'Compliant SKUs', dataIndex: 'compliantSKUs', key: 'compliantSKUs', align: 'right', render: (val) => <span className="text-green-600 font-medium">{val}</span> },
+        { title: 'Non-Compliant SKUs', dataIndex: 'nonCompliantSKUs', key: 'nonCompliantSKUs', align: 'right', render: (val) => <span className="text-red-600 font-medium">{val}</span> },
+        { title: 'Total Components', dataIndex: 'totalComponents', key: 'totalComponents', align: 'right' },
+        { title: 'Compliant Components', dataIndex: 'compliantComponents', key: 'compliantComponents', align: 'right', render: (val) => <span className="text-green-600 font-medium">{val}</span> },
+        { title: 'Non-Compliant Components', dataIndex: 'nonCompliantComponents', key: 'nonCompliantComponents', align: 'right', render: (val) => <span className="text-red-600 font-medium">{val}</span> },
+    ];
+
     const summaryTableContent = (
         <>
             <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -673,6 +739,50 @@ const SummaryReport = ({
             label: 'Marking and Labeling',
             children: (
                 <MarkingLabeling clientId={clientId} API_URL={import.meta.env.VITE_API_URL} />
+            )
+        },
+        {
+            key: 'analysis',
+            label: 'Industry Analysis',
+            children: (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <Table
+                        columns={analysisColumns}
+                        dataSource={industryStats}
+                        pagination={false}
+                        size="middle"
+                        rowKey="industryCategory"
+                        summary={(pageData) => {
+                            let totalSKUs = 0;
+                            let compliantSKUs = 0;
+                            let nonCompliantSKUs = 0;
+                            let totalComponents = 0;
+                            let compliantComponents = 0;
+                            let nonCompliantComponents = 0;
+                            
+                            pageData.forEach(({ totalSKUs: ts, compliantSKUs: cs, nonCompliantSKUs: ncs, totalComponents: tc, compliantComponents: cc, nonCompliantComponents: ncc }) => {
+                                totalSKUs += ts;
+                                compliantSKUs += cs;
+                                nonCompliantSKUs += ncs;
+                                totalComponents += tc;
+                                compliantComponents += cc;
+                                nonCompliantComponents += ncc;
+                            });
+                            
+                            return (
+                                <Table.Summary.Row className="bg-gray-50 font-bold">
+                                    <Table.Summary.Cell>Total</Table.Summary.Cell>
+                                    <Table.Summary.Cell align="right">{totalSKUs}</Table.Summary.Cell>
+                                    <Table.Summary.Cell align="right" className="text-green-700">{compliantSKUs}</Table.Summary.Cell>
+                                    <Table.Summary.Cell align="right" className="text-red-700">{nonCompliantSKUs}</Table.Summary.Cell>
+                                    <Table.Summary.Cell align="right">{totalComponents}</Table.Summary.Cell>
+                                    <Table.Summary.Cell align="right" className="text-green-700">{compliantComponents}</Table.Summary.Cell>
+                                    <Table.Summary.Cell align="right" className="text-red-700">{nonCompliantComponents}</Table.Summary.Cell>
+                                </Table.Summary.Row>
+                            );
+                        }}
+                    />
+                </div>
             )
         }
     ];

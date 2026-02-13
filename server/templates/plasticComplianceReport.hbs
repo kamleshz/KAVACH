@@ -756,6 +756,31 @@
                 <div class="report-title">SKU & Component Analysis</div>
             </div>
 
+            <!-- Industry Category Wise Details SKU & COMPONENT ANALYSIS -->
+            <div class="section" style="margin-top: 20px; margin-bottom: 30px;">
+                <h3 style="color: #c2410c; margin-bottom: 10px; border-bottom: 2px solid #f97316; padding-bottom: 5px;">Industry Category Wise Details SKU & COMPONENT ANALYSIS</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="background: #fed7aa; color: #9a3412;">Industry Category</th>
+                            <th style="background: #fed7aa; color: #9a3412;">Total SKU</th>
+                            <th style="background: #fed7aa; color: #9a3412;">Compliant SKU</th>
+                            <th style="background: #fed7aa; color: #9a3412;">Non-Compliant SKU</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{#each industryCategories}}
+                        <tr>
+                            <td>{{this.name}}</td>
+                            <td style="text-align: center;">{{this.summary.totalSkus}}</td>
+                            <td style="text-align: center; color: #166534; font-weight: bold;">{{this.summary.skuCompliantCount}}</td>
+                            <td style="text-align: center; color: #991b1b; font-weight: bold;">{{this.summary.skuNonCompliantCount}}</td>
+                        </tr>
+                        {{/each}}
+                    </tbody>
+                </table>
+            </div>
+
             {{#each industryCategories}}
                 <div class="section">
                     <h3 style="color: #c2410c; border-bottom: 2px solid #f97316; padding-bottom: 5px; margin-bottom: 20px;">
@@ -783,6 +808,18 @@
                                         <tr>
                                             <td style="font-weight: bold;">SKU UOM</td>
                                             <td>{{this.skuUom}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: bold;">Compliance Status</td>
+                                            <td>
+                                                {{#if (eq this.status 'Compliant')}}
+                                                    <span style="background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-weight: bold;">{{this.status}}</span>
+                                                {{else if (eq this.status 'Non-Compliant')}}
+                                                    <span style="background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; font-weight: bold;">{{this.status}}</span>
+                                                {{else}}
+                                                    <span style="background: #f3f4f6; color: #374151; padding: 2px 6px; border-radius: 4px; font-weight: bold;">{{this.status}}</span>
+                                                {{/if}}
+                                            </td>
                                         </tr>
                                     </table>
                                 </div>
