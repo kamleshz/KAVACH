@@ -140,9 +140,19 @@ app.use((err, req, res, next) => {
 });
 
 connectDB().then(async ()=>{
-    await seedRoles();
-    initAuditCron();
+    try {
+        await seedRoles();
+        initAuditCron();
+        app.listen(PORT, '0.0.0.0', ()=>{
+            logger.info(`Server is running ${PORT}`)
+        });
+    } catch (startupError) {
+        logger.error("Error during startup sequence:", startupError);
+    }
+}).catch((err) => {
+    logger.error("CRITICAL: Database connection failed. Server starting in limited mode.", err);
+    // Start server anyway to provide health check and logs
     app.listen(PORT, '0.0.0.0', ()=>{
-        logger.info(`Server is running ${PORT}`)
-    })
-})
+        logger.info(`Server started (LIMITED MODE - NO DB) on ${PORT}`);
+    });
+});
