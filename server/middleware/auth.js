@@ -4,6 +4,11 @@ export const auth = async (req, res, next) => {
     try {
         const token = req.cookies?.accessToken || req.headers?.authorization?.split(' ')[1];
 
+        // Debug logging for auth issues
+        console.log(`[Auth Middleware] Path: ${req.path}, Method: ${req.method}`);
+        console.log(`[Auth Middleware] Headers Auth: ${req.headers?.authorization ? 'Present' : 'Missing'}`);
+        console.log(`[Auth Middleware] Cookies Auth: ${req.cookies?.accessToken ? 'Present' : 'Missing'}`);
+
         if (!token) {
             return res.status(401).json({
                 message: "Authentication required",
@@ -13,9 +18,19 @@ export const auth = async (req, res, next) => {
         }
 
         const decoded = verifyAccessToken(token);
+        
+        if (!decoded || !decoded.id) {
+             return res.status(401).json({
+                message: "Invalid token structure",
+                error: true,
+                success: false
+            });
+        }
+
         req.userId = decoded.id;
         next();
     } catch (error) {
+        console.error("[Auth Middleware Error]", error.message);
         return res.status(401).json({
             message: error.message || "Invalid authentication token",
             error: true,

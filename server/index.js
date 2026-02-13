@@ -21,6 +21,15 @@ import logger from './utils/logger.js';
 
 const app = express()
 app.set('trust proxy', 1); // Trust first proxy (Render/Vercel) for secure cookies
+
+// Debug Environment Variables
+if (!process.env.SECRET_KEY_ACCESS_TOKEN) {
+    logger.error("CRITICAL: SECRET_KEY_ACCESS_TOKEN is missing in environment variables!");
+}
+if (!process.env.MONGODB_URI) {
+    logger.error("CRITICAL: MONGODB_URI is missing in environment variables!");
+}
+
 const realtimeEmitter = new EventEmitter()
 app.set('realtimeEmitter', realtimeEmitter)
 const allowedOriginsRaw = process.env.FRONTEND_URL || "";
@@ -58,8 +67,10 @@ app.use(cors({
         if (allowedOrigins.length === 0) return callback(null, true);
         if (allowedOrigins.includes(origin)) return callback(null, true);
         
-        logger.warn(`DEBUG CORS FAIL: Origin = ${origin}`);
-        logger.error(`Blocked by CORS: ${origin}`); 
+        logger.warn(`DEBUG CORS FAIL: Origin = ${origin} | Allowed = ${JSON.stringify(allowedOrigins)}`);
+        // Don't error immediately, let it pass but log it (or strictly block?)
+        // Strict block is safer, but causes 401s if misconfigured.
+        // Returning error here causes a CORS error in browser, not 401.
         return callback(new Error(`CORS: Origin ${origin} not allowed`));
     }
 }))
