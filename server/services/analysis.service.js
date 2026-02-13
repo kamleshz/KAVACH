@@ -1276,7 +1276,16 @@ class AnalysisService {
         try {
             const browser = await puppeteer.launch({ 
                 headless: true, // Updated for newer Puppeteer versions
-                args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+                args: [
+                    '--no-sandbox', 
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage', // Critical for Render/Docker
+                    '--disable-gpu',
+                    '--no-zygote',
+                    '--single-process' // Sometimes required on resource-constrained envs
+                ],
+                // On Render, we might need to rely on the installed chrome if puppeteer's download failed or path issues
+                // executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(), 
             });
             const page = await browser.newPage();
             console.log("[Report Generation] Setting Content...");
