@@ -1274,18 +1274,24 @@ class AnalysisService {
         // 7. Generate PDF
         console.log("[Report Generation] Launching Puppeteer...");
         try {
+            // Log env to debug
+            console.log("PUPPETEER_EXECUTABLE_PATH:", process.env.PUPPETEER_EXECUTABLE_PATH);
+
             const browser = await puppeteer.launch({ 
-                headless: true, // Updated for newer Puppeteer versions
+                headless: true, 
+                dumpio: true, // Capture stdout/stderr from browser
                 args: [
                     '--no-sandbox', 
                     '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage', // Critical for Render/Docker
+                    '--disable-dev-shm-usage', 
                     '--disable-gpu',
                     '--no-zygote',
-                    '--single-process' // Sometimes required on resource-constrained envs
+                    '--single-process',
+                    '--disable-extensions'
                 ],
-                // On Render, we might need to rely on the installed chrome if puppeteer's download failed or path issues
-                // executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(), 
+                // Explicitly use the installed chrome if env var is set (from Dockerfile)
+                // Otherwise fallback to puppeteer's default (which might be missing if skipped download)
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(), 
             });
             const page = await browser.newPage();
             console.log("[Report Generation] Setting Content...");
