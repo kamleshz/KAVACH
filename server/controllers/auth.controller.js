@@ -68,6 +68,8 @@ export const verifyLoginOtpController = asyncHandler(async (req, res) => {
     try {
         const { email, otp, photo, location } = req.body;
         
+        console.log(`[Verify Login OTP] Request received for: ${email}`);
+
         // Get IP and User Agent from request
         const ipHeader = req.headers['x-forwarded-for'];
         const ipAddress = Array.isArray(ipHeader)
@@ -105,8 +107,18 @@ export const verifyLoginOtpController = asyncHandler(async (req, res) => {
         });
     } catch (error) {
         console.error("[Login Verification Error]", error); // Detailed logging
-        if (error instanceof ApiError) throw error;
-        throw new ApiError(500, "OTP verification failed: " + (error.message || "Unknown error"));
+        // Check if headers already sent to avoid crashing
+        if (res.headersSent) {
+             console.error("Headers already sent, cannot send error response");
+             return;
+        }
+        if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message, success: false, error: true });
+        
+        return res.status(500).json({ 
+            message: "OTP verification failed: " + (error.message || "Unknown error"),
+            error: true, 
+            success: false 
+        });
     }
 });
 

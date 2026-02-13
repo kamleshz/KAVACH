@@ -408,26 +408,50 @@ export const getAllProductComplianceRowsController = async (req, res) => {
 
 export const uploadProductComplianceRowController = async (req, res) => {
     try {
+        console.log(`[Product Compliance Upload] Request received. ClientID: ${req.params.clientId}, Type: ${req.body.type}, ItemID: ${req.body.itemId}, RowIndex: ${req.body.rowIndex}`);
+        
         const { clientId } = req.params;
         const { type, itemId, rowIndex, row } = req.body;
-        const clientExists = await ClientService.findClientOrPwp(clientId);
-        const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
-        const itemFound = clientExists.productionFacility[listKey].id(itemId);
-        if (!itemFound) {
-            return res.status(404).json({ message: `${type} detail not found`, error: true, success: false });
+        
+        if (!clientId || !type || !itemId || rowIndex === undefined) {
+             console.error(`[Product Compliance Upload] Missing required fields: clientId=${clientId}, type=${type}, itemId=${itemId}, rowIndex=${rowIndex}`);
+             return res.status(400).json({ message: "Missing required fields", error: true, success: false });
         }
+
+        const clientExists = await ClientService.findClientOrPwp(clientId);
+        if (!clientExists) {
+             console.error(`[Product Compliance Upload] Client not found: ${clientId}`);
+             return res.status(404).json({ message: "Client not found", error: true, success: false });
+        }
+
+        const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
+        const itemFound = clientExists.productionFacility?.[listKey]?.id(itemId);
+        
+        // Only check for itemFound if productionFacility exists and listKey is valid
+        // Some clients might not have productionFacility structured this way if they are PWP
+        // But the original code assumed this structure, so we'll keep it but add safety checks
+        if (clientExists.productionFacility && clientExists.productionFacility[listKey] && !itemFound) {
+             console.error(`[Product Compliance Upload] Facility Item not found: ${itemId} in ${listKey}`);
+             return res.status(404).json({ message: `${type} detail not found`, error: true, success: false });
+        }
+
         let doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
         if (!doc) {
+            console.log(`[Product Compliance Upload] Document not found, creating new one for Client: ${clientId}`);
             doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [] });
         }
         if (!Array.isArray(doc.changeHistory)) doc.changeHistory = [];
 
         let single = row;
         if (typeof single === 'string') {
-            try { single = JSON.parse(single); } catch (_) { single = {}; }
+            try { single = JSON.parse(single); } catch (e) { 
+                console.error(`[Product Compliance Upload] JSON Parse Error for row:`, e);
+                single = {}; 
+            }
         }
         const idx = parseInt(rowIndex, 10);
         if (Number.isNaN(idx) || idx < 0) {
+             console.error(`[Product Compliance Upload] Invalid Row Index: ${rowIndex}`);
             return res.status(400).json({ message: "Invalid rowIndex", error: true, success: false });
         }
         
@@ -439,18 +463,21 @@ export const uploadProductComplianceRowController = async (req, res) => {
         const additionalDocFile = req.files?.additionalDocument?.[0] || null;
 
         if (productFile) {
+            console.log(`[Product Compliance Upload] Uploading Product Image: ${productFile.originalname}`);
             const ext = path.extname(productFile.originalname).toLowerCase();
             const isDoc = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'].includes(ext);
             const filenameOverride = `pc_product_${type}_${itemId}_${Date.now()}`;
             productImageUrl = await uploadToCloudinary(productFile.path, 'eprkavach/product_compliance', filenameOverride, isDoc);
         }
         if (componentFile) {
+            console.log(`[Product Compliance Upload] Uploading Component Image: ${componentFile.originalname}`);
             const ext = path.extname(componentFile.originalname).toLowerCase();
             const isDoc = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'].includes(ext);
             const filenameOverride = `pc_component_${type}_${itemId}_${Date.now()}`;
             componentImageUrl = await uploadToCloudinary(componentFile.path, 'eprkavach/product_compliance', filenameOverride, isDoc);
         }
         if (additionalDocFile) {
+            console.log(`[Product Compliance Upload] Uploading Additional Doc: ${additionalDocFile.originalname}`);
             const ext = path.extname(additionalDocFile.originalname).toLowerCase();
             const isDoc = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png'].includes(ext);
             const filenameOverride = `pc_doc_${type}_${itemId}_${Date.now()}`;
@@ -493,6 +520,7 @@ export const uploadProductComplianceRowController = async (req, res) => {
             });
 
             if (isDuplicate) {
+                 console.warn(`[Product Compliance Upload] Duplicate Component Code detected: ${newCode}`);
                 return res.status(400).json({ message: `Component Code '${newCode}' must be unique (or match existing SKU/Description)`, error: true, success: false });
             }
         }
