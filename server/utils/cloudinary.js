@@ -4,6 +4,16 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Validate config before use
+const missingKeys = [];
+if (!process.env.CLOUDINARY_CLOUD_NAME) missingKeys.push('CLOUDINARY_CLOUD_NAME');
+if (!process.env.CLOUDINARY_API_KEY) missingKeys.push('CLOUDINARY_API_KEY');
+if (!process.env.CLOUDINARY_API_SECRET) missingKeys.push('CLOUDINARY_API_SECRET');
+
+if (missingKeys.length > 0) {
+    console.error(`[Cloudinary Config] CRITICAL: Missing environment variables: ${missingKeys.join(', ')}`);
+}
+
 // Configure Cloudinary
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -14,6 +24,10 @@ cloudinary.config({
 
 export const uploadToCloudinary = async (filePath, folder, filenameOverride, isDoc = false) => {
     try {
+        if (missingKeys.length > 0) {
+            throw new Error(`Cloudinary configuration is missing: ${missingKeys.join(', ')}. Please add them to your environment variables.`);
+        }
+        
         const ext = path.extname(filePath || '').toLowerCase();
         const isPdf = ext === '.pdf';
         const resourceType = isPdf ? 'image' : (isDoc ? 'raw' : 'image');
