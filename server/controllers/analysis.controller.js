@@ -187,6 +187,12 @@ export const generatePlasticComplianceReportController = async (req, res) => {
     } catch (error) {
         console.error("Generate Report Error:", error);
         console.error(error.stack); // Log stack trace for debugging
-        res.status(500).json({ message: error.message || "Error generating report" });
+        
+        // Ensure error response is JSON and includes details for debugging
+        res.status(500).json({ 
+            message: error.message || "Error generating report",
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+            details: "Please check Render logs for 'Puppeteer Launch Error'"
+        });
     }
 };

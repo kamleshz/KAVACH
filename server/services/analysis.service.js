@@ -1275,7 +1275,24 @@ class AnalysisService {
         console.log("[Report Generation] Launching Puppeteer...");
         try {
             // Log env to debug
+            const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
             console.log("PUPPETEER_EXECUTABLE_PATH:", process.env.PUPPETEER_EXECUTABLE_PATH);
+            console.log("Resolved executablePath:", executablePath);
+
+            // Check if executable exists
+            if (fs.existsSync(executablePath)) {
+                console.log("Executable found at path:", executablePath);
+            } else {
+                console.warn("Executable NOT found at path:", executablePath);
+                // Try to find google-chrome-stable in standard paths if not found
+                if (!process.env.PUPPETEER_EXECUTABLE_PATH) {
+                     const standardPath = '/usr/bin/google-chrome-stable';
+                     if (fs.existsSync(standardPath)) {
+                         console.log("Found standard path:", standardPath);
+                         process.env.PUPPETEER_EXECUTABLE_PATH = standardPath;
+                     }
+                }
+            }
 
             const browser = await puppeteer.launch({ 
                 headless: true, 
@@ -1287,11 +1304,16 @@ class AnalysisService {
                     '--disable-gpu',
                     '--no-zygote',
                     '--single-process',
-                    '--disable-extensions'
+                    '--disable-extensions',
+                    '--disable-infobars',
+                    '--window-position=0,0',
+                    '--ignore-certificate-errors',
+                    '--ignore-certificate-errors-spki-list',
+                    '--user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3312.0 Safari/537.36"'
                 ],
                 // Explicitly use the installed chrome if env var is set (from Dockerfile)
                 // Otherwise fallback to puppeteer's default (which might be missing if skipped download)
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(), 
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || executablePath, 
             });
             const page = await browser.newPage();
             console.log("[Report Generation] Setting Content...");
