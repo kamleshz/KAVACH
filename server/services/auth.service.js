@@ -214,17 +214,17 @@ class AuthService {
             throw new Error(`Database save failed: ${saveError.message}`);
         }
 
-        try {
-            await sendEmail({
-                to: email,
-                subject: 'Login OTP - EPR Kavach Audit',
-                html: loginOtpTemplate({ name: user.name, otp })
-            });
-        } catch (emailError) {
+        // NON-BLOCKING: Send email asynchronously to improve response time
+        sendEmail({
+            to: email,
+            subject: 'Login OTP - EPR Kavach Audit',
+            html: loginOtpTemplate({ name: user.name, otp })
+        }).catch(emailError => {
+            console.error("❌ Failed to send login OTP email (async):", emailError);
             console.log("---------------------------------------------------");
             console.log(`[DEV] Login OTP for ${email}: ${otp}`);
             console.log("---------------------------------------------------");
-        }
+        });
 
         return {
             requireOtp: true,
@@ -340,7 +340,8 @@ class AuthService {
         try {
             const geo = geoip.lookup(ipAddress);
 
-            await LoginActivityModel.create({
+            // NON-BLOCKING: Record login activity asynchronously
+            LoginActivityModel.create({
                 user: user._id,
                 email: user.email,
                 name: user.name,
@@ -352,9 +353,11 @@ class AuthService {
                 city: geo?.city || '',
                 region: geo?.region || '',
                 country: geo?.country || ''
+            }).catch(logError => {
+                console.error("Failed to record login activity (async):", logError);
             });
-        } catch (logError) {
-            console.error("Failed to record login activity:", logError);
+        } catch (error) {
+            console.error("Error in login activity setup:", error);
         }
 
         return {
