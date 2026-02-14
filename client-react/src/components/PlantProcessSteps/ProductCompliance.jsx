@@ -1483,14 +1483,7 @@ const ProductCompliance = ({
                             <Popconfirm
                                 title="Are you sure you want to delete all rows?"
                                 onConfirm={() => {
-            setMonthlyRows([{
-                systemCode:'', supplierName:'', componentCode:'', componentDescription:'',
-                polymerType:'', componentPolymer:'', category:'', dateOfInvoice:'',
-                monthName:'', quarter:'', yearlyQuarter:'', purchaseQty:'', uom:'',
-                perPieceWeightKg:'', monthlyPurchaseMt:'', recycledPercent:'', recycledQty:'', recycledRate: '', recycledQrtAmount: '',
-                virginQty: '', virginRate: '', virginQtyAmount: '',
-                rcPercentMentioned: ''
-            }]);
+            setMonthlyRows([]);
                                     setLastSavedMonthlyRows([]);
                                 }}
                                 okText="Yes"

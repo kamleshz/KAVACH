@@ -209,23 +209,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     return 'UNK';
   };
 
-  const [productRows, setProductRows] = useState([
-    {
-      generate: 'No',
-      systemCode: '',
-      packagingType: '',
-      skuCode: '',
-      skuDescription: '',
-      skuUom: '',
-      productImage: null,
-      componentCode: '',
-      componentDescription: '',
-      supplierName: '',
-      generateSupplierCode: 'No',
-      supplierCode: '',
-      componentImage: null
-    }
-  ]);
+  const [productRows, setProductRows] = useState([]);
   const [lastSavedRows, setLastSavedRows] = useState([]);
   const [initialProductRows, setInitialProductRows] = useState([]);
   const [skuRows, setSkuRows] = useState([
@@ -252,9 +236,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
   const [skuPage, setSkuPage] = useState(1);
   const [skuItemsPerPage, setSkuItemsPerPage] = useState(5);
   const fileInputSupplierRef = useRef(null);
-  const [componentRows, setComponentRows] = useState([
-    { systemCode: '', skuCode: '', componentCode: '', componentDescription: '', polymerType: '', componentPolymer: '', category: '', categoryIIType: '', containerCapacity: '', foodGrade: '', layerType: '', thickness: '', supplierName: '' }
-  ]);
+  const [componentRows, setComponentRows] = useState([]);
 
   useEffect(() => {
     const totalPages = Math.ceil(productRows.length / itemsPerPage);
@@ -2431,9 +2413,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     reader.readAsBinaryString(file);
   };
 
-  const [supplierRows, setSupplierRows] = useState([
-    { componentCode: '', componentDescription: '', supplierName: '', supplierStatus: '', foodGrade: '', eprCertificateNumber: '', fssaiLicNo: '' }
-  ]);
+  const [supplierRows, setSupplierRows] = useState([]);
   const [supplierPage, setSupplierPage] = useState(1);
   const [supplierItemsPerPage, setSupplierItemsPerPage] = useState(5);
   const [lastSavedSupplierRows, setLastSavedSupplierRows] = useState([]);
@@ -2447,44 +2427,14 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     }
   }, [supplierRows.length, supplierItemsPerPage, supplierPage]);
 
-  const [recycledRows, setRecycledRows] = useState([
-    {
-      componentCode: '',
-      componentDescription: '',
-      category: '',
-      annualConsumption: '',
-      uom: '',
-      perPieceWeight: '',
-      annualConsumptionMt: '',
-      usedRecycledPercent: '',
-      usedRecycledQtyMt: '',
-      supplierName: ''
-    }
-  ]);
+  const [recycledRows, setRecycledRows] = useState([]);
   const [recycledPage, setRecycledPage] = useState(1);
   const [recycledItemsPerPage, setRecycledItemsPerPage] = useState(5);
   const [lastSavedRecycledRows, setLastSavedRecycledRows] = useState([]);
   const [initialRecycledRows, setInitialRecycledRows] = useState([]);
   const [savingRecycledRow, setSavingRecycledRow] = useState(null);
 
-  const [monthlyRows, setMonthlyRows] = useState([
-    {
-      systemCode: '',
-      supplierName: '',
-      componentCode: '',
-      componentDescription: '',
-      polymerType: '',
-      componentPolymer: '',
-      category: '',
-      dateOfInvoice: '',
-      purchaseQty: '',
-      uom: '',
-      perPieceWeightKg: '',
-      monthlyPurchaseMt: '',
-      recycledPercent: '',
-      recycledQty: ''
-    }
-  ]);
+  const [monthlyRows, setMonthlyRows] = useState([]);
   const [monthlyPage, setMonthlyPage] = useState(1);
   const [monthlyItemsPerPage, setMonthlyItemsPerPage] = useState(5);
   const [lastSavedMonthlyRows, setLastSavedMonthlyRows] = useState([]);
