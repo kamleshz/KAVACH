@@ -9,6 +9,7 @@ import PrivateRoute from './components/PrivateRoute';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './index.css';
+import IdleTimer from './components/IdleTimer';
 
 // Lazy load heavy components
 const DashboardHome = lazy(() => import('./pages/DashboardHome'));
@@ -45,6 +46,8 @@ function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ToastContainer position="top-right" autoClose={3000} />
+      {/* 10 minutes = 600000 ms */}
+      <IdleTimer timeout={600000} />
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
           <Route path="/login" element={<Login />} />
