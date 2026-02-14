@@ -1500,11 +1500,7 @@ const AddClientContent = () => {
                 const newId = clientId || response.data.data._id;
                 setClientId(newId);
                 setIsPreValidationUnlocked(true);
-                if (!clientId) {
-                     navigate(`/dashboard/client/${newId}/audit`, { state: { activeTab: 'Audit' } });
-                } else {
-                     setActiveTab('Audit');
-                }
+                navigate(`/dashboard/client/${newId}/audit`, { state: { activeTab: 'Audit' } });
             } else {
                 setTimeout(() => navigate('/dashboard/clients'), 1500);
             }
