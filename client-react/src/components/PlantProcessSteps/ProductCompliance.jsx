@@ -231,7 +231,7 @@ const ProductCompliance = ({
                         )}
                     </div>
                 </div>
-                <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
+                <div className={`${productRows.length === 0 ? 'hidden' : ''} overflow-x-auto border border-gray-200 rounded-xl shadow-sm`}>
                     <table className="min-w-full text-xs divide-y divide-gray-200 border-separate border-spacing-0">
                         <thead className={isManager ? "bg-green-50" : "bg-gray-50"}>
                             <tr>
@@ -782,13 +782,15 @@ const ProductCompliance = ({
                     </table>
                 </div>
 
-                <Pagination
-                    currentPage={currentPage}
-                    totalItems={productRows.length}
-                    pageSize={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                    onPageSizeChange={setItemsPerPage}
-                />
+                {productRows.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={productRows.length}
+                        pageSize={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={setItemsPerPage}
+                    />
+                )}
 
                 <div className="flex justify-end mt-4" />
                 </>
@@ -837,7 +839,7 @@ const ProductCompliance = ({
                             )}
                         </div>
                     </div>
-                    <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
+                    <div className={`${supplierRows.length === 0 ? 'hidden' : ''} overflow-x-auto border border-gray-200 rounded-xl shadow-sm`}>
                         <table className="min-w-full text-xs divide-y divide-gray-200 border-separate border-spacing-0">
                             <thead className={isManager ? "bg-green-50" : "bg-gray-50"}>
                                 <tr>
@@ -1033,13 +1035,15 @@ const ProductCompliance = ({
                         </table>
                     </div>
 
-                <Pagination
-                    currentPage={supplierPage}
-                    totalItems={supplierRows.length}
-                    pageSize={supplierItemsPerPage}
-                    onPageChange={setSupplierPage}
-                    onPageSizeChange={setSupplierItemsPerPage}
-                />
+                {supplierRows.length > 0 && (
+                    <Pagination
+                        currentPage={supplierPage}
+                        totalItems={supplierRows.length}
+                        pageSize={supplierItemsPerPage}
+                        onPageChange={setSupplierPage}
+                        onPageSizeChange={setSupplierItemsPerPage}
+                    />
+                )}
 
                 <div className="flex justify-end mt-4" />
                 </div>
@@ -1088,7 +1092,7 @@ const ProductCompliance = ({
                         )}
                     </div>
                 </div>
-                    <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
+                    <div className={`${componentRows.length === 0 ? 'hidden' : ''} overflow-x-auto border border-gray-200 rounded-xl shadow-sm`}>
                         <table className="min-w-full text-xs divide-y divide-gray-200 border-separate border-spacing-0">
                             <thead className={isManager ? "bg-green-50" : "bg-gray-50"}>
                                 <tr>
@@ -1421,13 +1425,15 @@ const ProductCompliance = ({
                         </table>
                     </div>
 
-                <Pagination
-                    currentPage={componentPage}
-                    totalItems={componentRows.length}
-                    pageSize={componentItemsPerPage}
-                    onPageChange={setComponentPage}
-                    onPageSizeChange={setComponentItemsPerPage}
-                />
+                {componentRows.length > 0 && (
+                    <Pagination
+                        currentPage={componentPage}
+                        totalItems={componentRows.length}
+                        pageSize={componentItemsPerPage}
+                        onPageChange={setComponentPage}
+                        onPageSizeChange={setComponentItemsPerPage}
+                    />
+                )}
                 
                 <div className="flex justify-end mt-4" />
                 </div>
@@ -1513,7 +1519,7 @@ const ProductCompliance = ({
                             )}
                         </div>
                     </div>
-                    <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm max-h-[450px] mb-6">
+                    <div className={`${monthlyRows.length === 0 ? 'hidden' : ''} overflow-x-auto rounded-lg border border-gray-200 shadow-sm max-h-[450px] mb-6`}>
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className={isManager ? "bg-green-50 sticky top-0 z-10" : "bg-gray-50 sticky top-0 z-10"}>
                                 <tr>
@@ -1907,13 +1913,15 @@ const ProductCompliance = ({
                             </tbody>
                         </table>
                     </div>
-                    <Pagination
-                        currentPage={monthlyPage}
-                        totalItems={monthlyRows.length}
-                        pageSize={monthlyItemsPerPage}
-                        onPageChange={setMonthlyPage}
-                        onPageSizeChange={setMonthlyItemsPerPage}
-                    />
+                    {monthlyRows.length > 0 && (
+                        <Pagination
+                            currentPage={monthlyPage}
+                            totalItems={monthlyRows.length}
+                            pageSize={monthlyItemsPerPage}
+                            onPageChange={setMonthlyPage}
+                            onPageSizeChange={setMonthlyItemsPerPage}
+                        />
+                    )}
                     <div className="flex justify-between items-center mb-3">
                         <div className="flex items-center gap-2">
                              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider border-b pb-2 border-primary-100 flex items-center gap-2">
@@ -1959,7 +1967,7 @@ const ProductCompliance = ({
                             )}
                         </div>
                     </div>
-                    <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm max-h-[500px]">
+                    <div className={`${recycledRows.length === 0 ? 'hidden' : ''} overflow-x-auto rounded-lg border border-gray-200 shadow-sm max-h-[500px]`}>
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className={isManager ? "bg-green-50 sticky top-0 z-10" : "bg-gray-50 sticky top-0 z-10"}>
                                 <tr>
@@ -2193,13 +2201,15 @@ const ProductCompliance = ({
                             </tbody>
                         </table>
                     </div>
-                    <Pagination
-                        currentPage={recycledPage}
-                        totalItems={recycledRows.length}
-                        pageSize={recycledItemsPerPage}
-                        onPageChange={setRecycledPage}
-                        onPageSizeChange={setRecycledItemsPerPage}
-                    />
+                    {recycledRows.length > 0 && (
+                        <Pagination
+                            currentPage={recycledPage}
+                            totalItems={recycledRows.length}
+                            pageSize={recycledItemsPerPage}
+                            onPageChange={setRecycledPage}
+                            onPageSizeChange={setRecycledItemsPerPage}
+                        />
+                    )}
 
                 <div className="mt-6 bg-white rounded-xl shadow-lg border border-gray-100 p-4">
                     <div className="flex justify-between items-center mb-3">
