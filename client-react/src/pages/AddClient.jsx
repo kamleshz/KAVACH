@@ -1499,12 +1499,11 @@ const AddClientContent = () => {
             if (processPreValidation) {
                 const newId = clientId || response.data.data._id;
                 setClientId(newId);
-                setIsPreValidationUnlocked(true); // Unlock Pre-Validation tab only
+                setIsPreValidationUnlocked(true);
                 if (!clientId) {
-                     // If it was a new client, navigate to edit page to persist state
-                     navigate(`/dashboard/client/${newId}/edit`, { state: { activeTab: 'Pre - Validation' } });
+                     navigate(`/dashboard/client/${newId}/audit`, { state: { activeTab: 'Audit' } });
                 } else {
-                     setActiveTab('Pre - Validation');
+                     setActiveTab('Audit');
                 }
             } else {
                 setTimeout(() => navigate('/dashboard/clients'), 1500);
@@ -3996,4 +3995,3 @@ const AddClient = () => (
 );
 
 export default AddClient;
-
