@@ -1327,7 +1327,7 @@ class AnalysisService {
         const template = handlebars.compile(templateHtml);
         const html = template(templateData);
 
-        // 7. Generate PDF
+            // 7. Generate PDF
         console.log("[Report Generation] Launching Puppeteer...");
         try {
             // Log env to debug
@@ -1340,14 +1340,42 @@ class AnalysisService {
                 console.log("Executable found at path:", executablePath);
             } else {
                 console.warn("Executable NOT found at path:", executablePath);
-                // Try to find google-chrome-stable in standard paths if not found
-                if (!process.env.PUPPETEER_EXECUTABLE_PATH) {
-                     const standardPath = '/usr/bin/google-chrome-stable';
-                     if (fs.existsSync(standardPath)) {
-                         console.log("Found standard path:", standardPath);
-                         process.env.PUPPETEER_EXECUTABLE_PATH = standardPath;
-                     }
-                }
+                    // Try to find browser in standard paths by platform
+                    if (!process.env.PUPPETEER_EXECUTABLE_PATH) {
+                        if (process.platform === 'linux') {
+                            const standardPath = '/usr/bin/google-chrome-stable';
+                            if (fs.existsSync(standardPath)) {
+                                console.log("Found standard path:", standardPath);
+                                process.env.PUPPETEER_EXECUTABLE_PATH = standardPath;
+                            }
+                        } else if (process.platform === 'win32') {
+                            const candidates = [
+                                'C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe',
+                                'C:\\\\Program Files (x86)\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe',
+                                'C:\\\\Program Files\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe',
+                                'C:\\\\Program Files (x86)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe'
+                            ];
+                            for (const p of candidates) {
+                                if (fs.existsSync(p)) {
+                                    console.log("Found Windows browser path:", p);
+                                    process.env.PUPPETEER_EXECUTABLE_PATH = p;
+                                    break;
+                                }
+                            }
+                        } else if (process.platform === 'darwin') {
+                            const candidates = [
+                                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+                                '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
+                            ];
+                            for (const p of candidates) {
+                                if (fs.existsSync(p)) {
+                                    console.log("Found macOS browser path:", p);
+                                    process.env.PUPPETEER_EXECUTABLE_PATH = p;
+                                    break;
+                                }
+                            }
+                        }
+                    }
             }
 
             const browser = await puppeteer.launch({ 
@@ -1358,8 +1386,7 @@ class AnalysisService {
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage', 
                     '--disable-gpu',
-                    '--no-zygote',
-                    '--single-process',
+                        '--no-zygote',
                     '--disable-extensions',
                     '--disable-infobars',
                     '--window-position=0,0',

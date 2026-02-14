@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Select, Input, Button, Upload, Popover, Popconfirm, message, Modal } from 'antd';
+import { Table, Select, Input, Button, Upload, Popover, Popconfirm, Modal, message as AntMessage } from 'antd';
 import { 
   FaCheckDouble, FaFilePdf, FaClipboardCheck, FaChartLine, FaFilter, 
   FaExclamationCircle, FaTrashAlt, FaEdit, FaSave, FaUndo, FaCheck, FaCheckCircle,
@@ -172,12 +172,13 @@ const PostAuditCheck = ({
     const [savingSummary, setSavingSummary] = useState(false);
     const [savingRowIndex, setSavingRowIndex] = useState(null);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [msgApi, msgContextHolder] = AntMessage.useMessage();
 
     const handleDownloadReport = async () => {
         try {
             setIsDownloading(true);
             if (!applicationType || !selectedPlantId) {
-                 message.error("Missing report context (Type/Plant ID)");
+                 msgApi.error("Missing report context (Type/Plant ID)");
                  return;
             }
     
@@ -193,10 +194,10 @@ const PostAuditCheck = ({
             link.click();
             link.remove();
             
-            message.success("Report downloaded successfully");
+            msgApi.success("Report downloaded successfully");
         } catch (error) {
             console.error("Download failed:", error);
-            message.error("Failed to download report");
+            msgApi.error("Failed to download report");
         } finally {
             setIsDownloading(false);
         }
@@ -270,10 +271,10 @@ const PostAuditCheck = ({
                 itemId: selectedPlantId,
                 rows: summaryProductRows
             });
-            message.success("Product assessment saved successfully");
+            msgApi.success("Product assessment saved successfully");
         } catch (error) {
             console.error("Error saving product assessment", error);
-            message.error("Failed to save product assessment");
+            msgApi.error("Failed to save product assessment");
         } finally {
             setSavingSummary(false);
         }
@@ -287,7 +288,7 @@ const PostAuditCheck = ({
         );
 
         if (rowIndex === -1) {
-            message.error("Row not found");
+            msgApi.error("Row not found");
             return;
         }
 
@@ -301,10 +302,10 @@ const PostAuditCheck = ({
                 rowIndex: rowIndex,
                 row: row
             });
-            message.success("Row saved successfully");
+            msgApi.success("Row saved successfully");
         } catch (error) {
             console.error("Error saving row", error);
-            message.error("Failed to save row");
+            msgApi.error("Failed to save row");
         } finally {
             setSavingRowIndex(null);
         }
@@ -392,7 +393,8 @@ const PostAuditCheck = ({
     };
 
     return (
-             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                 {msgContextHolder}
                  {clientId ? (
                     <div>
                         <div className="flex items-center gap-3 mb-6">
