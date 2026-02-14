@@ -309,7 +309,7 @@ const CteCtoCca = ({
                                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/3">Plant Name</th>
                                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/3">Product Name</th>
                                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/4">Quantity</th>
-                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-24">UOM</th>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[140px]">UOM</th>
                                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-28">Actions</th>
                                     </tr>
                                 </thead>
@@ -362,16 +362,13 @@ const CteCtoCca = ({
                                             </td>
                                             <td className="px-4 py-3">
                                                 {row.isEditing ? (
-                                                    <select
+                                                    <input
+                                                        type="text"
+                                                        placeholder="UOM"
                                                         value={row.uom || ''}
                                                         onChange={(e) => handleCteProductionChange(index, 'uom', e.target.value)}
                                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
-                                                    >
-                                                        <option value="">Select UOM</option>
-                                                        <option value="MT/Year">MT/Year</option>
-                                                        <option value="KG/Year">KG/Year</option>
-                                                        <option value="Units/Year">Units/Year</option>
-                                                    </select>
+                                                    />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-700">{row.uom || '-'}</span>
                                                 )}
@@ -699,10 +696,10 @@ const CteCtoCca = ({
                             <table className="min-w-full text-xs divide-y divide-gray-200 border-separate border-spacing-0">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/3">Plant Name</th>
-                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/3">Product Name</th>
-                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-1/4">Quantity</th>
-                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-24">UOM</th>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[160px]">Plant Name</th>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[180px]">Product Name</th>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[140px]">Quantity</th>
+                                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[140px]">UOM</th>
                                         <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-28">Actions</th>
                                     </tr>
                                 </thead>
@@ -755,16 +752,13 @@ const CteCtoCca = ({
                                             </td>
                                             <td className="px-4 py-3">
                                                 {row.isEditing ? (
-                                                    <select
+                                                    <input
+                                                        type="text"
+                                                        placeholder="UOM"
                                                         value={row.uom || ''}
                                                         onChange={(e) => handleCtoProductChange(index, 'uom', e.target.value)}
                                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
-                                                    >
-                                                        <option value="">Select UOM</option>
-                                                        <option value="MT">MT</option>
-                                                        <option value="KG">KG</option>
-                                                        <option value="Units">Units</option>
-                                                    </select>
+                                                    />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-700">{row.uom || '-'}</span>
                                                 )}
@@ -1061,16 +1055,13 @@ const CteCtoCca = ({
                                                             {isViewMode ? (
                                                                 <span className="block px-2 py-1 text-sm text-gray-600">{row.uom || '-'}</span>
                                                             ) : (
-                                                                <select
+                                                                <input
+                                                                    type="text"
                                                                     value={row.uom || ''}
                                                                     onChange={(e) => updateWaterRegulationRow(idx, 'uom', e.target.value)}
                                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
-                                                                >
-                                                                    <option value="">Select UOM</option>
-                                                                    <option value="KLD">KLD</option>
-                                                                    <option value="CMD">CMD</option>
-                                                                    <option value="Liters/Day">Liters/Day</option>
-                                                                </select>
+                                                                    placeholder="UOM"
+                                                                />
                                                             )}
                                                         </td>
                                                         {!isViewMode && (
@@ -1164,16 +1155,13 @@ const CteCtoCca = ({
                                                             {isViewMode ? (
                                                                 <span className="block px-2 py-1 text-sm text-gray-600">{row.uom || '-'}</span>
                                                             ) : (
-                                                                <select
+                                                                <input
+                                                                    type="text"
                                                                     value={row.uom || ''}
                                                                     onChange={(e) => updateAirRegulationRow(idx, 'uom', e.target.value)}
                                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
-                                                                >
-                                                                    <option value="">Select UOM</option>
-                                                                    <option value="mg/Nm3">mg/Nm3</option>
-                                                                    <option value="ppm">ppm</option>
-                                                                    <option value="kg/hr">kg/hr</option>
-                                                                </select>
+                                                                    placeholder="UOM"
+                                                                />
                                                             )}
                                                         </td>
                                                         {!isViewMode && (
@@ -1283,15 +1271,13 @@ const CteCtoCca = ({
                                                             {isViewMode ? (
                                                                 <span className="block px-2 py-1 text-sm text-gray-600">{row.uom || '-'}</span>
                                                             ) : (
-                                                                <select
+                                                                <input
+                                                                    type="text"
                                                                     value={row.uom || ''}
                                                                     onChange={(e) => updateHazardousWasteRegulationRow(idx, 'uom', e.target.value)}
                                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
-                                                                >
-                                                                    <option value="">Select UOM</option>
-                                                                    <option value="MT/Year">MT/Year</option>
-                                                                    <option value="KG/Year">KG/Year</option>
-                                                                </select>
+                                                                    placeholder="UOM"
+                                                                />
                                                             )}
                                                         </td>
                                                         {!isViewMode && (
