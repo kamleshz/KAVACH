@@ -4,6 +4,7 @@ import { UploadOutlined, BarChartOutlined, TableOutlined } from '@ant-design/ico
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import api from '../../services/api';
 import { API_ENDPOINTS } from '../../services/apiEndpoints';
+import { useClientContext } from '../../context/ClientContext';
 
 const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId }) => {
     const [salesFile, setSalesFile] = useState(null);
@@ -15,6 +16,8 @@ const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId }) => {
     const [viewMode, setViewMode] = useState('table');
 
     const [messageApi, contextHolder] = message.useMessage();
+    const { formData } = useClientContext();
+    const isProducer = (formData?.entityType || '').toString() === 'Producer';
 
     // Handle isStepReadOnly whether it's a function or a boolean
     const isReadOnly = typeof isStepReadOnly === 'function' ? isStepReadOnly() : isStepReadOnly;
@@ -226,7 +229,7 @@ const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId }) => {
                                 className="border border-gray-200 rounded-lg overflow-hidden mb-8"
                             />
 
-                            {summary?.target_tables && summary.target_tables.length > 0 && (
+                            {summary?.target_tables && summary.target_tables.length > 0 && !isProducer && (
                                 <div className="space-y-8 mt-8">
                                     <h3 className="text-lg font-bold text-gray-800">EPR Target Calculation</h3>
                                     {summary.target_tables.map((table, idx) => (

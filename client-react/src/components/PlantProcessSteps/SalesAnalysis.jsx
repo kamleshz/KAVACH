@@ -15,6 +15,7 @@ const SalesAnalysis = ({ clientId, type, itemId }) => {
     const [financialYears, setFinancialYears] = useState([]);
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(null);
+    const [targetTables, setTargetTables] = useState([]);
 
     useEffect(() => {
         if (clientId && type && itemId) {
@@ -30,6 +31,7 @@ const SalesAnalysis = ({ clientId, type, itemId }) => {
             setSummaryData([]);
             setFySummaryData([]);
             setFinancialYears([]);
+            setTargetTables([]);
         }
     }, [rawRows]);
 
@@ -123,6 +125,8 @@ const SalesAnalysis = ({ clientId, type, itemId }) => {
         
         // Also calculate FY Summary table
         calculateFySummary(rows);
+        // And Producer EPR Target Calculation based on Sales
+        calculateProducerTargetsFromSales(rows, years);
     };
 
     const calculateFySummary = (rows) => {
@@ -159,6 +163,80 @@ const SalesAnalysis = ({ clientId, type, itemId }) => {
         fyData.sort((a, b) => a.financialYear.localeCompare(b.financialYear));
 
         setFySummaryData(fyData);
+    };
+
+    const normalizeSalesCategory = (val) => {
+        if (!val) return null;
+        const v = String(val).toUpperCase();
+        if (v.includes("IV") || v.includes("CAT-IV") || v.includes("CAT IV") || v.includes("CATEGORY IV")) return "Cat-IV";
+        if (v.includes("III") || v.includes("CAT-III") || v.includes("CAT III") || v.includes("CATEGORY III")) return "Cat-III";
+        if (v.includes("II") || v.includes("CAT-II") || v.includes("CAT II") || v.includes("CATEGORY II")) return "Cat-II";
+        if (v.includes("CAT-I") || v.includes("CAT I") || v.includes("CATEGORY I") || (v.includes("I") && v.includes("CONTAINER"))) return "Cat-I";
+        if (/\bI\b/.test(v) || /CAT.*I/.test(v)) return "Cat-I";
+        return null;
+    };
+
+    const getNextFinancialYear = (fy) => {
+        if (!fy || typeof fy !== 'string' || !fy.includes('-')) return fy;
+        const [start, end] = fy.split('-').map(s => parseInt(s, 10));
+        const nextStart = start + 1;
+        const nextEnd = end + 1;
+        return `${nextStart}-${String(nextEnd).padStart(2, '0')}`;
+    };
+
+    const calculateProducerTargetsFromSales = (rows, years) => {
+        const categories = ['Cat-I', 'Cat-II', 'Cat-III', 'Cat-IV'];
+        const yearlyAgg = {};
+        categories.forEach(cat => { yearlyAgg[cat] = {}; });
+
+        rows.forEach(row => {
+            const cat = normalizeSalesCategory(row.plasticCategory);
+            const fy = row.financialYear || 'Unknown';
+            const qty = parseFloat(row.totalPlasticQty) || 0;
+            const regType = (row.registrationType || '').toLowerCase();
+            if (!cat) return;
+            const val = qty;
+            yearlyAgg[cat][fy] = (yearlyAgg[cat][fy] || 0) + val;
+        });
+
+        const sortedYears = [...years].sort();
+        const tables = [];
+        if (sortedYears.length >= 2) {
+            for (let i = 0; i < sortedYears.length - 1; i++) {
+                const year1 = sortedYears[i];
+                const year2 = sortedYears[i + 1];
+                const targetYear = sortedYears[i + 2] || getNextFinancialYear(year2);
+
+                const data = categories.map(cat => {
+                    const val1 = parseFloat(yearlyAgg[cat]?.[year1] || 0);
+                    const val2 = parseFloat(yearlyAgg[cat]?.[year2] || 0);
+                    const avg = (val1 + val2) / 2;
+
+                    // Registered Sales for Year2 (Producer logic)
+                    // Using FY summary derived from rows (registered only)
+                    const regYear2 = rows
+                        .filter(r => normalizeSalesCategory(r.plasticCategory) === cat && (r.registrationType || '').toLowerCase().includes('registered') && !(r.registrationType || '').toLowerCase().includes('unregistered') && (r.financialYear || '') === year2)
+                        .reduce((sum, r) => sum + (parseFloat(r.totalPlasticQty) || 0), 0);
+
+                    const targetVal = avg - regYear2;
+
+                    const row = {
+                        "Category of Plastic": cat,
+                        [year1]: parseFloat(val1.toFixed(4)),
+                        [year2]: parseFloat(val2.toFixed(4)),
+                        "Avg": parseFloat(avg.toFixed(4)),
+                        [`Registered Sales (${year2})`]: parseFloat(regYear2.toFixed(4)),
+                        [`Target ${targetYear}`]: parseFloat(targetVal.toFixed(4)),
+                    };
+                    return row;
+                });
+
+                const columns = ["Category of Plastic", year1, year2, "Avg", `Registered Sales (${year2})`, `Target ${targetYear}`];
+                tables.push({ title: `Target Calculation for ${targetYear} (Producer)`, data, columns });
+            }
+        }
+
+        setTargetTables(tables);
     };
 
     const fetchSavedAnalysis = async () => {
@@ -642,6 +720,34 @@ const SalesAnalysis = ({ clientId, type, itemId }) => {
                                 expandedRowRender: fyExpandedRowRender
                             }}
                         />
+                    </div>
+                </div>
+            )}
+            
+            {targetTables.length > 0 && (
+                <div className="mt-8">
+                    <h3 className="text-gray-700 font-semibold text-lg mb-4">EPR Target Calculation</h3>
+                    <div className="space-y-6">
+                        {targetTables.map((table, idx) => (
+                            <div key={idx} className="bg-white border border-gray-200 rounded-md overflow-hidden">
+                                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 font-semibold text-gray-700">
+                                    {table.title}
+                                </div>
+                                <Table
+                                    dataSource={table.data}
+                                    columns={table.columns.map(col => ({
+                                        title: col,
+                                        dataIndex: col,
+                                        key: col,
+                                        align: col === "Category of Plastic" ? "left" : "right"
+                                    }))}
+                                    pagination={false}
+                                    size="small"
+                                    bordered
+                                    rowKey="Category of Plastic"
+                                />
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

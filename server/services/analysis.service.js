@@ -678,7 +678,7 @@ class AnalysisService {
         // ideally runPlasticAnalysis should have been called before.
         const summary = analysisDoc?.summary || {};
         const prePostSummary = summary.portal_summary || [];
-        const targetTables = summary.target_tables || [];
+        const targetTablesPrePost = summary.target_tables || [];
         
         // Format Pre/Post Summary for Template
         const formattedPrePost = prePostSummary
@@ -1055,6 +1055,62 @@ class AnalysisService {
             return acc;
         }, { category: 'Total', regTotal: '0.00', unregTotal: '0.00' });
         purchaseSummaryTable.push(purchaseTotalRow);
+
+        // Build EPR Target Tables for Report
+        const isProducerEntity = (clientDoc.entityType || '').toString() === 'Producer';
+        let targetTables = targetTablesPrePost;
+        if (isProducerEntity) {
+            const normalizeSalesCategory = (val) => {
+                if (!val) return null;
+                const v = String(val).toUpperCase();
+                if (v.includes("IV") || v.includes("CAT-IV") || v.includes("CAT IV") || v.includes("CATEGORY IV")) return "Cat-IV";
+                if (v.includes("III") || v.includes("CAT-III") || v.includes("CAT III") || v.includes("CATEGORY III")) return "Cat-III";
+                if (v.includes("II") || v.includes("CAT-II") || v.includes("CAT II") || v.includes("CATEGORY II")) return "Cat-II";
+                if (v.includes("CAT-I") || v.includes("CAT I") || v.includes("CATEGORY I") || (v.includes("I") && v.includes("CONTAINER"))) return "Cat-I";
+                if (/\bI\b/.test(v) || /CAT.*I/.test(v)) return "Cat-I";
+                return null;
+            };
+            const categories = ['Cat-I', 'Cat-II', 'Cat-III', 'Cat-IV'];
+            const yearlyAgg = {};
+            categories.forEach(cat => { yearlyAgg[cat] = {}; });
+            (analysisDoc?.salesRows || []).forEach(r => {
+                const cat = normalizeSalesCategory(r.plasticCategory);
+                const fy = r.financialYear || 'Unknown';
+                const qty = parseFloat(r.totalPlasticQty) || 0;
+                if (!cat || fy === 'Unknown') return;
+                yearlyAgg[cat][fy] = (yearlyAgg[cat][fy] || 0) + qty;
+            });
+            const sortedYears = [...displaySalesYears];
+            const tables = [];
+            if (sortedYears.length >= 2) {
+                for (let i = 0; i < sortedYears.length - 1; i++) {
+                    const year1 = sortedYears[i];
+                    const year2 = sortedYears[i + 1];
+                    const targetYear = sortedYears[i + 2] || this.getNextFinancialYear(year2);
+                    const data = categories.map(cat => {
+                        const val1 = parseFloat(yearlyAgg[cat]?.[year1] || 0);
+                        const val2 = parseFloat(yearlyAgg[cat]?.[year2] || 0);
+                        const avg = (val1 + val2) / 2;
+                        const regYear2 = (analysisDoc?.salesRows || [])
+                            .filter(rr => normalizeSalesCategory(rr.plasticCategory) === cat && (rr.registrationType || '').toLowerCase().includes('registered') && !(rr.registrationType || '').toLowerCase().includes('unregistered') && (rr.financialYear || '') === year2)
+                            .reduce((sum, rr) => sum + (parseFloat(rr.totalPlasticQty) || 0), 0);
+                        const targetVal = avg - regYear2;
+                        const row = {
+                            "Category of Plastic": cat,
+                            [year1]: parseFloat(val1.toFixed(4)),
+                            [year2]: parseFloat(val2.toFixed(4)),
+                            "Avg": parseFloat(avg.toFixed(4)),
+                            [`Registered Sales (${year2})`]: parseFloat(regYear2.toFixed(4)),
+                            [`Target ${targetYear}`]: parseFloat(targetVal.toFixed(4)),
+                        };
+                        return row;
+                    });
+                    const columns = ["Category of Plastic", year1, year2, "Avg", `Registered Sales (${year2})`, `Target ${targetYear}`];
+                    tables.push({ title: `Target Calculation for ${targetYear} (Producer)`, data, columns });
+                }
+            }
+            targetTables = tables;
+        }
 
         // 5. Generate Auditor Insights
         const auditorInsights = this.generateAuditorInsights(
