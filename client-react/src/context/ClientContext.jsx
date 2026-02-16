@@ -9,6 +9,7 @@ export const ClientProvider = ({ children }) => {
         clientName: '',
         tradeName: '',
         companyGroupName: '',
+        companyType: '',
         financialYear: '',
         wasteType: '', // No default - must be set by AddClient or loaded data
         entityType: 'Producer', // Default

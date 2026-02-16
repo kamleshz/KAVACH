@@ -57,6 +57,10 @@ const pwpSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
+    companyType: {
+        type: String,
+        default: ""
+    },
     financialYear: {
         type: String,
         default: ""

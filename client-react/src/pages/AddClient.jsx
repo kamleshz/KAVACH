@@ -409,6 +409,7 @@ const AddClientContent = () => {
               clientName: client.clientName || '',
               tradeName: client.tradeName || '',
               companyGroupName: client.companyGroupName || '',
+              companyType: client.companyType || '',
               financialYear: client.financialYear || '',
               wasteType: client.wasteType || '', // Ensure wasteType is loaded
               entityType: client.entityType || prev.entityType,
@@ -1139,6 +1140,7 @@ const AddClientContent = () => {
             clientName: formData.clientName,
             tradeName: formData.tradeName,
             companyGroupName: formData.companyGroupName,
+            companyType: formData.companyType,
             financialYear: formData.financialYear,
             wasteType: formData.wasteType || undefined,
             entityType: formData.entityType,
@@ -1559,6 +1561,7 @@ const AddClientContent = () => {
             clientName: formData.clientName,
             tradeName: formData.tradeName,
             companyGroupName: formData.companyGroupName,
+            companyType: formData.companyType,
             financialYear: formData.financialYear,
             wasteType: finalWasteType,
             entityType: formData.entityType,

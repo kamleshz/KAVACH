@@ -202,6 +202,30 @@ const ClientBasicInfo = ({
                                 </div>
                             </div>
                             <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Company Type</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <FaBuilding className="text-gray-400" />
+                                    </div>
+                                    <select
+                                        name="companyType"
+                                        value={formData.companyType}
+                                        onChange={handleChange}
+                                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all shadow-sm hover:border-gray-400 appearance-none"
+                                    >
+                                        <option value="">Select Company Type</option>
+                                        <option value="Private Limited">Private Limited</option>
+                                        <option value="LLP">LLP</option>
+                                        <option value="Partnership">Partnership</option>
+                                        <option value="Proprietorship">Proprietorship</option>
+                                        <option value="Public Limited">Public Limited</option>
+                                    </select>
+                                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                        <FaChevronDown className="text-gray-400 text-xs" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Financial Year <span className="text-red-500">*</span></label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

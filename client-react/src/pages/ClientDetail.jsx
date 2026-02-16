@@ -250,6 +250,10 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                       <span className="text-gray-900">{client.companyGroupName || 'N/A'}</span>
                     </div>
                     <div className="flex">
+                      <span className="w-48 text-gray-600 font-medium">Company Type:</span>
+                      <span className="text-gray-900">{client.companyType || 'N/A'}</span>
+                    </div>
+                    <div className="flex">
                       <span className="w-48 text-gray-600 font-medium">Financial Year:</span>
                       <span className="text-gray-900">{client.financialYear || 'N/A'}</span>
                     </div>

@@ -91,6 +91,7 @@ const EditClient = () => {
     clientName: '',
     tradeName: '',
     companyGroupName: '',
+    companyType: '',
     financialYear: '',
     entityType: '',
     contactPersonName: '',
@@ -171,6 +172,7 @@ const EditClient = () => {
           clientName: client.clientName || '',
           tradeName: client.tradeName || '',
           companyGroupName: client.companyGroupName || '',
+          companyType: client.companyType || '',
           financialYear: client.financialYear || '',
           entityType: client.entityType || '',
           contactPersonName: client.contactPerson?.name || '',
@@ -647,6 +649,7 @@ const EditClient = () => {
         clientName: formData.clientName,
         tradeName: formData.tradeName,
         companyGroupName: formData.companyGroupName,
+        companyType: formData.companyType,
         financialYear: formData.financialYear,
         entityType: formData.entityType,
         authorisedPerson: {
@@ -888,6 +891,23 @@ const EditClient = () => {
                     className="input-field"
                     required
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Company Type</label>
+                  <select
+                    name="companyType"
+                    value={formData.companyType}
+                    onChange={handleChange}
+                    className="input-field"
+                  >
+                    <option value="">Select Company Type</option>
+                    <option value="Private Limited">Private Limited</option>
+                    <option value="LLP">LLP</option>
+                    <option value="Partnership">Partnership</option>
+                    <option value="Proprietorship">Proprietorship</option>
+                    <option value="Public Limited">Public Limited</option>
+                  </select>
                 </div>
 
                 <div>
