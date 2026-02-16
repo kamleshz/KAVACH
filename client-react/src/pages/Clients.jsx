@@ -175,15 +175,12 @@ const Clients = () => {
       const cteList = client.productionFacility?.cteDetailsList || [];
       const ctoList = client.productionFacility?.ctoDetailsList || [];
 
-      cteList.forEach(item => {
+      const hasActiveAudit = [...cteList, ...ctoList].some(item => {
         const steps = item.completedSteps?.length || 0;
-        if (steps > 0 && steps < 5) count++;
+        return steps > 0 && steps < 5;
       });
 
-      ctoList.forEach(item => {
-        const steps = item.completedSteps?.length || 0;
-        if (steps > 0 && steps < 5) count++;
-      });
+      if (hasActiveAudit) count++;
     });
     return count;
   }, [wasteTypeClients]);
