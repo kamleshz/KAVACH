@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Button, Table, message, Upload } from 'antd';
-import { UploadOutlined, DeleteOutlined, SaveOutlined } from '@ant-design/icons';
+import { UploadOutlined, DeleteOutlined, SaveOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import api from '../../services/api';
 import { API_ENDPOINTS } from '../../services/apiEndpoints';
 
-const PurchaseAnalysis = ({ clientId, type, itemId }) => {
+const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
     // rawRows: keeps the detailed data if needed for backend save
     const [rawRows, setRawRows] = useState([]);
     // summaryData: for the display table
@@ -15,6 +15,7 @@ const PurchaseAnalysis = ({ clientId, type, itemId }) => {
     const [financialYears, setFinancialYears] = useState([]);
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(null);
+    const [isExpanded, setIsExpanded] = useState(true);
 
     useEffect(() => {
         if (clientId && type && itemId) {
@@ -548,6 +549,7 @@ const PurchaseAnalysis = ({ clientId, type, itemId }) => {
     return (
         <div className="bg-white p-6 rounded-lg shadow-sm">
             {/* Header Section */}
+            {!readOnly && (
             <div className="mb-6">
                 <h3 className="text-blue-600 font-semibold text-lg uppercase mb-4">UPLOAD DATA FILES</h3>
                 
@@ -596,10 +598,20 @@ const PurchaseAnalysis = ({ clientId, type, itemId }) => {
                     </div>
                 </div>
             </div>
+            )}
 
             {/* Table Section */}
             {summaryData.length > 0 && (
                 <div className="mt-6 border rounded-md overflow-hidden">
+                     <div 
+                        className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => setIsExpanded(!isExpanded)}
+                    >
+                        <h3 className="font-semibold text-blue-700 text-lg m-0">Purchase Portal Data</h3>
+                        {isExpanded ? <UpOutlined /> : <DownOutlined />}
+                    </div>
+                    {isExpanded && (
+                    <>
                     <Table
                         dataSource={summaryData}
                         columns={columns}
@@ -613,29 +625,29 @@ const PurchaseAnalysis = ({ clientId, type, itemId }) => {
                             rowExpandable: (record) => record.key !== 'Total',
                         }}
                     />
-                </div>
-            )}
-
-            {/* Financial Year Analysis Table */}
-            {fySummaryData.length > 0 && (
-                <div className="mt-8">
-                    <h3 className="text-gray-700 font-semibold text-lg mb-4 flex items-center gap-2">
-                        <span className="w-1 h-6 bg-blue-500 rounded-full inline-block"></span>
-                        Financial Year Analysis
-                    </h3>
-                    <div className="border rounded-md overflow-hidden">
-                        <Table
-                            dataSource={fySummaryData}
-                            columns={fyColumns}
-                            pagination={false}
-                            size="middle"
-                            bordered
-                            rowKey="key"
-                            expandable={{
-                                expandedRowRender: fyExpandedRowRender
-                            }}
-                        />
-                    </div>
+                    {fySummaryData.length > 0 && (
+                        <div className="p-4 border-t border-gray-200">
+                            <h3 className="text-gray-700 font-semibold text-lg mb-4 flex items-center gap-2">
+                                <span className="w-1 h-6 bg-blue-500 rounded-full inline-block"></span>
+                                Financial Year Analysis
+                            </h3>
+                            <div className="border rounded-md overflow-hidden">
+                                <Table
+                                    dataSource={fySummaryData}
+                                    columns={fyColumns}
+                                    pagination={false}
+                                    size="middle"
+                                    bordered
+                                    rowKey="key"
+                                    expandable={{
+                                        expandedRowRender: fyExpandedRowRender
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+                    </>
+                    )}
                 </div>
             )}
             

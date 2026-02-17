@@ -6,7 +6,7 @@ import api from '../../services/api';
 import { API_ENDPOINTS } from '../../services/apiEndpoints';
 import { useClientContext } from '../../context/ClientContext';
 
-const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId }) => {
+const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId, entityType }) => {
     const [salesFile, setSalesFile] = useState(null);
     const [purchaseFile, setPurchaseFile] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -17,7 +17,10 @@ const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId }) => {
 
     const [messageApi, contextHolder] = message.useMessage();
     const { formData } = useClientContext();
-    const isProducer = (formData?.entityType || '').toString() === 'Producer';
+    
+    // Use prop entityType if available, otherwise fallback to context
+    const currentEntityType = entityType || formData?.entityType;
+    const isProducer = (currentEntityType || '').toString() === 'Producer';
 
     // Handle isStepReadOnly whether it's a function or a boolean
     const isReadOnly = typeof isStepReadOnly === 'function' ? isStepReadOnly() : isStepReadOnly;
@@ -126,6 +129,7 @@ const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId }) => {
              <div className="mb-8">
                 <h2 className="text-xl font-bold text-gray-800 mb-6">Plastic Pre/Post Validation Analysis</h2>
                 
+                {!isReadOnly && (
                 <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
                     <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Upload Data Files</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -168,6 +172,7 @@ const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId }) => {
                         </Button>
                     </div>
                 </div>
+                )}
             </div>
 
             {data && (

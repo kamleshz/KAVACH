@@ -75,6 +75,12 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
         },
       ],
     },
+    {
+      key: '/dashboard/client-connect',
+      icon: <SearchOutlined />,
+      label: 'Client Connect',
+      onClick: () => navigate('/dashboard/client-connect'),
+    },
   ];
 
   if (isAdmin) {

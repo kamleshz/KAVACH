@@ -13,7 +13,7 @@ const getBase64 = (file) =>
     reader.onerror = (error) => reject(error);
   });
 
-const MarkingLabeling = ({ clientId, API_URL }) => {
+const MarkingLabeling = ({ clientId, API_URL, readOnly = false }) => {
     // Preview state for file uploads
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewImage, setPreviewImage] = useState('');
@@ -76,12 +76,16 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             fixed: 'left',
             className: 'bg-white',
             render: (text) => (
-                <input 
-                    type="text"
-                    value={text} 
-                    readOnly
-                    className="w-full border border-gray-200 rounded text-xs p-1 bg-gray-100 text-gray-600 focus:outline-none cursor-not-allowed"
-                />
+                readOnly ? (
+                    <span className="text-xs text-gray-700 font-medium">{text}</span>
+                ) : (
+                    <input 
+                        type="text"
+                        value={text} 
+                        readOnly
+                        className="w-full border border-gray-200 rounded text-xs p-1 bg-gray-100 text-gray-600 focus:outline-none cursor-not-allowed"
+                    />
+                )
             ) 
         },
         { 
@@ -90,11 +94,15 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'skuDescription', 
             width: 220, 
             render: (text) => (
-                <textarea 
-                    value={text} 
-                    readOnly
-                    className="w-full border border-gray-200 rounded text-xs p-1 bg-gray-100 text-gray-600 focus:outline-none min-h-[32px] cursor-not-allowed"
-                />
+                readOnly ? (
+                    <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">{text}</div>
+                ) : (
+                    <textarea 
+                        value={text} 
+                        readOnly
+                        className="w-full border border-gray-200 rounded text-xs p-1 bg-gray-100 text-gray-600 focus:outline-none min-h-[32px] cursor-not-allowed"
+                    />
+                )
             ) 
         },
         { 
@@ -103,12 +111,16 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'skuUm', 
             width: 100, 
             render: (text) => (
-                <input 
-                    type="text"
-                    value={text} 
-                    readOnly
-                    className="w-full border border-gray-200 rounded text-xs p-1 bg-gray-100 text-gray-600 focus:outline-none cursor-not-allowed"
-                />
+                readOnly ? (
+                    <span className="text-xs text-gray-700">{text}</span>
+                ) : (
+                    <input 
+                        type="text"
+                        value={text} 
+                        readOnly
+                        className="w-full border border-gray-200 rounded text-xs p-1 bg-gray-100 text-gray-600 focus:outline-none cursor-not-allowed"
+                    />
+                )
             ) 
         },
         { 
@@ -161,16 +173,20 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'brandOwner', 
             width: 150, 
             render: (text, record) => (
-                <select
-                    value={text}
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'brandOwner', e.target.value)}
-                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
-                >
-                    <option value="">Select</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                    <option value="Not Applicable">Not Applicable</option>
-                </select>
+                readOnly ? (
+                    <span className="text-xs text-gray-700">{text || '-'}</span>
+                ) : (
+                    <select
+                        value={text}
+                        onChange={(e) => handleSkuComplianceChange(record.key, 'brandOwner', e.target.value)}
+                        className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                    >
+                        <option value="">Select</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                        <option value="Not Applicable">Not Applicable</option>
+                    </select>
+                )
             ) 
         },
         { 
@@ -179,16 +195,20 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'eprCertBrandOwner', 
             width: 200, 
             render: (text, record) => (
-                <select
-                    value={text}
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'eprCertBrandOwner', e.target.value)}
-                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
-                >
-                    <option value="">Select</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                    <option value="Not Applicable">Not Applicable</option>
-                </select>
+                readOnly ? (
+                    <span className="text-xs text-gray-700">{text || '-'}</span>
+                ) : (
+                    <select
+                        value={text}
+                        onChange={(e) => handleSkuComplianceChange(record.key, 'eprCertBrandOwner', e.target.value)}
+                        className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                    >
+                        <option value="">Select</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                        <option value="Not Applicable">Not Applicable</option>
+                    </select>
+                )
             ) 
         },
         { 
@@ -197,16 +217,20 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'eprCertProducer', 
             width: 220, 
             render: (text, record) => (
-                <select
-                    value={text}
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'eprCertProducer', e.target.value)}
-                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
-                >
-                    <option value="">Select</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                    <option value="Not Applicable">Not Applicable</option>
-                </select>
+                readOnly ? (
+                    <span className="text-xs text-gray-700">{text || '-'}</span>
+                ) : (
+                    <select
+                        value={text}
+                        onChange={(e) => handleSkuComplianceChange(record.key, 'eprCertProducer', e.target.value)}
+                        className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                    >
+                        <option value="">Select</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                        <option value="Not Applicable">Not Applicable</option>
+                    </select>
+                )
             ) 
         },
         { 
@@ -215,16 +239,20 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'thicknessMentioned', 
             width: 180, 
             render: (text, record) => (
-                <select
-                    value={text}
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'thicknessMentioned', e.target.value)}
-                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
-                >
-                    <option value="">Select</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                    <option value="Not Applicable">Not Applicable</option>
-                </select>
+                readOnly ? (
+                    <span className="text-xs text-gray-700">{text || '-'}</span>
+                ) : (
+                    <select
+                        value={text}
+                        onChange={(e) => handleSkuComplianceChange(record.key, 'thicknessMentioned', e.target.value)}
+                        className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                    >
+                        <option value="">Select</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                        <option value="Not Applicable">Not Applicable</option>
+                    </select>
+                )
             ) 
         },
         { 
@@ -277,16 +305,20 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'recycledPercent', 
             width: 220, 
             render: (text, record) => (
-                <select
-                    value={text}
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'recycledPercent', e.target.value)}
-                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
-                >
-                    <option value="">Select</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                    <option value="Not Applicable">Not Applicable</option>
-                </select>
+                readOnly ? (
+                    <span className="text-xs text-gray-700">{text || '-'}</span>
+                ) : (
+                    <select
+                        value={text}
+                        onChange={(e) => handleSkuComplianceChange(record.key, 'recycledPercent', e.target.value)}
+                        className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                    >
+                        <option value="">Select</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                        <option value="Not Applicable">Not Applicable</option>
+                    </select>
+                )
             ) 
         },
         { 
@@ -295,16 +327,20 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'compostableRegNo', 
             width: 250, 
             render: (text, record) => (
-                <select
-                    value={text}
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'compostableRegNo', e.target.value)}
-                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
-                >
-                    <option value="">Select</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                    <option value="Not Applicable">Not Applicable</option>
-                </select>
+                readOnly ? (
+                    <span className="text-xs text-gray-700">{text || '-'}</span>
+                ) : (
+                    <select
+                        value={text}
+                        onChange={(e) => handleSkuComplianceChange(record.key, 'compostableRegNo', e.target.value)}
+                        className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                    >
+                        <option value="">Select</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                        <option value="Not Applicable">Not Applicable</option>
+                    </select>
+                )
             ) 
         },
         {
@@ -319,17 +355,19 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
                         fileList={fileList || []}
                         onPreview={handlePreview}
                         onChange={({ fileList: newFileList }) => {
+                            if (readOnly) return;
                             const processedList = newFileList.map(f => {
                                  if (f.response && f.response.url) return { ...f, url: f.response.url };
                                  return f;
                             });
                              handleSkuComplianceChange(record.key, 'markingImage', processedList);
                         }}
-                        showUploadList={{ showRemoveIcon: true }}
+                        showUploadList={{ showRemoveIcon: !readOnly }}
                         beforeUpload={() => false}
+                        disabled={readOnly}
                         className="custom-upload-grid"
                     >
-                         {fileList?.length >= 5 ? null : (
+                         {fileList?.length >= 5 || readOnly ? null : (
                             <div className="flex flex-col items-center justify-center">
                                 <PlusOutlined className="text-gray-400 text-sm" />
                                 <div className="text-[10px] text-gray-500 mt-0.5">Upload</div>
@@ -375,13 +413,17 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
                 const remarks = Array.isArray(record.remarks) ? record.remarks : (record.remarks ? [record.remarks] : []);
                 const val = remarks.join('\n');
                 return (
-                    <textarea
-                        className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 min-h-[50px]"
-                        value={val}
-                        onChange={(e) => handleSkuComplianceChange(record.key, 'remarks', e.target.value.split('\n'))}
-                        placeholder="Auditor remarks..."
-                        onClick={(e) => e.stopPropagation()}
-                    />
+                    readOnly ? (
+                        <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">{val || '-'}</div>
+                    ) : (
+                        <textarea
+                            className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 min-h-[50px]"
+                            value={val}
+                            onChange={(e) => handleSkuComplianceChange(record.key, 'remarks', e.target.value.split('\n'))}
+                            placeholder="Auditor remarks..."
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    )
                 );
             }
         },
@@ -408,17 +450,27 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             key: 'complianceStatus', 
             width: 200, 
             render: (text, record) => (
-                <select
-                    value={text}
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'complianceStatus', e.target.value)}
-                    className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
-                >
-                    <option value="">Select</option>
-                    <option value="Compliant">Compliant</option>
-                    <option value="Partially Compliant">Partially Compliant</option>
-                    <option value="Non-Compliant">Non-Compliant</option>
-                    <option value="Pending">Pending</option>
-                </select>
+                readOnly ? (
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                        text === 'Compliant' ? 'bg-green-100 text-green-700' :
+                        text === 'Non-Compliant' ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
+                    }`}>
+                        {text || '-'}
+                    </span>
+                ) : (
+                    <select
+                        value={text}
+                        onChange={(e) => handleSkuComplianceChange(record.key, 'complianceStatus', e.target.value)}
+                        className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white"
+                    >
+                        <option value="">Select</option>
+                        <option value="Compliant">Compliant</option>
+                        <option value="Partially Compliant">Partially Compliant</option>
+                        <option value="Non-Compliant">Non-Compliant</option>
+                        <option value="Pending">Pending</option>
+                    </select>
+                )
             ) 
         },
         {
@@ -456,6 +508,12 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
         return data;
     }, [skuComplianceData, skuSearchText, skuStatusFilter]);
 
+    // Filter out columns if readOnly
+    const visibleColumns = useMemo(() => {
+        if (!readOnly) return skuComplianceColumns;
+        return skuComplianceColumns.filter(col => col.key !== 'action');
+    }, [readOnly, skuComplianceColumns]);
+
     return (
         <div className="p-4 bg-white rounded-lg">
             <div className="flex justify-between items-center mb-4">
@@ -481,7 +539,7 @@ const MarkingLabeling = ({ clientId, API_URL }) => {
             </div>
 
             <Table 
-                columns={skuComplianceColumns}
+                columns={visibleColumns}
                 dataSource={skuTableDataSource}
                 pagination={{
                     current: skuPagination.current,

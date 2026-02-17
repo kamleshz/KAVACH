@@ -21,6 +21,8 @@ const EWasteCategorySelection = lazy(() => import('./features/ewaste/pages/EWast
 const WasteTypeSelection = lazy(() => import('./pages/WasteTypeSelection'));
 const EditClient = lazy(() => import('./pages/EditClient'));
 const ClientGroupSearch = lazy(() => import('./pages/ClientGroupSearch'));
+const ClientConnect = lazy(() => import('./pages/ClientConnect'));
+const ClientConnectDetail = lazy(() => import('./pages/ClientConnectDetail'));
 const ClientValidation = lazy(() => import('./pages/ClientValidation'));
 const PlantProcess = lazy(() => import('./pages/PlantProcess'));
 const EWasteProcess = lazy(() => import('./features/ewaste/pages/EWasteProcess'));
@@ -63,6 +65,9 @@ function App() {
           >
           <Route index element={<DashboardHome />} />
           <Route path="clients" element={<Clients />} />
+          <Route path="client-connect" element={<ClientConnect />} />
+          <Route path="client-connect/:id" element={<ClientConnectDetail />} />
+          <Route path="client-connect" element={<ClientConnect />} />
           <Route path="client/:id" element={<ClientDetail />} />
           <Route path="client/:id/edit" element={<AddClient />} />
           <Route path="client/:id/audit" element={<AddClient />} />
