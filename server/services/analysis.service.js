@@ -353,7 +353,7 @@ class AnalysisService {
                 columns.push(`Target ${targetYear}`);
 
                 targetTables.push({
-                    title: `Target Calculation for ${targetYear} (${isProducer ? 'Producer' : 'Brand Owner/Importer'})`,
+                    title: `Target Calculation for ${targetYear} (${isProducer ? 'Producer' : 'Brand Owner'})`,
                     columns: columns,
                     data: tableData
                 });
@@ -371,33 +371,129 @@ class AnalysisService {
             };
         });
 
-        // READ & CLEAN PURCHASE FILE (Optional)
         const purchaseAgg = {};
         
-        if (hasPurchaseFile) {
-            const purchaseWb = XLSX.readFile(purchaseFilePath);
-            const purchaseData = XLSX.utils.sheet_to_json(purchaseWb.Sheets[purchaseWb.SheetNames[0]]);
+        const normalizePurchaseCategory = normalizeSalesCategory;
 
-            const normalizeCategory = (val) => {
-                if (!val) return null;
-                const v = String(val).toUpperCase().replace(/\s+/g, "").replace(/-/g, "");
-                const map = { "CATI": "Cat-I", "CATII": "Cat-II", "CATIII": "Cat-III", "CATIV": "Cat-IV" };
-                return map[v] || null;
-            };
-            
-            const extractCategory = (val) => {
-                if (!val) return null;
-                const match = String(val).match(/(Cat\s*[IVX]+)/i);
-                return match ? normalizeCategory(match[0]) : null;
-            };
+        const getPurchaseCategory = (row) => {
+            if (!row) return null;
+            const keys = Object.keys(row);
+            if (keys.length === 0) return null;
 
-            purchaseData.forEach(row => {
-                const cat = extractCategory(row["Category of Plastic"]);
-                if (cat) {
-                    const qty = parseFloat(row["Total Plastic Qty (Tons)"]) || 0;
-                    purchaseAgg[cat] = (purchaseAgg[cat] || 0) + qty;
+            const keyMap = {};
+            keys.forEach(k => {
+                if (!k) return;
+                keyMap[k.trim().toLowerCase()] = k;
+            });
+
+            const candidateKeys = [
+                'category of plastic',
+                'plastic category',
+                'category',
+                'cat'
+            ];
+
+            let sourceKey = null;
+            for (const norm of candidateKeys) {
+                if (keyMap[norm]) {
+                    sourceKey = keyMap[norm];
+                    break;
+                }
+            }
+
+            if (!sourceKey) {
+                sourceKey =
+                    keys.find(k => {
+                        const lk = k.toLowerCase();
+                        return lk.includes('category') && lk.includes('plastic');
+                    }) ||
+                    keys.find(k => k.toLowerCase().includes('category'));
+            }
+
+            return sourceKey ? row[sourceKey] : null;
+        };
+
+        const getPurchaseQty = (row) => {
+            if (!row) return 0;
+
+            const candidates = [
+                'Total Plastic Qty (Tons)',
+                'Total Plastic Qty',
+                'Total Qty (Tons)',
+                'totalPlasticQty',
+                'totalQty',
+                'Registered Qty (Tons)',
+                'registeredQty',
+                'Unregistered Qty (Tons)',
+                'unregisteredQty',
+                'Quantity',
+                'total plastic qty (tons)',
+                'total plastic qty',
+                'quantity'
+            ];
+
+            for (const key of candidates) {
+                if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+                    const val = parseFloat(row[key]);
+                    if (!Number.isNaN(val)) return val;
+                }
+            }
+
+            let sum = 0;
+            Object.keys(row).forEach(k => {
+                const value = row[k];
+                if (typeof value === 'number' && k.toLowerCase().includes('qty')) {
+                    sum += value;
                 }
             });
+
+            return sum;
+        };
+
+        if (hasPurchaseFile) {
+            const purchaseWb = XLSX.readFile(purchaseFilePath);
+            const purchaseSheet = purchaseWb.Sheets[purchaseWb.SheetNames[0]];
+            const purchaseDataRaw = XLSX.utils.sheet_to_json(purchaseSheet, { defval: 0, raw: false });
+
+            const purchaseData = purchaseDataRaw.map(row => {
+                const newRow = {};
+                Object.keys(row).forEach(key => {
+                    if (!key) return;
+                    const trimmed = key.trim();
+                    newRow[trimmed] = row[key];
+                    newRow[trimmed.toLowerCase()] = row[key];
+                });
+                return newRow;
+            });
+
+            purchaseData.forEach(row => {
+                const catRaw = getPurchaseCategory(row);
+                const cat = normalizePurchaseCategory(catRaw);
+                if (!cat) return;
+
+                const qty = getPurchaseQty(row);
+                purchaseAgg[cat] = (purchaseAgg[cat] || 0) + (qty || 0);
+            });
+        } else if (clientId && type && itemId) {
+            try {
+                let analysisDoc = salesAnalysisDoc; 
+                if (!analysisDoc) {
+                    analysisDoc = await PlasticAnalysisModel.findOne({ client: clientId, type, itemId });
+                }
+
+                if (analysisDoc && analysisDoc.purchaseRows && analysisDoc.purchaseRows.length > 0) {
+                    analysisDoc.purchaseRows.forEach(row => {
+                        const catRaw = row.plasticCategory || row.category || row['Category of Plastic'];
+                        const cat = normalizePurchaseCategory(catRaw);
+                        if (!cat) return;
+
+                        const qty = getPurchaseQty(row);
+                        purchaseAgg[cat] = (purchaseAgg[cat] || 0) + (qty || 0);
+                    });
+                }
+            } catch (err) {
+                console.error("Error fetching saved Purchase Analysis for fallback:", err);
+            }
         }
 
         // Merge Sales + Purchase
@@ -1007,8 +1103,14 @@ class AnalysisService {
                 
                 const type = (row.registrationType || 'unregistered').toLowerCase();
                 const isRegistered = type.includes('registered') && !type.includes('unregistered');
-                // Fix: Check both 'purchaseQty' and 'totalPlasticQty' keys
-                const qty = parseFloat(row.totalPlasticQty || row.purchaseQty || 0); 
+                // Robust check for Total Plastic Qty (Tons) or variants
+                let qty = 0;
+                if (row["Total Plastic Qty (Tons)"] !== undefined) qty = parseFloat(row["Total Plastic Qty (Tons)"]);
+                else if (row["Total Plastic Qty"] !== undefined) qty = parseFloat(row["Total Plastic Qty"]);
+                else if (row["Quantity"] !== undefined) qty = parseFloat(row["Quantity"]);
+                else if (row["totalPlasticQty"] !== undefined) qty = parseFloat(row["totalPlasticQty"]); // Camel case
+                
+                qty = qty || 0;
 
                 const targetObj = isRegistered ? purchaseAgg[cat].registered : purchaseAgg[cat].unregistered;
                 targetObj[year] = (targetObj[year] || 0) + qty;

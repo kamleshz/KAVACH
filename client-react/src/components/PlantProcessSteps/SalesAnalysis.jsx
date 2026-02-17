@@ -4,8 +4,13 @@ import { UploadOutlined, DeleteOutlined, SaveOutlined, DownOutlined, UpOutlined 
 import * as XLSX from 'xlsx';
 import api from '../../services/api';
 import { API_ENDPOINTS } from '../../services/apiEndpoints';
+import { useClientContext } from '../../context/ClientContext';
 
 const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, showTargetsOnTop = false }) => {
+    const { formData } = useClientContext();
+    const currentEntityType = entityType || formData?.entityType;
+    const isBrandOwner = (currentEntityType || '').toString() === 'Brand Owner';
+    
     // rawRows: keeps the detailed data if needed for backend save
     const [rawRows, setRawRows] = useState([]);
     // summaryData: for the display table
@@ -320,6 +325,10 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
     };
 
     const handleSalesExcelUpload = (e) => {
+        if (isBrandOwner) {
+            message.info('Your category is Brand Owner. Sales data upload is not applicable.');
+            return;
+        }
         // Handle both standard input event and Antd Upload info
         const file = e.target ? e.target.files[0] : e.file; 
         if (!file) return;
@@ -638,50 +647,56 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             <div className="mb-6">
                 <h3 className="text-blue-600 font-semibold text-lg uppercase mb-4">UPLOAD DATA FILES</h3>
                 
-                <div className="mb-2">
-                    <p className="text-gray-700 font-medium mb-2">Sales / Base File</p>
-                    <div className="flex items-center gap-4">
-                        <label className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none cursor-pointer transition-colors">
-                            <UploadOutlined className="mr-2 text-gray-500" />
-                            Select Sales File
-                            <input
-                                type="file"
-                                accept=".xlsx, .xls"
-                                className="hidden"
-                                onChange={handleSalesExcelUpload}
-                            />
-                        </label>
-                        
-                        {rawRows.length > 0 && (
-                            <>
-                                <Button 
-                                    type="primary"
-                                    icon={<SaveOutlined />}
-                                    loading={loading}
-                                    onClick={handleSave}
-                                >
-                                    Save Data
-                                </Button>
-                                <Button 
-                                    danger 
-                                    icon={<DeleteOutlined />} 
-                                    onClick={() => {
-                                        setRawRows([]);
-                                        setSummaryData([]);
-                                        message.info('Data cleared');
-                                    }}
-                                >
-                                    Clear
-                                </Button>
-                            </>
-                        )}
-                        {lastUpdated && (
-                            <span className="text-xs text-gray-500 ml-2">
-                                Last saved: {new Date(lastUpdated).toLocaleString()}
-                            </span>
-                        )}
+                {isBrandOwner ? (
+                    <div className="mt-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-md px-4 py-3">
+                        Your category is Brand Owner. Sales data upload is not applicable.
                     </div>
-                </div>
+                ) : (
+                    <div className="mb-2">
+                        <p className="text-gray-700 font-medium mb-2">Sales / Base File</p>
+                        <div className="flex items-center gap-4">
+                            <label className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none cursor-pointer transition-colors">
+                                <UploadOutlined className="mr-2 text-gray-500" />
+                                Select Sales File
+                                <input
+                                    type="file"
+                                    accept=".xlsx, .xls"
+                                    className="hidden"
+                                    onChange={handleSalesExcelUpload}
+                                />
+                            </label>
+                            
+                            {rawRows.length > 0 && (
+                                <>
+                                    <Button 
+                                        type="primary"
+                                        icon={<SaveOutlined />}
+                                        loading={loading}
+                                        onClick={handleSave}
+                                    >
+                                        Save Data
+                                    </Button>
+                                    <Button 
+                                        danger 
+                                        icon={<DeleteOutlined />} 
+                                        onClick={() => {
+                                            setRawRows([]);
+                                            setSummaryData([]);
+                                            message.info('Data cleared');
+                                        }}
+                                    >
+                                        Clear
+                                    </Button>
+                                </>
+                            )}
+                            {lastUpdated && (
+                                <span className="text-xs text-gray-500 ml-2">
+                                    Last saved: {new Date(lastUpdated).toLocaleString()}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
             )}
 
@@ -715,7 +730,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             )}
 
             {/* Table Section */}
-            {summaryData.length > 0 && (
+            {!isBrandOwner && summaryData.length > 0 && (
                 <div className="mt-6 border rounded-md overflow-hidden">
                      <div 
                         className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
@@ -766,7 +781,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             )}
             
             {/* EPR Target Calculation (Bottom Position - Default) */}
-            {!showTargetsOnTop && targetTables.length > 0 && (entityType === 'Producer' || !entityType) && (
+            {!showTargetsOnTop && targetTables.length > 0 && (currentEntityType === 'Producer' || !currentEntityType) && (
                 <div className="mt-8">
                     <h3 className="text-gray-700 font-semibold text-lg mb-4">EPR Target Calculation</h3>
                     <div className="space-y-6">
@@ -795,7 +810,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             )}
             
             {/* Placeholder if no data */}
-            {summaryData.length === 0 && (
+            {!isBrandOwner && summaryData.length === 0 && (
                  <div className="mt-6 border rounded-md p-8 text-center bg-gray-50 text-gray-400">
                     No data uploaded. Please select a sales Excel file to view analysis.
                  </div>
