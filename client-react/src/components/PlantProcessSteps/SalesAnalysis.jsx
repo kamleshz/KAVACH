@@ -192,6 +192,27 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
 
     const calculateProducerTargetsFromSales = (rows, years) => {
         const categories = ['Cat-I', 'Cat-II', 'Cat-III', 'Cat-IV'];
+        const UREP_TARGET_MATRIX = {
+            'Cat-I': {
+                '2025-26': 30,
+                '2026-27': 40,
+                '2027-28': 50,
+                '2028-29': 60,
+            },
+            'Cat-II': {
+                '2025-26': 10,
+                '2026-27': 10,
+                '2027-28': 20,
+                '2028-29': 20,
+            },
+            'Cat-III': {
+                '2025-26': 5,
+                '2026-27': 5,
+                '2027-28': 10,
+                '2028-29': 10,
+            },
+            'Cat-IV': {},
+        };
         const yearlyAgg = {};
         categories.forEach(cat => { yearlyAgg[cat] = {}; });
 
@@ -199,7 +220,6 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             const cat = normalizeSalesCategory(row.plasticCategory);
             const fy = row.financialYear || 'Unknown';
             const qty = parseFloat(row.totalPlasticQty) || 0;
-            const regType = (row.registrationType || '').toLowerCase();
             if (!cat) return;
             const val = qty;
             yearlyAgg[cat][fy] = (yearlyAgg[cat][fy] || 0) + val;
@@ -221,10 +241,45 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                     // Registered Sales for Year2 (Producer logic)
                     // Using FY summary derived from rows (registered only)
                     const regYear2 = rows
-                        .filter(r => normalizeSalesCategory(r.plasticCategory) === cat && (r.registrationType || '').toLowerCase().includes('registered') && !(r.registrationType || '').toLowerCase().includes('unregistered') && (r.financialYear || '') === year2)
+                        .filter(r => {
+                            const rCat = normalizeSalesCategory(r.plasticCategory);
+                            const rYear = r.financialYear || '';
+                            const type = (r.registrationType || '').toLowerCase();
+                            const status = (r.uploadStatus || '').toString().trim().toLowerCase();
+                            const statusOk = !status || status === 'completed';
+                            return rCat === cat && rYear === year2 && type.includes('registered') && !type.includes('unregistered') && statusOk;
+                        })
                         .reduce((sum, r) => sum + (parseFloat(r.totalPlasticQty) || 0), 0);
 
-                    const targetVal = avg - regYear2;
+                    // Recycled Plastic % for Year2 (Producer logic)
+                    // Taken from Excel column "Recycled Plastic %" for latest year (year2)
+                    // Only from REGISTERED entries (same registration filter as Registered Sales)
+                    const recycledRows = rows.filter(r => {
+                        const rCat = normalizeSalesCategory(r.plasticCategory);
+                        const rYear = r.financialYear || '';
+                        const type = (r.registrationType || '').toLowerCase();
+                        const status = (r.uploadStatus || '').toString().trim().toLowerCase();
+                        const statusOk = !status || status === 'completed';
+                        const rawPct = r.recycledPlasticPercent;
+                        const hasPct = rawPct !== undefined && rawPct !== null && String(rawPct).toString().trim() !== '';
+                        const isRegisteredOnly = type.includes('registered') && !type.includes('unregistered');
+                        return rCat === cat && rYear === year2 && hasPct && isRegisteredOnly && statusOk;
+                    });
+
+                    let recycledPct = 0;
+                    if (recycledRows.length > 0) {
+                        const sumPct = recycledRows.reduce((sum, r) => {
+                            const raw = r.recycledPlasticPercent;
+                            const cleaned = typeof raw === 'string' ? raw.replace('%', '') : raw;
+                            const num = parseFloat(cleaned) || 0;
+                            return sum + num;
+                        }, 0);
+                        recycledPct = sumPct;
+                    }
+
+                    const recycledQty = (avg * recycledPct) / 100;
+
+                    const targetVal = avg - regYear2 - recycledQty;
 
                     const row = {
                         "Category of Plastic": cat,
@@ -232,14 +287,51 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                         [year2]: parseFloat(val2.toFixed(4)),
                         "Avg": parseFloat(avg.toFixed(4)),
                         [`Registered Sales (${year2})`]: parseFloat(regYear2.toFixed(4)),
-                        [`Target ${targetYear}`]: parseFloat(targetVal.toFixed(4)),
+                        [`Recycled Plastic % (${year2})`]: parseFloat(recycledPct.toFixed(2)),
+                        "Recycled Qty": parseFloat(recycledQty.toFixed(4)),
+                        [`Target Of Virgin ${targetYear}`]: parseFloat(targetVal.toFixed(4)),
                     };
                     return row;
                 });
 
-                const columns = ["Category of Plastic", year1, year2, "Avg", `Registered Sales (${year2})`, `Target ${targetYear}`];
+                const columns = [
+                    "Category of Plastic",
+                    year1,
+                    year2,
+                    "Avg",
+                    `Registered Sales (${year2})`,
+                    `Recycled Plastic % (${year2})`,
+                    "Recycled Qty",
+                    `Target Of Virgin ${targetYear}`
+                ];
                 tables.push({ title: `Target Calculation for ${targetYear} (Producer)`, data, columns });
             }
+        }
+
+        if (sortedYears.length > 0) {
+            const activeYear = sortedYears[sortedYears.length - 1];
+
+            const urepMandateColumnLabel = `Urep Target (FY ${activeYear} as per Mandate)`;
+            const urepQtyColumnLabel = `Urep Target`;
+
+            const urepData = categories.map(cat => {
+                const catTargets = UREP_TARGET_MATRIX[cat] || {};
+                const pct = catTargets[activeYear] !== undefined ? catTargets[activeYear] : 0;
+                const baseQty = parseFloat(yearlyAgg[cat]?.[activeYear] || 0);
+                const qty = (baseQty * pct) / 100;
+                return {
+                    "Plastic Category": cat,
+                    [urepMandateColumnLabel]: pct,
+                    [urepQtyColumnLabel]: parseFloat(qty.toFixed(4)),
+                };
+            });
+
+            const urepColumns = ["Plastic Category", urepMandateColumnLabel, urepQtyColumnLabel];
+            tables.push({
+                title: `Urep Target for ${activeYear} (As per Mandate)`,
+                data: urepData,
+                columns: urepColumns,
+            });
         }
 
         setTargetTables(tables);
@@ -252,7 +344,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             });
             
             if (response.data.success) {
-                // Backend returns top-level keys: salesRows, salesSummary, lastUpdated
+                // Backend returns top-level keys: salesRows, salesSummary, salesTargetTables, lastUpdated
                 // or returns data: null if not found
                 if (response.data.salesRows || response.data.salesSummary) {
                     setRawRows(response.data.salesRows || []);
@@ -286,6 +378,10 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                     });
 
                     setSummaryData(sanitizedSummary);
+
+                    if (Array.isArray(response.data.salesTargetTables) && response.data.salesTargetTables.length > 0) {
+                        setTargetTables(response.data.salesTargetTables);
+                    }
                     setLastUpdated(response.data.lastUpdated);
                 }
             }
@@ -307,7 +403,8 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                 type,
                 itemId,
                 summary: summaryData,
-                rows: rawRows
+                rows: rawRows,
+                targetTables
             });
 
             if (response.data.success) {
@@ -350,15 +447,16 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                 // Normalize headers
                 const headers = data[0].map(h => (h || '').toString().trim().toLowerCase());
                 const headerMap = {
-                    'registration type': 'registrationType', // Registered vs Unregistered
-                    'category of plastic': 'plasticCategory', // Cat-I, Cat-II, etc.
+                    'registration type': 'registrationType',
+                    'category of plastic': 'plasticCategory',
                     'total plastic qty (tons)': 'totalPlasticQty',
-                    // Keep other fields if needed for raw data storage
                     'entity type': 'entityType',
                     'name of the entity': 'entityName',
                     'plastic material type': 'plasticMaterialType',
                     'financial year': 'financialYear',
-                    'gst': 'gst'
+                    'gst': 'gst',
+                    'upload status': 'uploadStatus',
+                    'recycled plastic %': 'recycledPlasticPercent'
                 };
 
                 const processedRows = [];

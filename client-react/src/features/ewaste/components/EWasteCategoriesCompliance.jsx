@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Popconfirm, Button } from 'antd';
-import { FileExcelOutlined, SaveOutlined, DeleteOutlined } from '@ant-design/icons';
+import { FileExcelOutlined, SaveOutlined, DeleteOutlined, UndoOutlined, LoadingOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
 import api from '../../../services/api';
 import { API_ENDPOINTS } from '../../../services/apiEndpoints';
@@ -8,6 +8,7 @@ import { E_WASTE_DATA } from '../constants/EWasteData';
 import { useExcelImport } from '../../../hooks/useExcelImport';
 import BulkUploadControl from '../../../components/common/BulkUploadControl';
 import { E_WASTE_CATEGORIES_TEMPLATE } from '../../../constants/excelTemplates';
+import { createTemplateWithReferenceData } from '../../../utils/excelHelpers';
 
 const EEE_CATEGORIES = [
     "Information Technology and Telecommunication Equipment",
@@ -26,7 +27,27 @@ const EWasteCategoriesCompliance = ({ clientId, clientName, isManager = false })
     const [savingRow, setSavingRow] = useState(null); // Track which row is being saved
     const [page, setPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
-    const { importData, downloadTemplate, isLoading } = useExcelImport();
+    const { importData, isLoading } = useExcelImport();
+
+    const handleTemplateDownload = () => {
+        const headers = E_WASTE_CATEGORIES_TEMPLATE.headers || [
+            "Category Code",
+            "Product Name",
+            "Category of EEE",
+            "EEE Code",
+            "List of EEE",
+            "Product Avg Life",
+            "Sales / Import Date",
+            "Quantity sold/Imported in MT"
+        ];
+
+        createTemplateWithReferenceData(
+            headers,
+            E_WASTE_CATEGORIES_TEMPLATE.fileName || "Categories_Compliance_Template.xlsx",
+            EEE_CATEGORIES,
+            E_WASTE_DATA
+        );
+    };
 
     const handleExcelUpload = (e) => {
         importData(e, (data) => {
@@ -394,7 +415,7 @@ const EWasteCategoriesCompliance = ({ clientId, clientName, isManager = false })
                         <>
                             <BulkUploadControl
                                 onUpload={handleExcelUpload}
-                                onDownloadTemplate={() => downloadTemplate(E_WASTE_CATEGORIES_TEMPLATE)}
+                                onDownloadTemplate={handleTemplateDownload}
                                 uploadLabel="Upload Excel"
                                 templateLabel="Template"
                             />
@@ -595,18 +616,20 @@ const EWasteCategoriesCompliance = ({ clientId, clientName, isManager = false })
                                                 )}
                                                 <button
                                                     onClick={() => handleSaveRow(globalIndex)}
-                                                    className="p-1.5 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all hover:scale-110"
+                                                    className="px-2.5 py-1.5 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all hover:scale-110 text-xs flex items-center gap-1"
                                                     title="Save Row"
                                                 >
-                                                    {savingRow === globalIndex ? <i className="fas fa-spinner fa-spin text-xs"></i> : <i className="fas fa-save text-xs"></i>}
+                                                    {savingRow === globalIndex ? <LoadingOutlined className="text-xs" /> : <SaveOutlined className="text-xs" />}
+                                                    <span>Save</span>
                                                 </button>
                                                 <button
                                                     onClick={() => handleCancelRow(globalIndex)}
-                                                    className="p-1.5 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all hover:scale-110"
+                                                    className="px-2.5 py-1.5 rounded text-gray-700 bg-gray-100 hover:bg-gray-200 transition-all hover:scale-110 text-xs flex items-center gap-1"
                                                     title="Cancel Changes"
                                                     disabled={!isRowChanged(row)}
                                                 >
-                                                    <i className="fas fa-undo text-xs"></i>
+                                                    <UndoOutlined className="text-xs" />
+                                                    <span>Cancel</span>
                                                 </button>
                                                 <Popconfirm
                                                     title="Are you sure delete this row?"
@@ -615,10 +638,11 @@ const EWasteCategoriesCompliance = ({ clientId, clientName, isManager = false })
                                                     cancelText="No"
                                                 >
                                                     <button 
-                                                        className="p-1.5 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all hover:scale-110"
+                                                        className="px-2.5 py-1.5 rounded text-red-600 bg-red-50 hover:bg-red-100 transition-all hover:scale-110 text-xs flex items-center gap-1"
                                                         title="Remove Row"
                                                     >
-                                                        <i className="fas fa-trash-alt text-xs"></i>
+                                                        <DeleteOutlined className="text-xs" />
+                                                        <span>Delete</span>
                                                     </button>
                                                 </Popconfirm>
                                             </div>

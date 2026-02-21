@@ -17,7 +17,8 @@ import {
   FaFolderOpen,
   FaBuilding,
   FaCheckCircle,
-  FaClipboardCheck
+  FaClipboardCheck,
+  FaFilePdf
 } from 'react-icons/fa';
 import AuditStepper from '../components/AuditStepper';
 import DocumentViewerModal from '../components/DocumentViewerModal';
@@ -576,6 +577,18 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
         processData(client.productionFacility?.ctoProducts, 'ctoProds');
 
         const sortedGroups = Object.values(plantGroups).sort((a, b) => a.displayName.localeCompare(b.displayName));
+        const pf = client.productionFacility || {};
+        const regs = Array.isArray(pf.regulationsCoveredUnderCto) ? pf.regulationsCoveredUnderCto : [];
+        const hasWater = regs.includes('Water');
+        const waterRegs = Array.isArray(pf.waterRegulations) ? pf.waterRegulations : [];
+        const hasAir = regs.includes('Air');
+        const airRegs = Array.isArray(pf.airRegulations) ? pf.airRegulations : [];
+        const hasHazardousWaste = regs.some((r) => {
+          const lower = (r || '').toString().trim().toLowerCase();
+          return lower === 'hazardous waste' || lower === 'hazardous wate';
+        });
+        const hazardousRegs = Array.isArray(pf.hazardousWasteRegulations) ? pf.hazardousWasteRegulations : [];
+        const hasCto = sortedGroups.some(group => (group.ctoDetails || []).length > 0);
 
         if (sortedGroups.length === 0) {
           return (
@@ -591,7 +604,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
           );
         }
 
-        return sortedGroups.map((group, pIdx) => {
+        const plantCards = sortedGroups.map((group, pIdx) => {
           const { displayName: plantName, cteDetails, ctoDetails, cteProd, ctoProds } = group;
           const plantKey = plantName || `plant-${pIdx}`;
           const plantToggleKey = `${plantKey}-plant`;
@@ -802,18 +815,32 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                                       </div>
                                     </td>
                                     <td className="p-3">
-                                      <div className="flex flex-col gap-1">
-                                        <div title={`Head: ${r.factoryHeadName}`}>
-                                          <span className="text-xs font-bold text-gray-700">Hd:</span>
-                                          <span className="text-xs text-gray-600 ml-1 truncate max-w-[100px] inline-block align-bottom">
-                                            {r.factoryHeadName}
-                                          </span>
+                                      <div className="flex flex-col gap-2 text-xs text-gray-600">
+                                        <div>
+                                          <div className="font-semibold text-gray-800">Factory Head</div>
+                                          <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                                            <span>{r.factoryHeadName || '-'}</span>
+                                            {r.factoryHeadDesignation && (
+                                              <span>| {r.factoryHeadDesignation}</span>
+                                            )}
+                                          </div>
+                                          <div className="flex flex-col">
+                                            {r.factoryHeadMobile && <span>Mob: {r.factoryHeadMobile}</span>}
+                                            {r.factoryHeadEmail && <span>Email: {r.factoryHeadEmail}</span>}
+                                          </div>
                                         </div>
-                                        <div title={`Contact: ${r.contactPersonName}`}>
-                                          <span className="text-xs font-bold text-gray-700">Ct:</span>
-                                          <span className="text-xs text-gray-600 ml-1 truncate max-w-[100px] inline-block align-bottom">
-                                            {r.contactPersonName}
-                                          </span>
+                                        <div>
+                                          <div className="font-semibold text-gray-800">Contact Person</div>
+                                          <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                                            <span>{r.contactPersonName || '-'}</span>
+                                            {r.contactPersonDesignation && (
+                                              <span>| {r.contactPersonDesignation}</span>
+                                            )}
+                                          </div>
+                                          <div className="flex flex-col">
+                                            {r.contactPersonMobile && <span>Mob: {r.contactPersonMobile}</span>}
+                                            {r.contactPersonEmail && <span>Email: {r.contactPersonEmail}</span>}
+                                          </div>
                                         </div>
                                       </div>
                                     </td>
@@ -900,6 +927,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                               <thead className="bg-gray-50 text-gray-700 text-xs uppercase tracking-wider">
                                 <tr>
                                   <th className="p-3 font-semibold border-b">Consent Order No</th>
+                                  <th className="p-3 font-semibold border-b">Type / Industry / Category</th>
                                   <th className="p-3 font-semibold border-b">Dates</th>
                                   <th className="p-3 font-semibold border-b">Location & Address</th>
                                   <th className="p-3 font-semibold border-b">Key Personnel</th>
@@ -911,6 +939,13 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                                 {ctoDetails.map((r, idx) => (
                                   <tr key={idx} className="hover:bg-gray-50">
                                     <td className="p-3 font-medium text-gray-900">{r.consentOrderNo}</td>
+                                    <td className="p-3 text-gray-600">
+                                      <div className="flex flex-col gap-1 text-xs">
+                                        <span>CTO/CCA Type: {r.ctoCaaType || '-'}</span>
+                                        <span>Industry: {r.industryType || '-'}</span>
+                                        <span>Category: {r.category || '-'}</span>
+                                      </div>
+                                    </td>
                                     <td className="p-3 text-gray-600">
                                       <div className="flex flex-col gap-1">
                                         <span className="text-xs">
@@ -932,18 +967,32 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                                       </div>
                                     </td>
                                     <td className="p-3">
-                                      <div className="flex flex-col gap-1">
-                                        <div title={`Head: ${r.factoryHeadName}`}>
-                                          <span className="text-xs font-bold text-gray-700">Hd:</span>
-                                          <span className="text-xs text-gray-600 ml-1 truncate max-w-[100px] inline-block align-bottom">
-                                            {r.factoryHeadName}
-                                          </span>
+                                      <div className="flex flex-col gap-2 text-xs text-gray-600">
+                                        <div>
+                                          <div className="font-semibold text-gray-800">Factory Head</div>
+                                          <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                                            <span>{r.factoryHeadName || '-'}</span>
+                                            {r.factoryHeadDesignation && (
+                                              <span>| {r.factoryHeadDesignation}</span>
+                                            )}
+                                          </div>
+                                          <div className="flex flex-col">
+                                            {r.factoryHeadMobile && <span>Mob: {r.factoryHeadMobile}</span>}
+                                            {r.factoryHeadEmail && <span>Email: {r.factoryHeadEmail}</span>}
+                                          </div>
                                         </div>
-                                        <div title={`Contact: ${r.contactPersonName}`}>
-                                          <span className="text-xs font-bold text-gray-700">Ct:</span>
-                                          <span className="text-xs text-gray-600 ml-1 truncate max-w-[100px] inline-block align-bottom">
-                                            {r.contactPersonName}
-                                          </span>
+                                        <div>
+                                          <div className="font-semibold text-gray-800">Contact Person</div>
+                                          <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                                            <span>{r.contactPersonName || '-'}</span>
+                                            {r.contactPersonDesignation && (
+                                              <span>| {r.contactPersonDesignation}</span>
+                                            )}
+                                          </div>
+                                          <div className="flex flex-col">
+                                            {r.contactPersonMobile && <span>Mob: {r.contactPersonMobile}</span>}
+                                            {r.contactPersonEmail && <span>Email: {r.contactPersonEmail}</span>}
+                                          </div>
                                         </div>
                                       </div>
                                     </td>
@@ -1065,6 +1114,199 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
             </div>
           );
         });
+
+        return (
+          <>
+            {plantCards}
+
+            {hasCto && (
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b bg-gray-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-1 bg-emerald-500 rounded-full"></div>
+                    <h4 className="font-bold text-gray-800 text-sm md:text-base">CTO/CCA Additional Details</h4>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                        Total Capital Investment (Lakhs)
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-gray-900">
+                        {pf.totalCapitalInvestmentLakhs ?? '-'}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                        Ground/Bore Well Water Usage
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-gray-900">
+                        {pf.groundWaterUsage || '-'}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                        CGWA NOC Requirement
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-gray-900">
+                        {pf.cgwaNocRequirement || '-'}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                        CGWA NOC Document
+                      </div>
+                      <div className="mt-2">
+                        {pf.cgwaNocDocument ? (
+                          <button
+                            onClick={() =>
+                              handleViewDocument(pf.cgwaNocDocument, 'CGWA', 'CGWA NOC')
+                            }
+                            className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                          >
+                            <FaEye className="mr-1" /> View
+                          </button>
+                        ) : (
+                          <span className="text-gray-400 text-xs italic">No Doc</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-1 bg-emerald-500 rounded-full"></div>
+                        <h4 className="font-bold text-gray-800 text-sm md:text-base">
+                          Regulations Covered under CTO
+                        </h4>
+                      </div>
+                    </div>
+
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {regs.length ? (
+                        regs.map(r => (
+                          <span
+                            key={r}
+                            className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          >
+                            {r}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 text-sm italic">Not selected</span>
+                      )}
+                    </div>
+
+                    {hasWater && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-sm font-bold text-gray-700">Water</div>
+                        </div>
+                        <div className="overflow-x-auto rounded-lg border border-gray-200">
+                          <table className="w-full text-left border-collapse">
+                            <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                              <tr>
+                                <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                <th className="p-3 font-semibold border-b">
+                                  Description (water consumption / waste)
+                                </th>
+                                <th className="p-3 font-semibold border-b w-48">Permitted quantity</th>
+                                <th className="p-3 font-semibold border-b w-24">UOM</th>
+                              </tr>
+                            </thead>
+                            <tbody className="text-sm divide-y divide-gray-100">
+                              {(waterRegs.length ? waterRegs : [{}]).map((row, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                  <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                  <td className="p-3 text-gray-700">{row.description || '-'}</td>
+                                  <td className="p-3 text-gray-700">{row.permittedQuantity || '-'}</td>
+                                  <td className="p-3 text-gray-700">{row.uom || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {hasAir && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-sm font-bold text-gray-700">Air</div>
+                        </div>
+                        <div className="overflow-x-auto rounded-lg border border-gray-200">
+                          <table className="w-full text-left border-collapse">
+                            <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                              <tr>
+                                <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                <th className="p-3 font-semibold border-b">Parameters</th>
+                                <th className="p-3 font-semibold border-b w-80">
+                                  Permissible annual / daily limit
+                                </th>
+                                <th className="p-3 font-semibold border-b w-24">UOM</th>
+                              </tr>
+                            </thead>
+                            <tbody className="text-sm divide-y divide-gray-100">
+                              {(airRegs.length ? airRegs : [{}]).map((row, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                  <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                  <td className="p-3 text-gray-700">{row.parameter || '-'}</td>
+                                  <td className="p-3 text-gray-700">{row.permittedLimit || '-'}</td>
+                                  <td className="p-3 text-gray-700">{row.uom || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {hasHazardousWaste && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-sm font-bold text-gray-700">Hazardous Waste</div>
+                        </div>
+                        <div className="overflow-x-auto rounded-lg border border-gray-200">
+                          <table className="w-full text-left border-collapse">
+                            <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                              <tr>
+                                <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                <th className="p-3 font-semibold border-b">Name of Hazardous Waste</th>
+                                <th className="p-3 font-semibold border-b">
+                                  Facility &amp; Mode of Disposal
+                                </th>
+                                <th className="p-3 font-semibold border-b w-40">Quantity MT/YR</th>
+                                <th className="p-3 font-semibold border-b w-24">UOM</th>
+                              </tr>
+                            </thead>
+                            <tbody className="text-sm divide-y divide-gray-100">
+                              {(hazardousRegs.length ? hazardousRegs : [{}]).map((row, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                  <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                  <td className="p-3 text-gray-700">
+                                    {row.nameOfHazardousWaste || '-'}
+                                  </td>
+                                  <td className="p-3 text-gray-700">
+                                    {row.facilityModeOfDisposal || '-'}
+                                  </td>
+                                  <td className="p-3 text-gray-700">{row.quantityMtYr || '-'}</td>
+                                  <td className="p-3 text-gray-700">{row.uom || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        );
       })()}
     </div>
   );
@@ -1097,11 +1339,43 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
   const renderDocumentsSection = () => (
     <div className="w-full mx-auto">
       <div className="rounded-xl border border-gray-200 bg-white">
-        <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl">
+        <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <span className="font-semibold text-gray-700 flex items-center gap-2">
             <FaFileContract className="text-primary-600" />
             Company Documents
           </span>
+          {(client.wasteType || '').toLowerCase().includes('plastic') && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  const response = await api.get(
+                    API_ENDPOINTS.ANALYSIS.COMPLIANCE_REPORT(id) + `?type=${type}&itemId=${itemId}`,
+                    { responseType: 'blob' }
+                  );
+                  const url = window.URL.createObjectURL(new Blob([response.data]));
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.setAttribute(
+                    'download',
+                    `Plastic_Compliance_Report_${client.clientName || id}.pdf`
+                  );
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                } catch (err) {
+                  console.error('Report download failed:', err);
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-primary-200 bg-white text-primary-700 text-xs font-semibold hover:bg-primary-50 transition-colors"
+            >
+              <FaFilePdf className="text-sm" />
+              Download Complete Report
+            </button>
+          )}
         </div>
         <div className="p-6 space-y-3">
           {(client.documents || [])
@@ -1154,8 +1428,8 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
           <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-4 text-primary-700">
             MSME Details
           </h4>
-          <div className="overflow-x-auto max-w-[calc(100vw-22rem)]">
-            <table className="w-full text-left border-collapse whitespace-nowrap">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-center border-collapse whitespace-nowrap">
               <thead className="bg-gray-50 text-gray-700">
                 <tr>
                   <th className="p-3 border-b text-sm font-semibold">Year</th>
@@ -1517,26 +1791,64 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
             )}
           </div>
         </div>
-        {!embedded && (
-        <div className="flex gap-3">
-          {isProcessMode && (
+        <div className="flex flex-wrap gap-3 justify-end">
+          {!embedded && (
+            <>
+              {isProcessMode && (
+                <button
+                  onClick={() =>
+                    navigate(`/dashboard/client/${id}/edit`, {
+                      state: { activeTab: 'Pre - Validation', unlockAudit: true },
+                    })
+                  }
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                >
+                  <AuditOutlined />
+                  Start Audit
+                </button>
+              )}
+              <button
+                onClick={() => navigate(`/dashboard/client/${id}/edit`)}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
+              >
+                <EditOutlined />
+                Edit
+              </button>
+            </>
+          )}
+          {(client.wasteType || '').toLowerCase().includes('plastic') && (
             <button
-              onClick={() => navigate(`/dashboard/client/${id}/edit`, { state: { activeTab: 'Pre - Validation', unlockAudit: true } })}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+              type="button"
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  const response = await api.get(
+                    API_ENDPOINTS.ANALYSIS.COMPLIANCE_REPORT(id) + `?type=${type}&itemId=${itemId}`,
+                    { responseType: 'blob' }
+                  );
+                  const url = window.URL.createObjectURL(new Blob([response.data]));
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.setAttribute(
+                    'download',
+                    `Plastic_Compliance_Report_${client.clientName || id}.pdf`
+                  );
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                } catch (err) {
+                  console.error('Report download failed:', err);
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-primary-200 bg-white text-primary-700 text-xs font-semibold hover:bg-primary-50 transition-colors"
             >
-              <AuditOutlined />
-              Start Audit
+              <FaFilePdf className="text-sm" />
+              Download Complete Report
             </button>
           )}
-          <button
-            onClick={() => navigate(`/dashboard/client/${id}/edit`)}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
-          >
-            <EditOutlined />
-            Edit
-          </button>
         </div>
-        )}
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6">

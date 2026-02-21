@@ -72,13 +72,13 @@ export const getPlasticAnalysisController = async (req, res) => {
 
 export const saveSalesAnalysisController = async (req, res) => {
     try {
-        const { clientId, type, itemId, summary, rows } = req.body;
+        const { clientId, type, itemId, summary, rows, targetTables } = req.body;
 
         if (!clientId || !type || !itemId || !summary || !rows) {
             return res.status(400).json({ message: "Missing required fields" });
         }
 
-        const result = await AnalysisService.saveSalesAnalysis(clientId, type, itemId, { summary, rows });
+        const result = await AnalysisService.saveSalesAnalysis(clientId, type, itemId, { summary, rows, targetTables });
 
         res.status(200).json({
             success: true,

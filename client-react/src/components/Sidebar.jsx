@@ -6,7 +6,7 @@ import {
   TeamOutlined,
   CrownOutlined,
   UnorderedListOutlined,
-  SearchOutlined,
+  LinkOutlined,
   DeleteOutlined,
   BlockOutlined,
   ThunderboltOutlined,
@@ -77,7 +77,7 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
     },
     {
       key: '/dashboard/client-connect',
-      icon: <SearchOutlined />,
+      icon: <LinkOutlined />,
       label: 'Client Connect',
       onClick: () => navigate('/dashboard/client-connect'),
     },

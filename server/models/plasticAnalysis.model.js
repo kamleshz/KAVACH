@@ -8,6 +8,7 @@ const plasticAnalysisSchema = new mongoose.Schema({
   rows: { type: Array, default: [] },
   salesSummary: { type: Array, default: [] },
   salesRows: { type: Array, default: [] },
+  salesTargetTables: { type: Array, default: [] },
   purchaseSummary: { type: Array, default: [] },
   purchaseRows: { type: Array, default: [] },
   lastUpdated: { type: Date, default: Date.now }

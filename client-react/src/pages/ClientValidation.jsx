@@ -1241,7 +1241,7 @@ Date: ___________________`;
                         <VerifyButton id="tab4_msme" />
                     </div>
                     <div className="overflow-x-auto w-full">
-                      <table className="w-full text-left border-collapse whitespace-nowrap">
+                      <table className="w-full text-center border-collapse whitespace-nowrap">
                         <thead className="bg-gray-50 text-gray-700">
                           <tr>
                             <th className="p-3 border-b text-sm font-semibold">Year</th>

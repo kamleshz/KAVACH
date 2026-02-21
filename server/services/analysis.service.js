@@ -74,6 +74,9 @@ class AnalysisService {
 
             doc.salesSummary = data.summary;
             doc.salesRows = data.rows;
+            if (data.targetTables) {
+                doc.salesTargetTables = data.targetTables;
+            }
             doc.lastUpdated = new Date();
 
             await doc.save();
@@ -99,6 +102,7 @@ class AnalysisService {
         return {
             salesSummary: doc.salesSummary,
             salesRows: doc.salesRows,
+            salesTargetTables: doc.salesTargetTables || [],
             lastUpdated: doc.lastUpdated
         };
     }
@@ -243,6 +247,7 @@ class AnalysisService {
 
         // For Year-wise Target Calculation
         const yearlyAgg = {};
+        const recycledPctAgg = {};
         
         salesData.forEach(row => {
             const catRaw = row["Category of Plastic"];
@@ -252,7 +257,7 @@ class AnalysisService {
                 const pre = parseFloat(row["Pre Consumer Waste Plastic Quantity (TPA)"]) || 0;
                 const post = parseFloat(row["Post Consumer Waste Plastic Quantity (TPA)"]) || 0;
                 const exp = parseFloat(row["Export Quantity Plastic Quantity (TPA)"]) || 0;
-                const total = pre + post + exp;
+                const totalForTarget = pre + post;
 
                 // Overall aggregation
                 if (salesAgg[cat]) {
@@ -265,7 +270,15 @@ class AnalysisService {
                 const year = row["Year"];
                 if (year) {
                     if (!yearlyAgg[cat]) yearlyAgg[cat] = {};
-                    yearlyAgg[cat][year] = (yearlyAgg[cat][year] || 0) + total;
+                    yearlyAgg[cat][year] = (yearlyAgg[cat][year] || 0) + totalForTarget;
+
+                    // Recycled Plastic % aggregation for Brand Owner targets
+                    const preRec = parseFloat(row["Pre Consumer Waste Recycled Plastic %"]) || 0;
+                    const postRec = parseFloat(row["Post Consumer Waste Recycled Plastic %"]) || 0;
+                    const recycledSum = preRec + postRec;
+
+                    if (!recycledPctAgg[cat]) recycledPctAgg[cat] = {};
+                    recycledPctAgg[cat][year] = (recycledPctAgg[cat][year] || 0) + recycledSum;
                 }
             }
         });
@@ -273,6 +286,27 @@ class AnalysisService {
         // Calculate Target Tables
         const years = Array.from(new Set(salesData.map(r => r["Year"]).filter(y => y))).sort();
         const targetTables = [];
+        const UREP_TARGET_MATRIX = {
+            'Cat-I': {
+                '2025-26': 30,
+                '2026-27': 40,
+                '2027-28': 50,
+                '2028-29': 60,
+            },
+            'Cat-II': {
+                '2025-26': 10,
+                '2026-27': 10,
+                '2027-28': 20,
+                '2028-29': 20,
+            },
+            'Cat-III': {
+                '2025-26': 5,
+                '2026-27': 5,
+                '2027-28': 10,
+                '2028-29': 10,
+            },
+            'Cat-IV': {},
+        };
 
         // We need at least 3 years to generate 2 target tables as requested
         // Or if we have years: Y1, Y2, Y3
@@ -293,22 +327,22 @@ class AnalysisService {
             salesAnalysisDoc = await PlasticAnalysisModel.findOne({ client: clientId, type, itemId });
         }
 
-        // Helper to get registered sales from DB for a specific year & category
         const getRegisteredSales = (cat, year) => {
             if (!salesAnalysisDoc || !salesAnalysisDoc.salesRows) return 0;
             
-            // Normalize Category for matching
             const targetCat = normalizeSalesCategory(cat);
             if (!targetCat) return 0;
 
-            const row = salesAnalysisDoc.salesRows.find(r => {
+            const rows = salesAnalysisDoc.salesRows.filter(r => {
                 const rCat = normalizeSalesCategory(r.plasticCategory);
                 const rYear = r.financialYear;
                 const rType = (r.registrationType || '').toLowerCase();
-                return rCat === targetCat && rYear === year && rType.includes('registered') && !rType.includes('unregistered');
+                const status = (r.uploadStatus || '').toString().trim().toLowerCase();
+                const statusOk = !status || status === 'completed';
+                return rCat === targetCat && rYear === year && rType.includes('registered') && !rType.includes('unregistered') && statusOk;
             });
 
-            return row ? parseFloat(row.totalPlasticQty) || 0 : 0;
+            return rows.reduce((sum, r) => sum + (parseFloat(r.totalPlasticQty) || 0), 0);
         };
 
         if (years.length >= 2) {
@@ -324,6 +358,8 @@ class AnalysisService {
                     
                     let targetVal = avg;
                     let registeredSales = 0;
+                    let recycledPctYear2 = 0;
+                    let recycledQtyYear2 = 0;
 
                     // Producer Logic
                     if (isProducer) {
@@ -331,6 +367,11 @@ class AnalysisService {
                         // Registered Sales data fetched from Sales Analysis DB
                         registeredSales = getRegisteredSales(cat, year2);
                         targetVal = avg - registeredSales;
+                    } else {
+                        // Brand Owner: compute Recycled Plastic % from Pre/Post recycled columns
+                        const sumPct = recycledPctAgg[cat]?.[year2] || 0;
+                        recycledPctYear2 = sumPct;
+                        recycledQtyYear2 = (avg * recycledPctYear2) / 100;
                     }
 
                     const row = {
@@ -342,15 +383,27 @@ class AnalysisService {
 
                     if (isProducer) {
                         row[`Registered Sales (${year2})`] = parseFloat(registeredSales.toFixed(4));
+                        row[`Target Of Virgin ${targetYear}`] = parseFloat(targetVal.toFixed(4));
+                    } else {
+                        row["Recycled Plastic %"] = parseFloat(recycledPctYear2.toFixed(2));
+                        row["Recycled Qty"] = parseFloat(recycledQtyYear2.toFixed(4));
+                        const targetForVirgin = avg - recycledQtyYear2;
+                        row[`Target ${targetYear}`] = parseFloat(targetVal.toFixed(4));
+                        row[`Target For Virgin (${targetYear})`] = parseFloat(targetForVirgin.toFixed(4));
                     }
-
-                    row[`Target ${targetYear}`] = parseFloat(targetVal.toFixed(4));
                     return row;
                 });
                 
                 const columns = ["Category of Plastic", year1, year2, "Avg"];
-                if (isProducer) columns.push(`Registered Sales (${year2})`);
-                columns.push(`Target ${targetYear}`);
+                if (isProducer) {
+                    columns.push(`Registered Sales (${year2})`);
+                    columns.push(`Target Of Virgin ${targetYear}`);
+                } else {
+                    columns.push("Recycled Plastic %");
+                    columns.push("Recycled Qty");
+                    columns.push(`Target ${targetYear}`);
+                    columns.push(`Target For Virgin (${targetYear})`);
+                }
 
                 targetTables.push({
                     title: `Target Calculation for ${targetYear} (${isProducer ? 'Producer' : 'Brand Owner'})`,
@@ -358,6 +411,32 @@ class AnalysisService {
                     data: tableData
                 });
             }
+        }
+
+        if (!isProducer && years.length > 0) {
+            const activeYear = years[years.length - 1];
+            const urepMandateColumnLabel = `Urep Target (FY ${activeYear} as per Mandate)`;
+            const urepQtyColumnLabel = `Urep Target`;
+
+            const categories = Object.keys(salesAgg);
+            const urepData = categories.map(cat => {
+                const catTargets = UREP_TARGET_MATRIX[cat] || {};
+                const pct = catTargets[activeYear] !== undefined ? catTargets[activeYear] : 0;
+                const baseQty = parseFloat((yearlyAgg[cat] && yearlyAgg[cat][activeYear]) || 0);
+                const qty = (baseQty * pct) / 100;
+                return {
+                    "Category of Plastic": cat,
+                    [urepMandateColumnLabel]: pct,
+                    [urepQtyColumnLabel]: parseFloat(qty.toFixed(4)),
+                };
+            });
+
+            const urepColumns = ["Category of Plastic", urepMandateColumnLabel, urepQtyColumnLabel];
+            targetTables.push({
+                title: `Urep Target for ${activeYear} (Brand Owner)`,
+                columns: urepColumns,
+                data: urepData,
+            });
         }
 
         const salesRows = Object.keys(salesAgg).map(cat => {
@@ -954,37 +1033,31 @@ class AnalysisService {
 
         // 3.1 Prepare Marking & Labeling Report Data (From SkuComplianceModel)
         const skuComplianceDocs = await SkuComplianceModel.find({ client: clientId });
-        
-        // Filter out SKUs that are not present in Product Compliance Rows and maintain their order
-        const validSkuCodes = [...new Set(allRows.map(r => (r.skuCode || '').trim()).filter(Boolean))];
-        
+
         const markingLabelingData = skuComplianceDocs
-            .filter(doc => validSkuCodes.includes((doc.skuCode || '').trim())) // Filter logic
             .sort((a, b) => {
-                const skuA = (a.skuCode || '').trim();
-                const skuB = (b.skuCode || '').trim();
-                return validSkuCodes.indexOf(skuA) - validSkuCodes.indexOf(skuB);
+                const aCode = (a.skuCode || '').trim();
+                const bCode = (b.skuCode || '').trim();
+                return aCode.localeCompare(bCode);
             })
-            .map((doc, index) => {
-                 return {
-                     index: index + 1,
-                     skuCode: doc.skuCode || '-',
-                     skuDescription: doc.skuDescription || '-',
-                     skuUom: doc.skuUm || '-',
-                     productImage: resolveImage(doc.productImage),
-                     brandOwner: doc.brandOwner || '-',
-                     eprCertBrandOwner: doc.eprCertBrandOwner || '-',
-                     eprCertProducer: doc.eprCertProducer || '-',
-                     thicknessMentioned: doc.thicknessMentioned || '-',
-                     polymerUsed: Array.isArray(doc.polymerUsed) ? doc.polymerUsed.join(', ') : (doc.polymerUsed || '-'),
-                     recycledPercent: doc.recycledPercent || '-',
-                     compostableRegNo: doc.compostableRegNo || '-',
-                     markingImages: (doc.markingImage || []).map(img => resolveImage(img)).filter(Boolean),
-                     auditorRemarks: Array.isArray(doc.remarks) ? doc.remarks.join('\n') : (doc.remarks || '-'),
-                     complianceRemarks: Array.isArray(doc.complianceRemarks) ? doc.complianceRemarks.join('\n') : (doc.complianceRemarks || '-'),
-                     complianceStatus: doc.complianceStatus || 'Pending'
-                 };
-        });
+            .map((doc, index) => ({
+                index: index + 1,
+                skuCode: doc.skuCode || '-',
+                skuDescription: doc.skuDescription || '-',
+                skuUom: doc.skuUm || '-',
+                productImage: resolveImage(doc.productImage),
+                brandOwner: doc.brandOwner || '-',
+                eprCertBrandOwner: doc.eprCertBrandOwner || '-',
+                eprCertProducer: doc.eprCertProducer || '-',
+                thicknessMentioned: doc.thicknessMentioned || '-',
+                polymerUsed: Array.isArray(doc.polymerUsed) ? doc.polymerUsed.join(', ') : (doc.polymerUsed || '-'),
+                recycledPercent: doc.recycledPercent || '-',
+                compostableRegNo: doc.compostableRegNo || '-',
+                markingImages: (doc.markingImage || []).map(img => resolveImage(img)).filter(Boolean),
+                auditorRemarks: Array.isArray(doc.remarks) ? doc.remarks.join('\n') : (doc.remarks || '-'),
+                complianceRemarks: Array.isArray(doc.complianceRemarks) ? doc.complianceRemarks.join('\n') : (doc.complianceRemarks || '-'),
+                complianceStatus: doc.complianceStatus || 'Pending'
+            }));
 
         // 4. Calculate Sales & Purchase Summary (Registered vs Unregistered)
         const normalizeCategory = (val) => {
@@ -1194,7 +1267,14 @@ class AnalysisService {
                         const val2 = parseFloat(yearlyAgg[cat]?.[year2] || 0);
                         const avg = (val1 + val2) / 2;
                         const regYear2 = (analysisDoc?.salesRows || [])
-                            .filter(rr => normalizeSalesCategory(rr.plasticCategory) === cat && (rr.registrationType || '').toLowerCase().includes('registered') && !(rr.registrationType || '').toLowerCase().includes('unregistered') && (rr.financialYear || '') === year2)
+                            .filter(rr => {
+                                const rCat = normalizeSalesCategory(rr.plasticCategory);
+                                const rYear = rr.financialYear || '';
+                                const type = (rr.registrationType || '').toLowerCase();
+                                const status = (rr.uploadStatus || '').toString().trim().toLowerCase();
+                                const statusOk = !status || status === 'completed';
+                                return rCat === cat && rYear === year2 && type.includes('registered') && !type.includes('unregistered') && statusOk;
+                            })
                             .reduce((sum, rr) => sum + (parseFloat(rr.totalPlasticQty) || 0), 0);
                         const targetVal = avg - regYear2;
                         const row = {
