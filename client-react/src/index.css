@@ -140,7 +140,9 @@
 }
 
 .ant-table-wrapper .ant-table-thead > tr > th {
-  @apply !bg-gray-50 !text-gray-600 !font-bold !text-center;
+  @apply !bg-orange-50 !text-gray-700 !text-center;
+  font-weight: 800 !important;
+  font-size: 13px !important;
 }
 
 .sku-compliance-table .ant-table-thead > tr > th {

@@ -6,7 +6,7 @@ import api from '../../services/api';
 import { API_ENDPOINTS } from '../../services/apiEndpoints';
 import { useClientContext } from '../../context/ClientContext';
 
-const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, showTargetsOnTop = false }) => {
+const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, showTargetsOnTop = false, hideSalesSection = false, hideTargetSection = false }) => {
     const { formData } = useClientContext();
     const currentEntityType = entityType || formData?.entityType;
     const isBrandOwner = (currentEntityType || '').toString() === 'Brand Owner';
@@ -738,22 +738,58 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
         }
     ];
 
+    const renderTargetTables = (tables) => (
+        <div className="space-y-5">
+            {tables.map((table, idx) => {
+                const isUrep = table.title.toLowerCase().includes('urep');
+                return (
+                    <div key={idx} className="rounded-xl border border-gray-200 overflow-hidden shadow-sm [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700">
+                        <div className={`px-5 py-3 border-b flex items-center gap-2 ${isUrep ? 'bg-gradient-to-r from-purple-50 to-white border-purple-100' : 'bg-gradient-to-r from-blue-50 to-white border-blue-100'}`}>
+                            <div className={`w-1.5 h-5 rounded-full ${isUrep ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
+                            <span className="font-semibold text-gray-700 text-sm">{table.title}</span>
+                        </div>
+                            <Table
+                            dataSource={table.data}
+                            columns={table.columns.map((col, colIdx) => ({
+                                title: <span className="text-xs font-bold text-gray-600 uppercase">{col}</span>,
+                                dataIndex: col,
+                                key: col,
+                                align: colIdx === 0 ? "left" : "right",
+                                render: (val) => {
+                                    if (colIdx === 0) return <span className="font-medium text-gray-700">{val}</span>;
+                                    const num = parseFloat(val);
+                                    if (col.toLowerCase().includes('target') && num > 0) return <span className="font-bold text-blue-700">{val}</span>;
+                                    if (col.toLowerCase().includes('target') && num <= 0) return <span className="font-bold text-green-600">{val}</span>;
+                                    return <span className="text-gray-600">{val}</span>;
+                                }
+                            }))}
+                            pagination={false}
+                            size="small"
+                            bordered
+                            rowKey={(r) => r["Category of Plastic"] || r["Plastic Category"] || idx}
+                        />
+                    </div>
+                );
+            })}
+        </div>
+    );
+
     return (
-        <div className="bg-white p-6 rounded-lg shadow-sm">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
             {/* Header Section */}
             {!readOnly && (
-            <div className="mb-6">
-                <h3 className="text-blue-600 font-semibold text-lg uppercase mb-4">UPLOAD DATA FILES</h3>
+            <div className="p-5 border-b border-gray-100">
+                <h3 className="text-blue-600 font-semibold text-base uppercase tracking-wide mb-4">Upload Data Files</h3>
                 
                 {isBrandOwner ? (
-                    <div className="mt-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-md px-4 py-3">
+                    <div className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-4 py-3">
                         Your category is Brand Owner. Sales data upload is not applicable.
                     </div>
                 ) : (
-                    <div className="mb-2">
-                        <p className="text-gray-700 font-medium mb-2">Sales / Base File</p>
-                        <div className="flex items-center gap-4">
-                            <label className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none cursor-pointer transition-colors">
+                    <div>
+                        <p className="text-gray-700 font-medium text-sm mb-2">Sales / Base File</p>
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <label className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors">
                                 <UploadOutlined className="mr-2 text-gray-500" />
                                 Select Sales File
                                 <input
@@ -788,7 +824,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                                 </>
                             )}
                             {lastUpdated && (
-                                <span className="text-xs text-gray-500 ml-2">
+                                <span className="text-[11px] text-gray-400 ml-1">
                                     Last saved: {new Date(lastUpdated).toLocaleString()}
                                 </span>
                             )}
@@ -799,117 +835,86 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             )}
 
             {/* EPR Target Calculation (Top Position) */}
-            {showTargetsOnTop && targetTables.length > 0 && (entityType === 'Producer' || !entityType) && (
-                <div className="mb-8">
-                    <h3 className="text-gray-700 font-semibold text-lg mb-4">EPR Target Calculation</h3>
-                    <div className="space-y-6">
-                        {targetTables.map((table, idx) => (
-                            <div key={idx} className="bg-white border border-gray-200 rounded-md overflow-hidden">
-                                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 font-semibold text-gray-700">
-                                    {table.title}
-                                </div>
-                                <Table
-                                    dataSource={table.data}
-                                    columns={table.columns.map(col => ({
-                                        title: col,
-                                        dataIndex: col,
-                                        key: col,
-                                        align: col === "Category of Plastic" ? "left" : "right"
-                                    }))}
-                                    pagination={false}
-                                    size="small"
-                                    bordered
-                                    rowKey="Category of Plastic"
-                                />
-                            </div>
-                        ))}
-                    </div>
+            {!hideTargetSection && showTargetsOnTop && targetTables.length > 0 && (entityType === 'Producer' || !entityType) && (
+                <div className="p-5 border-b border-gray-100">
+                    <h3 className="text-gray-800 font-bold text-base mb-4 flex items-center gap-2">
+                        <span className="w-1.5 h-5 bg-indigo-500 rounded-full inline-block"></span>
+                        EPR Target Calculation
+                    </h3>
+                    {renderTargetTables(targetTables)}
                 </div>
             )}
 
             {/* Table Section */}
-            {!isBrandOwner && summaryData.length > 0 && (
-                <div className="mt-6 border rounded-md overflow-hidden">
-                     <div 
-                        className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
+            {!hideSalesSection && !isBrandOwner && summaryData.length > 0 && (
+                <div className="border-b border-gray-100">
+                    <div 
+                        className="px-5 py-3 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors"
                         onClick={() => setIsExpanded(!isExpanded)}
                     >
-                        <h3 className="font-semibold text-blue-700 text-lg m-0">Sales Portal Data</h3>
-                        {isExpanded ? <UpOutlined /> : <DownOutlined />}
+                        <h3 className="font-bold text-gray-800 text-base m-0 flex items-center gap-2">
+                            <span className="w-1.5 h-5 bg-blue-500 rounded-full inline-block"></span>
+                            Sales Portal Data
+                        </h3>
+                        <span className="text-gray-400">{isExpanded ? <UpOutlined /> : <DownOutlined />}</span>
                     </div>
                     {isExpanded && (
-                    <>
-                    <Table
-                        dataSource={summaryData}
-                        columns={columns}
-                        pagination={false}
-                        size="middle"
-                        bordered
-                        rowKey="key"
-                        rowClassName={(record) => record.key === 'Total' ? 'bg-gray-50' : ''}
-                        expandable={{
-                            expandedRowRender,
-                            rowExpandable: (record) => record.key !== 'Total',
-                        }}
-                    />
-                    {fySummaryData.length > 0 && (
-                        <div className="p-4 border-t border-gray-200">
-                            <h3 className="text-gray-700 font-semibold text-lg mb-4 flex items-center gap-2">
-                                <span className="w-1 h-6 bg-blue-500 rounded-full inline-block"></span>
-                                Financial Year Analysis
-                            </h3>
-                            <div className="border rounded-md overflow-hidden">
-                                <Table
-                                    dataSource={fySummaryData}
-                                    columns={fyColumns}
-                                    pagination={false}
-                                    size="middle"
-                                    bordered
-                                    rowKey="key"
-                                    expandable={{
-                                        expandedRowRender: fyExpandedRowRender
-                                    }}
-                                />
-                            </div>
+                    <div className="px-5 pb-5 space-y-5">
+                        <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700">
+                            <Table
+                                dataSource={summaryData}
+                                columns={columns}
+                                pagination={false}
+                                size="middle"
+                                bordered
+                                rowKey="key"
+                                rowClassName={(record) => record.key === 'Total' ? 'bg-blue-50/50 font-semibold' : ''}
+                                expandable={{
+                                    expandedRowRender,
+                                    rowExpandable: (record) => record.key !== 'Total',
+                                }}
+                            />
                         </div>
-                    )}
-                    </>
+                        {fySummaryData.length > 0 && (
+                            <div>
+                                <h4 className="text-gray-700 font-semibold text-sm mb-3 flex items-center gap-2">
+                                    <span className="w-1 h-4 bg-blue-400 rounded-full inline-block"></span>
+                                    Financial Year Analysis
+                                </h4>
+                                <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700">
+                                    <Table
+                                        dataSource={fySummaryData}
+                                        columns={fyColumns}
+                                        pagination={false}
+                                        size="middle"
+                                        bordered
+                                        rowKey="key"
+                                        expandable={{
+                                            expandedRowRender: fyExpandedRowRender
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     )}
                 </div>
             )}
             
             {/* EPR Target Calculation (Bottom Position - Default) */}
-            {!showTargetsOnTop && targetTables.length > 0 && (currentEntityType === 'Producer' || !currentEntityType) && (
-                <div className="mt-8">
-                    <h3 className="text-gray-700 font-semibold text-lg mb-4">EPR Target Calculation</h3>
-                    <div className="space-y-6">
-                        {targetTables.map((table, idx) => (
-                            <div key={idx} className="bg-white border border-gray-200 rounded-md overflow-hidden">
-                                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 font-semibold text-gray-700">
-                                    {table.title}
-                                </div>
-                                <Table
-                                    dataSource={table.data}
-                                    columns={table.columns.map(col => ({
-                                        title: col,
-                                        dataIndex: col,
-                                        key: col,
-                                        align: col === "Category of Plastic" ? "left" : "right"
-                                    }))}
-                                    pagination={false}
-                                    size="small"
-                                    bordered
-                                    rowKey="Category of Plastic"
-                                />
-                            </div>
-                        ))}
-                    </div>
+            {!hideTargetSection && !showTargetsOnTop && targetTables.length > 0 && (currentEntityType === 'Producer' || !currentEntityType) && (
+                <div className="p-5">
+                    <h3 className="text-gray-800 font-bold text-base mb-4 flex items-center gap-2">
+                        <span className="w-1.5 h-5 bg-indigo-500 rounded-full inline-block"></span>
+                        EPR Target Calculation
+                    </h3>
+                    {renderTargetTables(targetTables)}
                 </div>
             )}
             
             {/* Placeholder if no data */}
-            {!isBrandOwner && summaryData.length === 0 && (
-                 <div className="mt-6 border rounded-md p-8 text-center bg-gray-50 text-gray-400">
+            {!hideSalesSection && !isBrandOwner && summaryData.length === 0 && (
+                 <div className="m-5 rounded-xl border border-dashed border-gray-300 p-8 text-center bg-gray-50/50 text-gray-400 text-sm">
                     No data uploaded. Please select a sales Excel file to view analysis.
                  </div>
             )}

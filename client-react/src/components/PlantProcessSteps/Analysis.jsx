@@ -6,7 +6,7 @@ import api from '../../services/api';
 import { API_ENDPOINTS } from '../../services/apiEndpoints';
 import { useClientContext } from '../../context/ClientContext';
 
-const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId, entityType }) => {
+const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId, entityType, showTargetsOnly = false, hideTargets = false }) => {
     const [salesFile, setSalesFile] = useState(null);
     const [purchaseFile, setPurchaseFile] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -124,178 +124,144 @@ const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId, entityTy
     ];
 
     return (
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 min-h-[600px]">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
             {contextHolder}
-             <div className="mb-8">
-                <h2 className="text-xl font-bold text-gray-800 mb-6">Plastic Pre/Post Validation Analysis</h2>
-                
-                {!isReadOnly && (
-                <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Upload Data Files</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Sales / Base File</label>
-                            <Upload 
-                                beforeUpload={(file) => { setSalesFile(file); return false; }} 
-                                maxCount={1}
-                                onRemove={() => setSalesFile(null)}
-                                fileList={salesFile ? [salesFile] : []}
-                                disabled={isReadOnly}
-                            >
-                                <Button icon={<UploadOutlined />} className="w-full h-12" disabled={isReadOnly}>Select Sales File</Button>
-                            </Upload>
+            {!showTargetsOnly && (
+                <div className="p-5 border-b border-gray-100">
+                    <h2 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                        <span className="w-1.5 h-5 bg-emerald-500 rounded-full inline-block"></span>
+                        Plastic Pre/Post Validation Analysis
+                    </h2>
+                    
+                    {!isReadOnly && (
+                    <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 mt-4">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4">Upload Data Files</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Sales / Base File</label>
+                                <Upload 
+                                    beforeUpload={(file) => { setSalesFile(file); return false; }} 
+                                    maxCount={1}
+                                    onRemove={() => setSalesFile(null)}
+                                    fileList={salesFile ? [salesFile] : []}
+                                    disabled={isReadOnly}
+                                >
+                                    <Button icon={<UploadOutlined />} className="w-full h-10" disabled={isReadOnly}>Select Sales File</Button>
+                                </Upload>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Purchase File</label>
+                                <Upload 
+                                    beforeUpload={(file) => { setPurchaseFile(file); return false; }} 
+                                    maxCount={1}
+                                    onRemove={() => setPurchaseFile(null)}
+                                    fileList={purchaseFile ? [purchaseFile] : []}
+                                    disabled={isReadOnly}
+                                >
+                                    <Button icon={<UploadOutlined />} className="w-full h-10" disabled={isReadOnly}>Select Purchase File</Button>
+                                </Upload>
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Purchase File</label>
-                            <Upload 
-                                beforeUpload={(file) => { setPurchaseFile(file); return false; }} 
-                                maxCount={1}
-                                onRemove={() => setPurchaseFile(null)}
-                                fileList={purchaseFile ? [purchaseFile] : []}
-                                disabled={isReadOnly}
+
+                        <div className="mt-6 flex justify-end">
+                            <Button 
+                                type="primary" 
+                                onClick={handleUpload} 
+                                loading={loading}
+                                size="large"
+                                className="px-8"
+                                disabled={isReadOnly || !salesFile}
                             >
-                                <Button icon={<UploadOutlined />} className="w-full h-12" disabled={isReadOnly}>Select Purchase File</Button>
-                            </Upload>
+                                Run Analysis
+                            </Button>
                         </div>
                     </div>
+                    )}
+                </div>
+            )}
 
-                    <div className="mt-8 flex justify-end">
-                        <Button 
-                            type="primary" 
-                            onClick={handleUpload} 
-                            loading={loading}
-                            size="large"
-                            className="px-8"
-                            disabled={isReadOnly || !salesFile}
-                        >
-                            Run Analysis
-                        </Button>
+            {summary?.target_tables && summary.target_tables.length > 0 && !isProducer && !hideTargets && (
+                <div className="p-5">
+                    <div className="space-y-5">
+                        <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                            <span className="w-1.5 h-5 bg-indigo-500 rounded-full inline-block"></span>
+                            EPR Target Calculation
+                        </h3>
+                        {summary.target_tables.map((table, idx) => (
+                            <div key={idx} className="rounded-xl border border-gray-200 overflow-hidden shadow-sm [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700">
+                                <div className="bg-gradient-to-r from-blue-50 to-white px-5 py-3 border-b border-blue-100 flex items-center gap-2">
+                                    <div className="w-1.5 h-5 rounded-full bg-blue-500"></div>
+                                    <span className="font-semibold text-gray-700 text-sm">{table.title}</span>
+                                </div>
+                                <Table 
+                                    dataSource={table.data} 
+                                    columns={table.columns.map((col, colIdx) => ({ 
+                                        title: <span className="text-xs font-bold text-gray-600 uppercase">{col}</span>,
+                                        dataIndex: col, 
+                                        key: col,
+                                        align: colIdx === 0 ? "left" : "right",
+                                        render: (val) => {
+                                            if (colIdx === 0) return <span className="font-medium text-gray-700">{val}</span>;
+                                            return <span className="text-gray-600">{val}</span>;
+                                        }
+                                    }))} 
+                                    pagination={false} 
+                                    rowKey="Category of Plastic"
+                                    bordered
+                                    size="small"
+                                />
+                            </div>
+                        ))}
                     </div>
                 </div>
-                )}
-            </div>
+            )}
 
-            {data && (
-                <div className="animate-fade-in">
+            {!showTargetsOnly && data && (
+                <div className="p-5">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-gray-800">Analysis Results</h3>
-                        <div className="inline-flex items-center rounded-lg bg-gray-100 p-1">
-                            <button
-                                onClick={() => setViewMode('table')}
-                                className={`px-3 py-1 text-sm font-medium rounded-md transition-all flex items-center ${
-                                    viewMode === 'table'
-                                        ? 'bg-white text-gray-800 shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                <TableOutlined className="mr-1" /> Table
-                            </button>
-                            <button
-                                onClick={() => setViewMode('graph')}
-                                className={`px-3 py-1 text-sm font-medium rounded-md transition-all flex items-center ${
-                                    viewMode === 'graph'
-                                        ? 'bg-white text-gray-800 shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                <BarChartOutlined className="mr-1" /> Graph
-                            </button>
-                        </div>
+                        <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                            <span className="w-1.5 h-5 bg-blue-500 rounded-full inline-block"></span>
+                            Analysis Results
+                        </h3>
                     </div>
                     
                     {summary && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                            <Card size="small" className="bg-blue-50 border-blue-100">
-                                <div className="text-xs text-blue-600 font-semibold uppercase">Total Purchase</div>
-                                <div className="text-2xl font-bold text-gray-800">{summary.total_purchase}</div>
-                            </Card>
-                            <Card size="small" className="bg-indigo-50 border-indigo-100">
-                                <div className="text-xs text-indigo-600 font-semibold uppercase">Total Consumption</div>
-                                <div className="text-2xl font-bold text-gray-800">{summary.total_consumption}</div>
-                            </Card>
-                            <Card size="small" className={`border ${Math.abs(summary.difference_percent) > 5 ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
-                                <div className={`text-xs font-semibold uppercase ${Math.abs(summary.difference_percent) > 5 ? 'text-red-600' : 'text-green-600'}`}>Difference</div>
-                                <div className={`text-2xl font-bold ${Math.abs(summary.difference_percent) > 5 ? 'text-red-700' : 'text-green-700'}`}>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+                            <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl border border-blue-100 p-4">
+                                <div className="text-[11px] text-blue-600 font-semibold uppercase tracking-wide">Total Purchase</div>
+                                <div className="text-2xl font-bold text-gray-800 mt-1">{summary.total_purchase}</div>
+                            </div>
+                            <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-indigo-100 p-4">
+                                <div className="text-[11px] text-indigo-600 font-semibold uppercase tracking-wide">Total Consumption</div>
+                                <div className="text-2xl font-bold text-gray-800 mt-1">{summary.total_consumption}</div>
+                            </div>
+                            <div className={`rounded-xl border p-4 ${Math.abs(summary.difference_percent) > 5 ? 'bg-gradient-to-br from-red-50 to-white border-red-100' : 'bg-gradient-to-br from-green-50 to-white border-green-100'}`}>
+                                <div className={`text-[11px] font-semibold uppercase tracking-wide ${Math.abs(summary.difference_percent) > 5 ? 'text-red-600' : 'text-green-600'}`}>Difference</div>
+                                <div className={`text-2xl font-bold mt-1 ${Math.abs(summary.difference_percent) > 5 ? 'text-red-700' : 'text-green-700'}`}>
                                     {summary.difference_percent}%
                                 </div>
-                            </Card>
+                            </div>
                         </div>
                     )}
 
-                    {viewMode === 'table' ? (
-                        <>
-                            <Table 
-                                dataSource={data} 
-                                columns={columns} 
-                                pagination={false} 
-                                rowKey="Category of Plastic"
-                                bordered
-                                size="middle"
-                                className="border border-gray-200 rounded-lg overflow-hidden mb-8"
-                            />
-
-                            {summary?.target_tables && summary.target_tables.length > 0 && !isProducer && (
-                                <div className="space-y-8 mt-8">
-                                    <h3 className="text-lg font-bold text-gray-800">EPR Target Calculation</h3>
-                                    {summary.target_tables.map((table, idx) => (
-                                        <div key={idx} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                                            <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 font-semibold text-gray-700">
-                                                {table.title}
-                                            </div>
-                                            <Table 
-                                                dataSource={table.data} 
-                                                columns={table.columns.map(col => ({ 
-                                                    title: col, 
-                                                    dataIndex: col, 
-                                                    key: col,
-                                                    align: col === "Category of Plastic" ? "left" : "right"
-                                                }))} 
-                                                pagination={false} 
-                                                rowKey="Category of Plastic"
-                                                bordered
-                                                size="small"
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <div className="bg-white p-6 border border-gray-200 rounded-lg h-[500px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart
-                                    data={graphData}
-                                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                                >
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis 
-                                        dataKey="Category of Plastic" 
-                                        tick={{ fontSize: 12 }} 
-                                        interval={0}
-                                        angle={-45}
-                                        textAnchor="end"
-                                        height={100}
-                                    />
-                                    <YAxis />
-                                    <Tooltip 
-                                        cursor={{ fill: '#f3f4f6' }}
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                                    />
-                                    <Legend verticalAlign="top" height={36}/>
-                                    <Bar dataKey="Total Purchase" fill="#4f46e5" name="Total Purchase" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="Total Consumption" fill="#10b981" name="Total Consumption" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    )}
+                    <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm mb-5 [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700">
+                        <Table 
+                            dataSource={data} 
+                            columns={columns} 
+                            pagination={false} 
+                            rowKey="Category of Plastic"
+                            bordered
+                            size="middle"
+                        />
+                    </div>
                 </div>
             )}
             
             {handleNext && (
-            <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end">
+            <div className="px-5 pb-5 pt-3 border-t border-gray-100 flex justify-end">
                  <button
                     onClick={handleNext}
-                    className="px-8 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors"
+                    className="px-8 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-sm transition-colors"
                 >
                     Skip / Next Step
                 </button>

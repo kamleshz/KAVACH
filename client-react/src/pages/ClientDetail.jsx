@@ -18,7 +18,17 @@ import {
   FaBuilding,
   FaCheckCircle,
   FaClipboardCheck,
-  FaFilePdf
+  FaFilePdf,
+  FaEnvelope,
+  FaPhone,
+  FaCalendarAlt,
+  FaUserTie,
+  FaRecycle,
+  FaBolt,
+  FaOilCan,
+  FaCarSide,
+  FaBatteryFull,
+  FaSpinner
 } from 'react-icons/fa';
 import AuditStepper from '../components/AuditStepper';
 import DocumentViewerModal from '../components/DocumentViewerModal';
@@ -37,6 +47,14 @@ import SalesAnalysis from '../components/PlantProcessSteps/SalesAnalysis';
 import PurchaseAnalysis from '../components/PlantProcessSteps/PurchaseAnalysis';
 
 import { ClientProvider } from '../context/ClientContext';
+
+const WASTE_THEME = {
+  'Plastic Waste': { color: '#059669', bg: '#ecfdf5', icon: FaRecycle },
+  'E-Waste': { color: '#7c3aed', bg: '#f5f3ff', icon: FaBolt },
+  'Battery Waste': { color: '#dc2626', bg: '#fef2f2', icon: FaBatteryFull },
+  'ELV': { color: '#0284c7', bg: '#f0f9ff', icon: FaCarSide },
+  'Used Oil': { color: '#b45309', bg: '#fffbeb', icon: FaOilCan },
+};
 
 const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComplete }) => {
   const { id: paramId } = useParams();
@@ -72,8 +90,8 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
   const [viewerUrl, setViewerUrl] = useState('');
   const [viewerName, setViewerName] = useState('');
 
-  // Embedded Audit Detail state
-  const [embeddedAuditTarget, setEmbeddedAuditTarget] = useState(null); // { type, id }
+  const [embeddedAuditTarget, setEmbeddedAuditTarget] = useState(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const [summaryProductRows, setSummaryProductRows] = useState([]);
   const [summaryMonthlyRows, setSummaryMonthlyRows] = useState([]);
@@ -82,6 +100,8 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
   const [summaryRecycledRows, setSummaryRecycledRows] = useState([]);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [selectedIndustryCategory, setSelectedIndustryCategory] = useState('All');
+  const [selectedComplianceStatus, setSelectedComplianceStatus] = useState('All');
+  const isProducerEntity = (client?.entityType || '').toString().toLowerCase().includes('producer');
 
   const { type, itemId } = useMemo(() => {
     if (!client) return { type: null, itemId: null };
@@ -386,8 +406,12 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="flex flex-col items-center justify-center h-[60vh]">
+        <div className="relative">
+          <div className="animate-spin rounded-full h-14 w-14 border-4 border-primary-200 border-t-primary-600" />
+          <FaBuilding className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary-600 text-lg" />
+        </div>
+        <p className="mt-4 text-sm text-gray-500 font-medium">Loading client details...</p>
       </div>
     );
   }
@@ -456,96 +480,161 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
     </div>
   );
 
-  const renderOverviewSection = () => (
-    <div className="w-full mx-auto">
-      <div className="rounded-xl border border-gray-200 bg-white">
-        <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl">
-          <span className="font-semibold text-gray-700 flex items-center gap-2">
-            <FaListAlt className="text-primary-600" />
-            Overview
-          </span>
+  const renderOverviewSection = () => {
+    const wasteType = client.wasteType || 'Plastic Waste';
+    const theme = WASTE_THEME[wasteType] || WASTE_THEME['Plastic Waste'];
+    const WasteIcon = theme.icon;
+
+    const InfoItem = ({ icon: Icon, label, value, iconColor = 'text-gray-400' }) => (
+      <div className="flex items-start gap-3 py-2.5">
+        <div className="mt-0.5">
+          <Icon className={`text-sm ${iconColor}`} />
         </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-3">
-            <div className="flex">
-              <span className="w-48 text-gray-600 font-medium">Client Name:</span>
-              <span className="text-gray-900">{client.clientName}</span>
-            </div>
-            <div className="flex">
-              <span className="w-48 text-gray-600 font-medium">Trade Name:</span>
-              <span className="text-gray-900">{client.tradeName || 'N/A'}</span>
-            </div>
-            <div className="flex">
-              <span className="w-48 text-gray-600 font-medium">Company Group Name:</span>
-              <span className="text-gray-900">{client.companyGroupName || 'N/A'}</span>
-            </div>
-            <div className="flex">
-              <span className="w-48 text-gray-600 font-medium">Company Type:</span>
-              <span className="text-gray-900">{client.companyType || 'N/A'}</span>
-            </div>
-            <div className="flex">
-              <span className="w-48 text-gray-600 font-medium">Financial Year:</span>
-              <span className="text-gray-900">{client.financialYear || 'N/A'}</span>
-            </div>
-            <div className="flex">
-              <span className="w-48 text-gray-600 font-medium">Entity Type:</span>
-              <span className="text-gray-900">{client.entityType}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-3 mt-6">
-            <div className="flex">
-              <span className="w-48 text-gray-600 font-medium">Assigned To:</span>
-              <span className="text-gray-900">{client.assignedTo?.name || 'Unassigned'}</span>
-            </div>
-            <div className="flex">
-              <span className="w-48 text-gray-600 font-medium">Assigned Email:</span>
-              <span className="text-gray-900">{client.assignedTo?.email || 'N/A'}</span>
-            </div>
-          </div>
-
-          <div className="mt-8">
-            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b pb-2 mb-4 text-primary-700">
-              Authorised Person Details
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-3">
-              <div className="flex">
-                <span className="w-48 text-gray-600 font-medium">Name:</span>
-                <span className="text-gray-900">{client.authorisedPerson?.name || 'N/A'}</span>
-              </div>
-              <div className="flex">
-                <span className="w-48 text-gray-600 font-medium">Contact Number:</span>
-                <span className="text-gray-900">{client.authorisedPerson?.number || 'N/A'}</span>
-              </div>
-              <div className="flex">
-                <span className="w-48 text-gray-600 font-medium">Email:</span>
-                <span className="text-gray-900">{client.authorisedPerson?.email || 'N/A'}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8">
-            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b pb-2 mb-4 text-primary-700">
-              Coordinating Person Details
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-3">
-              <div className="flex">
-                <span className="w-48 text-gray-600 font-medium">Name:</span>
-                <span className="text-gray-900">{client.coordinatingPerson?.name || 'N/A'}</span>
-              </div>
-              <div className="flex">
-                <span className="w-48 text-gray-600 font-medium">Contact Number:</span>
-                <span className="text-gray-900">{client.coordinatingPerson?.number || 'N/A'}</span>
-              </div>
-              <div className="flex">
-                <span className="w-48 text-gray-600 font-medium">Email:</span>
-                <span className="text-gray-900">{client.coordinatingPerson?.email || 'N/A'}</span>
-              </div>
-            </div>
-          </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">{label}</p>
+          <p className="text-sm text-gray-900 font-medium mt-0.5 truncate">{value || 'N/A'}</p>
         </div>
       </div>
-    </div>
-  );
+    );
+
+    const PersonCard = ({ title, person, icon: Icon }) => {
+      if (!person?.name) return null;
+      return (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
+            <Icon className="text-primary-600 text-sm" />
+            <h4 className="text-sm font-semibold text-gray-700">{title}</h4>
+          </div>
+          <div className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-sm">
+                {(person.name || 'U')[0].toUpperCase()}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{person.name}</p>
+                {person.designation && (
+                  <p className="text-xs text-gray-500">{person.designation}</p>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2 ml-[52px]">
+              {person.number && (
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <FaPhone className="text-gray-400 text-[10px]" />
+                  <span>{person.number}</span>
+                </div>
+              )}
+              {person.email && (
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <FaEnvelope className="text-gray-400 text-[10px]" />
+                  <span className="truncate">{person.email}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="w-full mx-auto space-y-5">
+        {/* Hero Card */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="h-1.5 w-full" style={{ backgroundColor: theme.color }} />
+          <div className="p-5 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-start gap-5">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg flex-shrink-0"
+                style={{ background: `linear-gradient(135deg, ${theme.color}, ${theme.color}bb)` }}
+              >
+                {(client.clientName || 'U')[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+                  <h2 className="text-xl font-bold text-gray-900 truncate">{client.clientName}</h2>
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold w-fit"
+                    style={{ color: theme.color, backgroundColor: theme.bg, border: `1px solid ${theme.color}33` }}
+                  >
+                    <WasteIcon className="text-[10px]" />
+                    {wasteType}
+                  </span>
+                </div>
+                {client.tradeName && (
+                  <p className="text-sm text-gray-500 mt-1">Trade Name: {client.tradeName}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3">
+                  {client.entityType && (
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <FaBuilding className="text-gray-400 text-xs" />
+                      <span>{client.entityType}</span>
+                    </div>
+                  )}
+                  {client.companyGroupName && (
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <FaIndustry className="text-gray-400 text-xs" />
+                      <span>{client.companyGroupName}</span>
+                    </div>
+                  )}
+                  {client.financialYear && (
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <FaCalendarAlt className="text-gray-400 text-xs" />
+                      <span>FY {client.financialYear}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Company Details */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
+              <FaBuilding className="text-primary-600 text-sm" />
+              <h4 className="text-sm font-semibold text-gray-700">Company Information</h4>
+            </div>
+            <div className="p-5 grid grid-cols-2 gap-x-6">
+              <InfoItem icon={FaBuilding} label="Client Name" value={client.clientName} iconColor="text-primary-500" />
+              <InfoItem icon={FaIdCard} label="Trade Name" value={client.tradeName} />
+              <InfoItem icon={FaIndustry} label="Company Group" value={client.companyGroupName} />
+              <InfoItem icon={FaListAlt} label="Company Type" value={client.companyType} />
+              <InfoItem icon={FaCalendarAlt} label="Financial Year" value={client.financialYear} />
+              <InfoItem icon={FaCheckCircle} label="Entity Type" value={client.entityType} />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
+              <FaUserTie className="text-primary-600 text-sm" />
+              <h4 className="text-sm font-semibold text-gray-700">Assignment Details</h4>
+            </div>
+            <div className="p-5">
+              <div className="grid grid-cols-2 gap-x-6">
+                <InfoItem icon={FaUserTie} label="Assigned To" value={client.assignedTo?.name || 'Unassigned'} iconColor="text-blue-500" />
+                <InfoItem icon={FaEnvelope} label="Assigned Email" value={client.assignedTo?.email} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Contact Person Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <PersonCard
+            title="Authorised Person"
+            person={client.authorisedPerson}
+            icon={FaUser}
+          />
+          <PersonCard
+            title="Coordinating Person"
+            person={client.coordinatingPerson}
+            icon={FaUserTie}
+          />
+        </div>
+      </div>
+    );
+  };
 
   const renderCteCtoSection = () => (
     <div className="w-full mx-auto space-y-8">
@@ -1483,15 +1572,23 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
 
   const renderSkuSummary = () => {
     const categories = ['All', ...new Set(skuTableData.map(item => item.industryCategory).filter(Boolean))];
+    const complianceOptions = ['All', 'Compliant', 'Non-Compliant'];
 
-    const filteredData = selectedIndustryCategory === 'All' 
+    const filteredByIndustry = selectedIndustryCategory === 'All' 
       ? skuTableData 
       : skuTableData.filter(item => item.industryCategory === selectedIndustryCategory);
+
+    const filteredData = selectedComplianceStatus === 'All'
+      ? filteredByIndustry
+      : filteredByIndustry.filter(item => item.productComplianceStatus === selectedComplianceStatus);
 
     // Calculate status counts based on ALL data (or filtered? usually dashboard cards show summary of current view)
     // Let's use filteredData for dynamic updates as requested by standard patterns
     const compliantCount = filteredData.filter(item => item.productComplianceStatus === 'Compliant').length;
     const nonCompliantCount = filteredData.filter(item => item.productComplianceStatus === 'Non-Compliant').length;
+    const totalWithStatus = compliantCount + nonCompliantCount;
+    const compliantPct = totalWithStatus ? ((compliantCount / totalWithStatus) * 100).toFixed(1) : '0.0';
+    const nonCompliantPct = totalWithStatus ? ((nonCompliantCount / totalWithStatus) * 100).toFixed(1) : '0.0';
 
     const detailColumns = [
       { title: 'Component Code', dataIndex: 'componentCode', key: 'componentCode', width: 120 },
@@ -1704,28 +1801,51 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
     return (
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="w-full md:w-64">
-            <span className="text-sm font-semibold text-gray-700 block mb-1">Filter by Industry Category:</span>
-            <Select
-              className="w-full"
-              value={selectedIndustryCategory}
-              onChange={setSelectedIndustryCategory}
-              options={categories.map(c => ({ value: c, label: c }))}
-            />
+          <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+            <div className="w-full md:w-64">
+              <span className="text-sm font-semibold text-gray-700 block mb-1">Filter by Industry Category:</span>
+              <Select
+                className="w-full"
+                value={selectedIndustryCategory}
+                onChange={setSelectedIndustryCategory}
+                options={categories.map(c => ({ value: c, label: c }))}
+              />
+            </div>
+            <div className="w-full md:w-64">
+              <span className="text-sm font-semibold text-gray-700 block mb-1">Compliance Status:</span>
+              <Select
+                className="w-full"
+                value={selectedComplianceStatus}
+                onChange={setSelectedComplianceStatus}
+                options={complianceOptions.map(c => ({ value: c, label: c }))}
+              />
+            </div>
           </div>
-          <div className="flex gap-4">
-            <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex items-center gap-3 min-w-[140px]">
-              <div className="w-2 h-8 bg-green-500 rounded-full"></div>
+          <div className="flex gap-3">
+            <div className="bg-gradient-to-br from-green-50 to-white px-4 py-3 rounded-xl border border-green-200 flex items-center gap-3 min-w-[180px] shadow-sm">
+              <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                <FaCheckCircle className="text-green-600" />
+              </div>
               <div>
-                <p className="text-xs text-gray-500 font-medium">Compliant</p>
-                <p className="text-lg font-bold text-green-600">{compliantCount}</p>
+                <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">Compliant</p>
+                <p className="text-xl font-bold text-green-600">{compliantCount}</p>
+                <p className="text-[11px] text-gray-500">{compliantPct}% of SKUs</p>
+                <div className="w-full h-1 bg-green-100 rounded-full mt-1 overflow-hidden">
+                  <div className="h-full bg-green-500 rounded-full transition-all duration-500" style={{ width: `${compliantPct}%` }}></div>
+                </div>
               </div>
             </div>
-            <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex items-center gap-3 min-w-[140px]">
-              <div className="w-2 h-8 bg-red-500 rounded-full"></div>
+            <div className="bg-gradient-to-br from-red-50 to-white px-4 py-3 rounded-xl border border-red-200 flex items-center gap-3 min-w-[180px] shadow-sm">
+              <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-red-600 font-bold text-sm">!</span>
+              </div>
               <div>
-                <p className="text-xs text-gray-500 font-medium">Non-Compliant</p>
-                <p className="text-lg font-bold text-red-600">{nonCompliantCount}</p>
+                <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">Non-Compliant</p>
+                <p className="text-xl font-bold text-red-600">{nonCompliantCount}</p>
+                <p className="text-[11px] text-gray-500">{nonCompliantPct}% of SKUs</p>
+                <div className="w-full h-1 bg-red-100 rounded-full mt-1 overflow-hidden">
+                  <div className="h-full bg-red-500 rounded-full transition-all duration-500" style={{ width: `${nonCompliantPct}%` }}></div>
+                </div>
               </div>
             </div>
           </div>
@@ -1780,16 +1900,18 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                 <ArrowLeftOutlined className="transition-transform group-hover:-translate-x-1" />
             </button>
           )}
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{client.clientName}</h1>
-            <p className="text-sm text-gray-500">Client Details</p>
-            {(client.auditStartDate || client.auditEndDate) && (
-              <p className="text-sm font-medium text-blue-600 mt-1">
-                <CalendarOutlined className="mr-1" />
-                Audit Period: {client.auditStartDate ? new Date(client.auditStartDate).toLocaleDateString() : 'N/A'} - {client.auditEndDate ? new Date(client.auditEndDate).toLocaleDateString() : 'N/A'}
-              </p>
-            )}
-          </div>
+          {initialViewMode !== 'client-connect' && (
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">{client.clientName}</h1>
+              <p className="text-sm text-gray-500">Client Details</p>
+              {(client.auditStartDate || client.auditEndDate) && (
+                <p className="text-sm font-medium text-blue-600 mt-1">
+                  <CalendarOutlined className="mr-1" />
+                  Audit Period: {client.auditStartDate ? new Date(client.auditStartDate).toLocaleDateString() : 'N/A'} - {client.auditEndDate ? new Date(client.auditEndDate).toLocaleDateString() : 'N/A'}
+                </p>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap gap-3 justify-end">
           {!embedded && (
@@ -1851,123 +1973,150 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         {initialViewMode !== 'client-connect' && tabs.length > 1 && (
-          <div className="mb-8">
+          <div className="p-6 pb-0 mb-6">
             <AuditStepper steps={tabs} currentStep={activeTab} onStepChange={setActiveTab} />
           </div>
         )}
 
-        <div className="animate-fadeIn">
+        <div>
           {initialViewMode === 'client-connect' ? (
-            <Tabs
-              activeKey={clientConnectTab}
-              onChange={setClientConnectTab}
-              type="card"
-              items={[
-                {
-                  key: 'overview',
-                  label: 'Client Overview',
-                  children: (
-                    <div className="mt-4">
-                      <div className="w-full mx-auto">
-                        <div className="rounded-xl border border-gray-200 bg-white">
-                          <button
-                            type="button"
-                            onClick={() => setClientDataOpen(prev => !prev)}
-                            className="w-full flex items-center justify-between px-6 py-4"
-                            aria-expanded={clientDataOpen}
-                          >
-                            <span className="font-semibold text-gray-700 flex items-center gap-2">
-                              <FaListAlt className="text-primary-600" />
-                              Client Data
-                            </span>
-                            <span
-                              className={`ml-4 flex items-center justify-center text-gray-500 transition-transform duration-300 ${
-                                clientDataOpen ? 'rotate-180' : ''
-                              }`}
-                            >
-                              <FaChevronDown className="text-sm" />
-                            </span>
-                          </button>
-                          <div
-                            className={`overflow-hidden transition-all duration-300 ${
-                              clientDataOpen ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'
-                            }`}
-                          >
-                            <div className="p-6 space-y-8 border-t border-gray-100">
-                              {renderOverviewSection()}
-                              {renderAddressSection()}
-                              {renderDocumentsSection()}
-                              {renderCteCtoSection()}
-                            </div>
-                          </div>
+            <>
+              {/* Custom Tab Navigation */}
+              <div className="border-b border-gray-200 px-5">
+                <nav className="flex gap-1 -mb-px overflow-x-auto" role="tablist">
+                  {[
+                    { key: 'overview', label: 'Client Overview', icon: FaListAlt },
+                    { key: 'industry', label: 'Industry SKU & Component', icon: FaIndustry },
+                    { key: 'marking', label: 'Marking & Labelling', icon: FaClipboardCheck },
+                    { key: 'portal', label: 'Portal Data & EPR Targets', icon: FaFileContract },
+                  ].map(tab => {
+                    const isActive = clientConnectTab === tab.key;
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.key}
+                        role="tab"
+                        aria-selected={isActive}
+                        onClick={() => setClientConnectTab(tab.key)}
+                        className={`
+                          flex items-center gap-2 px-4 py-3.5 text-sm font-medium whitespace-nowrap
+                          border-b-2 transition-all duration-200
+                          ${isActive
+                            ? 'border-primary-600 text-primary-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          }
+                        `}
+                      >
+                        <Icon className="text-xs" />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+
+              {/* Tab Content */}
+              <div className="p-5 md:p-6">
+                {clientConnectTab === 'overview' && (
+                  <div className="space-y-5">
+                    {renderOverviewSection()}
+
+                    {/* Expandable: Address Details */}
+                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setClientDataOpen(prev => !prev)}
+                        className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+                        aria-expanded={clientDataOpen}
+                      >
+                        <span className="font-semibold text-gray-700 flex items-center gap-2 text-sm">
+                          <FaMapMarkerAlt className="text-primary-600" />
+                          Address, Documents & Plant Details
+                        </span>
+                        <FaChevronDown className={`text-xs text-gray-400 transition-transform duration-300 ${clientDataOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      <div className={`overflow-hidden transition-all duration-300 ${clientDataOpen ? 'max-h-[8000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                        <div className="px-5 pb-5 space-y-6 border-t border-gray-100 pt-5">
+                          {renderAddressSection()}
+                          {renderDocumentsSection()}
+                          {renderCteCtoSection()}
                         </div>
                       </div>
                     </div>
-                  ),
-                },
-                {
-                  key: 'industry',
-                  label: 'Industry Category Wise SKU & Component',
-                  children: (
-                    <div className="mt-4">
-                      {renderSkuSummary()}
-                    </div>
-                  ),
-                },
-                {
-                  key: 'marking',
-                  label: 'Marking and Labelling',
-                  children: (
-                    <div className="mt-4">
-                      <MarkingLabeling clientId={id} API_URL={api.defaults.baseURL} readOnly={true} />
-                    </div>
-                  ),
-                },
-                {
-                  key: 'portal',
-                  label: 'Portal Data and EPR Targets',
-                  children: (
-                    <div className="mt-4 space-y-8">
-                      {/* 1. Pre/Post Table */}
-                      <Analysis 
-                        clientId={id} 
-                        type={type} 
-                        itemId={itemId} 
-                        isStepReadOnly={true}
-                        entityType={client.entityType}
-                      />
-
-                      {/* 2. Sales Table & 4. Producer EPR Target */}
-                      <SalesAnalysis 
-                        clientId={id} 
-                        type={type} 
-                        itemId={itemId} 
-                        readOnly={true}
-                        entityType={client.entityType}
-                        showTargetsOnTop={true}
-                      />
-
-                      {/* 3. Purchase Table */}
-                      <PurchaseAnalysis 
-                        clientId={id} 
-                        type={type} 
-                        itemId={itemId} 
-                        readOnly={true} 
-                      />
-                    </div>
-                  ),
-                },
-              ]}
-            />
+                  </div>
+                )}
+                {clientConnectTab === 'industry' && renderSkuSummary()}
+                {clientConnectTab === 'marking' && (
+                  <MarkingLabeling clientId={id} API_URL={api.defaults.baseURL} readOnly={true} />
+                )}
+                {clientConnectTab === 'portal' && (
+                  <div className="space-y-8">
+                    {isProducerEntity ? (
+                      <>
+                        <SalesAnalysis
+                          clientId={id}
+                          type={type}
+                          itemId={itemId}
+                          readOnly={true}
+                          entityType={client.entityType}
+                          showTargetsOnTop={true}
+                          hideSalesSection={true}
+                        />
+                        <Analysis
+                          clientId={id}
+                          type={type}
+                          itemId={itemId}
+                          isStepReadOnly={true}
+                          entityType={client.entityType}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Analysis
+                          clientId={id}
+                          type={type}
+                          itemId={itemId}
+                          isStepReadOnly={true}
+                          entityType={client.entityType}
+                          showTargetsOnly={true}
+                        />
+                        <Analysis
+                          clientId={id}
+                          type={type}
+                          itemId={itemId}
+                          isStepReadOnly={true}
+                          entityType={client.entityType}
+                          hideTargets={true}
+                        />
+                      </>
+                    )}
+                    <SalesAnalysis
+                      clientId={id}
+                      type={type}
+                      itemId={itemId}
+                      readOnly={true}
+                      entityType={client.entityType}
+                      hideTargetSection={true}
+                    />
+                    <PurchaseAnalysis
+                      clientId={id}
+                      type={type}
+                      itemId={itemId}
+                      readOnly={true}
+                    />
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
-            <>
+            <div className="p-6">
               {activeTab === 1 && renderOverviewSection()}
               {activeTab === 2 && renderAddressSection()}
               {activeTab === 3 && renderDocumentsSection()}
               {activeTab === 4 && renderCteCtoSection()}
-            </>
+            </div>
           )}
         </div>
       </div>

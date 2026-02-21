@@ -1031,10 +1031,44 @@ class AnalysisService {
             };
         });
 
-        // 3.1 Prepare Marking & Labeling Report Data (From SkuComplianceModel)
+        // 3.1 Prepare Marking & Labeling Report Data (From SkuComplianceModel + fallback to ProductCompliance)
         const skuComplianceDocs = await SkuComplianceModel.find({ client: clientId });
+        console.log(`[Report Generation] SkuCompliance docs found: ${skuComplianceDocs.length} for clientId: ${clientId}`);
 
-        const markingLabelingData = skuComplianceDocs
+        // Build marking data from SkuCompliance collection
+        let markingSource = skuComplianceDocs;
+
+        // If no dedicated SkuCompliance docs, fallback: build from productCompliance rows + skuComplianceMap
+        if (markingSource.length === 0 && allRows.length > 0) {
+            console.log(`[Report Generation] Falling back to productCompliance rows for marking data. allRows: ${allRows.length}, skuComplianceMap keys: ${Object.keys(skuComplianceMap).length}`);
+            const uniqueSkus = new Map();
+            allRows.forEach(row => {
+                const code = (row.skuCode || '').trim();
+                if (!code || uniqueSkus.has(code)) return;
+                const markingInfo = skuComplianceMap[code] || {};
+                uniqueSkus.set(code, {
+                    skuCode: code,
+                    skuDescription: row.skuDescription || '',
+                    skuUm: row.skuUom || '',
+                    productImage: row.productImage || '',
+                    brandOwner: markingInfo.brandOwner || '',
+                    eprCertBrandOwner: markingInfo.eprCertBrandOwner || '',
+                    eprCertProducer: markingInfo.eprCertProducer || '',
+                    thicknessMentioned: markingInfo.thicknessMentioned || '',
+                    polymerUsed: markingInfo.polymerUsed || [],
+                    recycledPercent: markingInfo.recycledPercent || '',
+                    compostableRegNo: markingInfo.compostableRegNo || '',
+                    markingImage: markingInfo.markingImage || [],
+                    remarks: markingInfo.remarks || [],
+                    complianceRemarks: markingInfo.complianceRemarks || [],
+                    complianceStatus: markingInfo.complianceStatus || 'Pending'
+                });
+            });
+            markingSource = Array.from(uniqueSkus.values());
+            console.log(`[Report Generation] Fallback marking source built: ${markingSource.length} unique SKUs`);
+        }
+
+        const markingLabelingData = markingSource
             .sort((a, b) => {
                 const aCode = (a.skuCode || '').trim();
                 const bCode = (b.skuCode || '').trim();
@@ -1044,7 +1078,7 @@ class AnalysisService {
                 index: index + 1,
                 skuCode: doc.skuCode || '-',
                 skuDescription: doc.skuDescription || '-',
-                skuUom: doc.skuUm || '-',
+                skuUom: doc.skuUm || doc.skuUom || '-',
                 productImage: resolveImage(doc.productImage),
                 brandOwner: doc.brandOwner || '-',
                 eprCertBrandOwner: doc.eprCertBrandOwner || '-',
@@ -1058,6 +1092,8 @@ class AnalysisService {
                 complianceRemarks: Array.isArray(doc.complianceRemarks) ? doc.complianceRemarks.join('\n') : (doc.complianceRemarks || '-'),
                 complianceStatus: doc.complianceStatus || 'Pending'
             }));
+        
+        console.log(`[Report Generation] Final markingLabelingData count: ${markingLabelingData.length}`);
 
         // 4. Calculate Sales & Purchase Summary (Registered vs Unregistered)
         const normalizeCategory = (val) => {
