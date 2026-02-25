@@ -3,7 +3,7 @@ import { message } from 'antd';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 
-const useSkuCompliance = (clientId) => {
+const useSkuCompliance = (clientId, isProducer = false, externalProductRows = []) => {
     const [skuComplianceData, setSkuComplianceData] = useState([
         { 
             key: Date.now(), 
@@ -161,14 +161,21 @@ const useSkuCompliance = (clientId) => {
             }
 
             // Fetch Product Compliance Data to sync/merge
-            const prodResponse = await api.get(API_ENDPOINTS.CLIENT.ALL_PRODUCT_COMPLIANCE_ROWS(clientId));
-            console.log('Product Compliance Response:', prodResponse.data);
-
             let productRows = [];
             let fetchSuccess = false;
-            if (prodResponse.data?.success && Array.isArray(prodResponse.data.data)) {
-                productRows = prodResponse.data.data;
-                fetchSuccess = true;
+
+            if (externalProductRows && externalProductRows.length > 0) {
+                 productRows = externalProductRows;
+                 fetchSuccess = true;
+                 console.log('Using external product rows:', productRows.length);
+            } else {
+                const prodResponse = await api.get(API_ENDPOINTS.CLIENT.ALL_PRODUCT_COMPLIANCE_ROWS(clientId));
+                console.log('Product Compliance Response:', prodResponse.data);
+
+                if (prodResponse.data?.success && Array.isArray(prodResponse.data.data)) {
+                    productRows = prodResponse.data.data;
+                    fetchSuccess = true;
+                }
             }
 
             console.log('Product Rows to Merge:', productRows);
@@ -184,9 +191,22 @@ const useSkuCompliance = (clientId) => {
             
             // First, add or update from Product Data
             productRows.forEach((prod, index) => {
-                 // Assuming product data has skuCode, skuDescription, skuUom, etc.
-                 const code = (prod.skuCode || '').trim();
-                 if (!code) return; // Skip if no skuCode
+                 // Logic for Producer vs others
+                 let code, description, uom, image;
+
+                 if (isProducer) {
+                     code = (prod.componentCode || '').trim();
+                     description = prod.componentDescription || '';
+                     uom = ''; // Component typically doesn't use SKU UOM here
+                     image = prod.componentImage || null;
+                 } else {
+                     code = (prod.skuCode || '').trim();
+                     description = prod.skuDescription || '';
+                     uom = prod.skuUom || '';
+                     image = prod.productImage || null;
+                 }
+
+                 if (!code) return; // Skip if no code
 
                  const existing = skuMap.get(code);
 
@@ -195,9 +215,9 @@ const useSkuCompliance = (clientId) => {
                      ...existing, // Keep existing SKU compliance edits
                      // Overwrite basic info from Product Compliance (source of truth)
                      skuCode: code,
-                     skuDescription: prod.skuDescription || existing?.skuDescription || '',
-                     skuUm: prod.skuUom || existing?.skuUm || '', 
-                     productImage: prod.productImage || existing?.productImage || null,
+                     skuDescription: description || existing?.skuDescription || '',
+                     skuUm: uom || existing?.skuUm || '', 
+                     productImage: image || existing?.productImage || null,
                      
                      // Ensure other fields are initialized
                      brandOwner: existing?.brandOwner || '',
@@ -283,7 +303,7 @@ const useSkuCompliance = (clientId) => {
             console.error('Error fetching SKU compliance data:', error);
             message.error('Failed to load SKU compliance data');
         }
-    }, [clientId]);
+    }, [clientId, isProducer, externalProductRows]);
 
     return {
         skuComplianceData,

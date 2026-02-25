@@ -194,6 +194,7 @@ class ClientService {
             componentCode: r.componentCode || '',
             componentDescription: r.componentDescription || '',
             supplierName: r.supplierName || '',
+            supplierType: r.supplierType || '',
             supplierStatus: r.supplierStatus || '',
             foodGrade: (r.foodGrade ?? r.foodgrade ?? '') || '',
             eprCertificateNumber: r.eprCertificateNumber || '',
@@ -249,7 +250,7 @@ class ClientService {
             } else {
                 doc.supplierCompliance.set(idx, single);
             }
-            pushDiffs('Supplier Compliance', idx + 1, beforeRow, single, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo']);
+            pushDiffs('Supplier Compliance', idx + 1, beforeRow, single, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo']);
             doc.markModified('supplierCompliance');
         } else {
             let parsed = rows;
@@ -261,7 +262,7 @@ class ClientService {
             const afterRows = parsed.map(sanitize);
             const maxLen = Math.max(beforeRows.length, afterRows.length);
             for (let i = 0; i < maxLen; i += 1) {
-                pushDiffs('Supplier Compliance', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo']);
+                pushDiffs('Supplier Compliance', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo']);
             }
             doc.supplierCompliance = afterRows;
             doc.markModified('supplierCompliance');

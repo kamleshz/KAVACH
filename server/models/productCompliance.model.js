@@ -49,6 +49,7 @@ const supplierComplianceRowSchema = new mongoose.Schema({
   componentCode: { type: String, default: "" },
   componentDescription: { type: String, default: "" },
   supplierName: { type: String, default: "" },
+  supplierType: { type: String, default: "" },
   supplierStatus: { type: String, default: "" },
   foodGrade: { type: String, default: "" },
   eprCertificateNumber: { type: String, default: "" },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, Select, Input, Button, Upload, Popover, Popconfirm, Modal, message as AntMessage } from 'antd';
 import { 
   FaCheckDouble, FaFilePdf, FaClipboardCheck, FaChartLine, FaFilter, 
@@ -154,7 +154,9 @@ const PostAuditCheck = ({
     handleBulkSavePostValidation, // Added prop for bulk save
     handleAddPostValidationRow,
     handleDeleteAllPostValidation,
-    wasteType
+    wasteType,
+    isProducer,
+    productRows
 }) => {
     const [plasticAnalysisTab, setPlasticAnalysisTab] = useState('prePostValidation');
     
@@ -551,6 +553,7 @@ const PostAuditCheck = ({
                                             savingRow={savingRowIndex}
                                             handleNext={() => {}} 
                                             onlyTable={true}
+                                            isProducer={isProducer}
                                         />
                                     )}
                                 </div>

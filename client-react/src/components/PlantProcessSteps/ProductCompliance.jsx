@@ -96,6 +96,7 @@ const ProductCompliance = ({
     setLastSavedMonthlyRows,
     notify,
     clientId,
+    client,
     type,
     itemId,
     monthlyPage,
@@ -141,6 +142,8 @@ const ProductCompliance = ({
     savingRecycledRow,
     categorySummary = []
 }) => {
+    const isProducer = client?.entityType === 'Producer';
+
     // Document Viewer State
     const [viewerOpen, setViewerOpen] = useState(false);
     const [viewerUrl, setViewerUrl] = useState('');
@@ -360,7 +363,18 @@ const ProductCompliance = ({
                                     { label: 'Supplier Code', width: 'min-w-[150px]' },
                                     { label: 'Component Image', width: 'min-w-[100px]' },
                                     { label: 'Actions', width: 'min-w-[100px]' }
-                                ].filter(h => !isManager || (h.label !== 'Actions' && h.label !== 'System Code')).map((header) => (
+                                ].filter(h => {
+                                    if (isProducer && [
+                                        'Industry Category',
+                                        'SKU code',
+                                        'SKU Description',
+                                        'SKU UOM',
+                                        'Product Image'
+                                    ].includes(h.label)) {
+                                        return false;
+                                    }
+                                    return !isManager || (h.label !== 'Actions' && h.label !== 'System Code');
+                                }).map((header) => (
                                     <th key={header.label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 z-10 border-b border-gray-200 ${isManager ? "bg-green-50" : "bg-gray-50"} ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200' : ''}`}>
                                         {header.label}
                                     </th>
@@ -427,6 +441,7 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    {!isProducer && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -463,6 +478,8 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
+                                    {!isProducer && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -485,6 +502,8 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
+                                    {!isProducer && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -507,6 +526,8 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
+                                    {!isProducer && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -529,6 +550,8 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
+                                    {!isProducer && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col items-center justify-center">
                                             {!isManager && (
@@ -591,6 +614,7 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -700,10 +724,22 @@ const ProductCompliance = ({
                                                 onChange={(e) => handleRowChange(globalIndex, 'supplierType', e.target.value)}
                                             >
                                                 <option value="">Select</option>
-                                                <option value="Contract Manufacture">Contract Manufacture</option>
-                                                <option value="Co-Processer">Co-Processer</option>
-                                                <option value="Co-Packaging">Co-Packaging</option>
-                                                <option value="Not Applicable">Not Applicable</option>
+                                                {isProducer ? (
+                                                    <>
+                                                        <option value="Manufacture">Manufacture</option>
+                                                        <option value="Importer of raw material">Importer of raw material</option>
+                                                        <option value="Importer">Importer</option>
+                                                        <option value="Producer">Producer</option>
+                                                        <option value="PWP">PWP</option>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <option value="Contract Manufacture">Contract Manufacture</option>
+                                                        <option value="Co-Processer">Co-Processer</option>
+                                                        <option value="Co-Packaging">Co-Packaging</option>
+                                                        <option value="Not Applicable">Not Applicable</option>
+                                                    </>
+                                                )}
                                             </select>
                                             )}
                                             {supplierTypeChanged && (
@@ -956,12 +992,16 @@ const ProductCompliance = ({
                                         { label: 'Component Code', width: 'min-w-[120px]' },
                                         { label: 'Component Description', width: 'min-w-[200px]' },
                                         { label: 'Name of Supplier', width: 'min-w-[150px]' },
+                                        { label: 'Supplier Type', width: 'min-w-[150px]' },
                                         { label: 'Supplier Status', width: 'min-w-[120px]' },
                                         { label: 'Food Grade', width: 'min-w-[120px]' },
                                         { label: 'EPR Certificate Number', width: 'min-w-[150px]' },
                                         { label: 'FSSAI Lic No', width: 'min-w-[150px]' },
                                         { label: 'Actions', width: 'min-w-[100px]' }
-                                    ].filter(h => !isManager || (h.label !== 'Actions' && h.label !== 'System Code')).map((header) => (
+                                    ].filter(h => {
+                                        if (h.label === 'Supplier Type' && !isProducer) return false;
+                                        return !isManager || (h.label !== 'Actions' && h.label !== 'System Code');
+                                    }).map((header) => (
                                         <th key={header.label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${isManager ? "bg-green-50" : "bg-gray-50"} ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 z-20' : 'z-10'}`}>
                                             {header.label}
                                         </th>
@@ -1033,6 +1073,20 @@ const ProductCompliance = ({
                                             />
                                             )}
                                         </td>
+                                        {isProducer && (
+                                        <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                            {isManager ? (
+                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.supplierType || '-'}</div>
+                                            ) : (
+                                            <input 
+                                                className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
+                                                placeholder="Supplier Type" 
+                                                value={row.supplierType || ''} 
+                                                readOnly
+                                            />
+                                            )}
+                                        </td>
+                                        )}
 
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
@@ -1210,7 +1264,10 @@ const ProductCompliance = ({
                                         { label: 'Monolayer / Multilayer', width: 'min-w-[150px]' },
                                         { label: 'Thickness (Micron)', width: 'min-w-[130px]' },
                                         { label: 'Actions', width: 'min-w-[140px]' }
-                                    ].filter(h => !isManager || (h.label !== 'Actions' && h.label !== 'System Code')).map((header) => (
+                                    ].filter(h => {
+                                        if (isProducer && (h.label === 'SKU Code' || h.label === 'Component Polymer')) return false;
+                                        return !isManager || (h.label !== 'Actions' && h.label !== 'System Code');
+                                    }).map((header) => (
                                         <th key={header.label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${isManager ? "bg-green-50" : "bg-gray-50"} ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 z-20' : 'z-10'}`}>
                                             {header.label}
                                         </th>
@@ -1240,6 +1297,7 @@ const ProductCompliance = ({
                                         </select>
                                     </td>
                                     )}
+                                    {!isProducer && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         {isManager ? (
                                             <div className="text-center text-xs text-gray-700 py-1.5">{row.skuCode || '-'}</div>
@@ -1252,6 +1310,7 @@ const ProductCompliance = ({
                                         />
                                         )}
                                     </td>
+                                    )}
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         {isManager ? (
                                             <div className="text-center text-xs text-gray-700 py-1.5">{row.componentCode || '-'}</div>
@@ -1303,6 +1362,7 @@ const ProductCompliance = ({
                                             </select>
                                             )}
                                         </td>
+                                        {!isProducer && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.componentPolymer || '-'}</div>
@@ -1321,6 +1381,7 @@ const ProductCompliance = ({
                                             />
                                             )}
                                         </td>
+                                        )}
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.polymerCode || '-'}</div>
@@ -1595,7 +1656,10 @@ const ProductCompliance = ({
                                     <th className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 w-12 ${isManager ? "bg-green-50" : "bg-gray-50"}`}>#</th>
             {[
             'System Code','SKU Code','Supplier Name','Component code','Component Description','Polymer Type','Component Polymer','Category of EPR','Date of invoice','Purchase Qty','UOM','Per Piece Weight','Monthly purchase MT','Recycled %','Recycled QTY','Recycled Rate','Recycled Qrt Amount','Virgin Rate','Virgin Qty','Virgin Qty Amount','RC % Mentioned','Actions'
-        ].filter(label => !isManager || (label !== 'Actions' && label !== 'System Code')).map((label) => (
+        ].filter(label => {
+            if (isProducer && (label === 'SKU Code' || label === 'Component Polymer')) return false;
+            return !isManager || (label !== 'Actions' && label !== 'System Code');
+        }).map((label) => (
             <th key={label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 bg-white' : ''} ${label === 'UOM' ? 'min-w-[100px]' : ''} ${isManager ? "bg-green-50" : "bg-gray-50"}`}>
                 {label}
             </th>
@@ -1770,7 +1834,10 @@ const ProductCompliance = ({
                                                 { key:'purchaseQty', placeholder:'Purchase Qty', type:'text' },
                                                 { key:'uom', type:'select' },
                                                 { key:'perPieceWeightKg', placeholder:'Per Piece Weight', type:'text' },
-                                            ].filter(col => !isManager || col.key !== 'systemCode').map((col) => (
+                                            ].filter(col => {
+                                                if (isProducer && (col.key === 'skuCode' || col.key === 'componentPolymer')) return false;
+                                                return !isManager || col.key !== 'systemCode';
+                                            }).map((col) => (
                                                 <td key={col.key} className="px-2 py-2 whitespace-nowrap align-middle">
                                                     {isManager ? (
                                                         <div className="text-center text-xs text-gray-700 py-1.5">

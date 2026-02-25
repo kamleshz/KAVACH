@@ -167,6 +167,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
   }, [clientId, type, itemId, dbHistoryLoaded, normalizedDbHistory.length, persistedHistory, historyStorageKey, legacyHistoryStorageKey]);
 
   const [client, setClient] = useState(null);
+  const isProducer = client?.entityType === 'Producer';
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -276,6 +277,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         componentCode: '',
         componentDescription: '',
         supplierName: '',
+        supplierType: '',
         polymerType: '',
         componentPolymer: '',
         category: ''
@@ -284,6 +286,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       if (!existing.componentCode && r.componentCode) existing.componentCode = r.componentCode;
       if (!existing.componentDescription && r.componentDescription) existing.componentDescription = r.componentDescription;
       if (!existing.supplierName && r.supplierName) existing.supplierName = r.supplierName;
+      if (!existing.supplierType && r.supplierType) existing.supplierType = r.supplierType;
       uniqueMap.set(code, existing);
     });
     componentRows.forEach(r => {
@@ -295,6 +298,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         componentCode: '',
         componentDescription: '',
         supplierName: '',
+        supplierType: '',
         polymerType: '',
         componentPolymer: '',
         category: ''
@@ -824,36 +828,40 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         }
     };
 
-    const handleSummaryChange = (skuCode, field, value) => {
+    const handleSummaryChange = (identifier, field, value) => {
         setProductRows(prev => prev.map(row => {
-            if ((row.skuCode || '').trim() === skuCode) {
+            const rowKey = isProducer ? (row.componentCode || '').trim() : (row.skuCode || '').trim();
+            if (rowKey === identifier) {
                 return { ...row, [field]: value };
             }
             return row;
         }));
     };
 
-    const handleComponentSummaryChange = (skuCode, componentCode, field, value) => {
+    const handleComponentSummaryChange = (skuIdentifier, componentCode, field, value) => {
         setProductRows(prev => prev.map(row => {
-            if ((row.skuCode || '').trim() === skuCode && (row.componentCode || '').trim() === componentCode) {
+            const rowKey = isProducer ? (row.componentCode || '').trim() : (row.skuCode || '').trim();
+            if (rowKey === skuIdentifier && (row.componentCode || '').trim() === componentCode) {
                 return { ...row, [field]: value };
             }
             return row;
         }));
     };
 
-    const handleSummaryFileChange = (skuCode, file) => {
+    const handleSummaryFileChange = (identifier, file) => {
         setProductRows(prev => prev.map(row => {
-            if ((row.skuCode || '').trim() === skuCode) {
+            const rowKey = isProducer ? (row.componentCode || '').trim() : (row.skuCode || '').trim();
+            if (rowKey === identifier) {
                 return { ...row, additionalDocument: file };
             }
             return row;
         }));
     };
 
-    const handleComponentSummaryFileChange = (skuCode, componentCode, file) => {
+    const handleComponentSummaryFileChange = (skuIdentifier, componentCode, file) => {
         setProductRows(prev => prev.map(row => {
-            if ((row.skuCode || '').trim() === skuCode && (row.componentCode || '').trim() === componentCode) {
+            const rowKey = isProducer ? (row.componentCode || '').trim() : (row.skuCode || '').trim();
+            if (rowKey === skuIdentifier && (row.componentCode || '').trim() === componentCode) {
                 return { ...row, additionalDocument: file };
             }
             return row;
@@ -952,16 +960,26 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             return;
         }
 
+        const isProducer = client?.entityType === 'Producer';
+
         const exportData = supplierRows.map((row) => {
             const data = {
                 'Component Code': row.componentCode,
                 'Component Description': row.componentDescription,
                 'Name of Supplier': row.supplierName,
+            };
+            
+            if (isProducer) {
+                data['Supplier Type'] = row.supplierType;
+            }
+
+            Object.assign(data, {
                 'Supplier Status': row.supplierStatus,
                 'Food Grade': row.foodGrade,
                 'EPR Certificate Number': row.eprCertificateNumber,
                 'FSSAI Lic No': row.fssaiLicNo
-            };
+            });
+
             if (!isManager) {
                 data['System Code'] = row.systemCode;
             }
@@ -975,11 +993,13 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     };
 
     const handleSupplierTemplateDownload = () => {
+        const isProducer = client?.entityType === 'Producer';
         const headers = [
             !isManager ? 'System Code' : null,
             'Component Code',
             'Component Description',
             'Name of Supplier',
+            isProducer ? 'Supplier Type' : null,
             'Supplier Status',
             'Food Grade',
             'EPR Certificate Number',
@@ -1253,19 +1273,32 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 };
 
                 const systemCode = getValue([/system.*code/i]);
-                const componentCode = getValue([/component.*code/i]);
-                const componentDescription = getValue([/component.*desc/i]);
-                const supplierName = getValue([/name.*supplier/i, /supplier.*name/i]);
+                let componentCode = getValue([/component.*code/i]);
+                let componentDescription = getValue([/component.*desc/i]);
+                let supplierName = getValue([/name.*supplier/i, /supplier.*name/i]);
+                let supplierType = getValue([/supplier.*type/i]);
                 const supplierStatus = getValue([/supplier.*status/i]);
                 const foodGrade = getValue([/food.*grade/i]);
                 const eprCertificateNumber = getValue([/epr.*cert/i, /epr.*no/i]);
                 const fssaiLicNo = getValue([/fssai.*lic/i, /fssai.*no/i]);
+
+                // Auto-fetch details if systemCode is present
+                if (systemCode) {
+                    const selected = systemCodeOptions.find(opt => opt.code === systemCode);
+                    if (selected && selected.data) {
+                        if (!componentCode) componentCode = selected.data.componentCode || '';
+                        if (!componentDescription) componentDescription = selected.data.componentDescription || '';
+                        if (!supplierName) supplierName = selected.data.supplierName || '';
+                        if (!supplierType) supplierType = selected.data.supplierType || '';
+                    }
+                }
 
                 newRows.push({
                     systemCode,
                     componentCode,
                     componentDescription,
                     supplierName,
+                    supplierType,
                     supplierStatus,
                     foodGrade,
                     eprCertificateNumber,
@@ -1319,6 +1352,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                     componentCode: r.componentCode,
                     componentDescription: r.componentDescription,
                     supplierName: r.supplierName,
+                    supplierType: (r.supplierType || '').toString(),
                     supplierStatus: r.supplierStatus,
                     foodGrade: r.foodGrade,
                     eprCertificateNumber: r.eprCertificateNumber,
@@ -1620,11 +1654,11 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     }
   };
 
-  const handleComponentSave = async (skuCode, componentCode) => {
-    const idx = productRows.findIndex(r => 
-        (r.skuCode || '').trim() === skuCode && 
-        (r.componentCode || '').trim() === componentCode
-    );
+  const handleComponentSave = async (skuIdentifier, componentCode) => {
+    const idx = productRows.findIndex(r => {
+        const rowKey = isProducer ? (r.componentCode || '').trim() : (r.skuCode || '').trim();
+        return rowKey === skuIdentifier && (r.componentCode || '').trim() === componentCode;
+    });
     if (idx !== -1) {
         await saveRow(idx);
     } else {
@@ -2209,7 +2243,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     if (!row.componentDescription) missing.push('Component Description');
     if (!row.supplierName) missing.push('Supplier Name');
     if (!row.polymerType) missing.push('Polymer Type');
-    if (!row.componentPolymer) missing.push('Component Polymer');
+    if (!isProducer && !row.componentPolymer) missing.push('Component Polymer');
     if (!row.category) missing.push('Category');
     if (row.category === 'Category I' && !row.containerCapacity) missing.push('Container Capacity');
     if (!row.layerType) missing.push('Layer Type');
@@ -2217,7 +2251,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
 
     const pt = (row.polymerType || '').trim();
     const cp = (row.componentPolymer || '').trim();
-    if (pt && pt.toLowerCase() !== 'others' && cp && pt.toLowerCase() !== cp.toLowerCase()) {
+    if (!isProducer && pt && pt.toLowerCase() !== 'others' && cp && pt.toLowerCase() !== cp.toLowerCase()) {
       missing.push('Polymer Type Mismatch');
     }
 
@@ -2319,13 +2353,15 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             'Component Description': row.componentDescription,
             'Supplier Name': row.supplierName,
             'Polymer Type': row.polymerType,
-            'Component Polymer': row.componentPolymer,
             'Category': row.category,
             'Category II Type': row.categoryIIType,
             'Container Capacity': row.containerCapacity,
             'Monolayer / Multilayer': row.layerType,
             'Thickness': row.thickness
         };
+        if (!isProducer) {
+            data['Component Polymer'] = row.componentPolymer;
+        }
         if (!isManager) {
             data['System Code'] = row.systemCode;
         }
@@ -2352,7 +2388,11 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         'Container Capacity',
         'Monolayer / Multilayer',
         'Thickness (Micron)'
-    ].filter(Boolean);
+    ].filter(h => {
+        if (!h) return false;
+        if (isProducer && (h === 'SKU Code' || h === 'Component Polymer')) return false;
+        return true;
+    });
 
     const ws = XLSX.utils.aoa_to_sheet([headers]);
     ws['!dataValidation'] = [
@@ -2958,12 +2998,10 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
          const exportData = monthlyRows.map(row => {
              const data = {
                  'Supplier Name': row.supplierName || '',
-                 'SKU Code': row.skuCode || '',
                  'Component Code': row.componentCode || '',
                  'Component Description': row.componentDescription || '',
                  'Polymer Type': row.polymerType || '',
-                'Component Polymer': row.componentPolymer || '',
-                'Category of EPR': row.category || '',
+                 'Category of EPR': row.category || '',
                  'Date of invoice': row.dateOfInvoice || '',
                   'Month Name': row.monthName || '',
                   'Quarter': row.quarter || '',
@@ -2981,6 +3019,12 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                  'Virgin Qty': row.virginQty || '',
                  'Virgin Qty Amount': row.virginQtyAmount || ''
              };
+             
+             if (!isProducer) {
+                data['SKU Code'] = row.skuCode || '';
+                data['Component Polymer'] = row.componentPolymer || '';
+             }
+
              if (!isManager) {
                  data['System Code'] = row.systemCode || '';
              }
@@ -3001,11 +3045,11 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       const headers = [
           !isManager ? 'System Code' : null,
           'Supplier Name',
-          'SKU Code',
+          !isProducer ? 'SKU Code' : null,
           'Component Code',
           'Component Description',
           'Polymer Type',
-          'Component Polymer',
+          !isProducer ? 'Component Polymer' : null,
           'Category of EPR',
           'Date of invoice',
           'Purchase Qty',
@@ -3152,7 +3196,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         systemCode: sysCode,
         componentCode: match?.componentCode || '',
         componentDescription: match?.componentDescription || '',
-        supplierName: match?.supplierName || ''
+        supplierName: match?.supplierName || '',
+        supplierType: match?.supplierType || ''
       };
       return copy;
     });
@@ -3186,7 +3231,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
 
   const addSupplierRow = () => {
     setSupplierRows(prev => {
-      const newRows = [...prev, { componentCode: '', componentDescription: '', supplierName: '', supplierStatus: '', foodGrade: '', eprCertificateNumber: '', fssaiLicNo: '' }];
+      const newRows = [...prev, { componentCode: '', componentDescription: '', supplierName: '', supplierType: '', supplierStatus: '', foodGrade: '', eprCertificateNumber: '', fssaiLicNo: '' }];
       setSupplierPage(Math.ceil(newRows.length / supplierItemsPerPage));
       return newRows;
     });
@@ -3211,7 +3256,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       await api.post(API_ENDPOINTS.CLIENT.PRODUCT_SUPPLIER_COMPLIANCE(clientId), payload);
 
       const row = supplierRows[idx] || {};
-      const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo'];
+      const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo'];
       const entryBaseId = `${Date.now()}-${Math.random()}`;
       const historyEntries = [];
       fields.forEach((field) => {
@@ -4296,6 +4341,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 clientId={clientId}
                 type={type}
                 itemId={itemId}
+                client={client}
                 monthlyPage={monthlyPage}
                 monthlyItemsPerPage={monthlyItemsPerPage}
                 setMonthlyPage={setMonthlyPage}
@@ -4368,6 +4414,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 handleComponentSummaryFileChange={handleComponentSummaryFileChange}
                 handleComponentSave={handleComponentSave}
                 savingRow={savingRow}
+                isProducer={isProducer}
             />
         )}
 

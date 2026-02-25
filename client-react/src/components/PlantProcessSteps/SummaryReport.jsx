@@ -23,7 +23,8 @@ const SummaryReport = ({
     handleComponentSummaryFileChange,
     handleComponentSave,
     savingRow,
-    onlyTable = false
+    onlyTable = false,
+    isProducer = false
 }) => {
     const [isDownloading, setIsDownloading] = useState(false);
 
@@ -54,25 +55,26 @@ const SummaryReport = ({
     
     // Process and aggregate data
     const tableData = useMemo(() => {
-        // 1. Group productRows by SKU Code
+        // 1. Group productRows by SKU Code (or Component Code for Producer)
         const groupedBySku = new Map();
 
         productRows.forEach(product => {
-            const skuCode = (product.skuCode || '').trim();
-            if (!skuCode) return; // Skip invalid rows
+            const groupKey = isProducer ? (product.componentCode || '').trim() : (product.skuCode || '').trim();
+            if (!groupKey) return; // Skip invalid rows
 
-            if (!groupedBySku.has(skuCode)) {
-                groupedBySku.set(skuCode, {
-                    skuCode,
-                    skuDescription: product.skuDescription || '-',
+            if (!groupedBySku.has(groupKey)) {
+                groupedBySku.set(groupKey, {
+                    key: groupKey,
+                    skuCode: isProducer ? product.componentCode : product.skuCode, // For Producer, use Component Code
+                    skuDescription: isProducer ? product.componentDescription : (product.skuDescription || '-'),
                     industryCategory: product.industryCategory || '-',
-                    productImage: product.productImage,
+                    productImage: isProducer ? product.componentImage : product.productImage,
                     componentCodes: new Set(),
-                    products: [] // Store original product rows for this SKU
+                    products: [] // Store original product rows for this SKU/Component
                 });
             }
 
-            const group = groupedBySku.get(skuCode);
+            const group = groupedBySku.get(groupKey);
             group.products.push(product);
             
             // Add component code to the set for this SKU
@@ -228,7 +230,13 @@ const SummaryReport = ({
                 managerRemarks: firstProduct.managerRemarks || ''
             };
         });
-    }, [productRows, monthlyRows, supplierRows, componentRows, recycledRows]);
+    }, [productRows, monthlyRows, supplierRows, componentRows, recycledRows, isProducer]);
+
+    // Flatten data for Producer
+    const flatTableData = useMemo(() => {
+        if (!isProducer) return [];
+        return tableData.flatMap(group => group.details);
+    }, [tableData, isProducer]);
 
     // Sync derived Product Compliance Status to parent state (productRows)
     // This ensures that the derived status is saved to the database when the user clicks Finish/Save
@@ -413,7 +421,10 @@ const SummaryReport = ({
                 )
             )
         }
-    ];
+    ].filter(col => {
+        if (isProducer && col.key === 'industryCategory') return false;
+        return true;
+    });
 
     // Columns for the nested detailed table
     const detailColumns = [
@@ -707,13 +718,13 @@ const SummaryReport = ({
         <>
             <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <Table 
-                    columns={columns} 
-                    dataSource={tableData} 
+                    columns={isProducer ? detailColumns : columns} 
+                    dataSource={isProducer ? flatTableData : tableData} 
                     pagination={false}
                     size="middle"
                     scroll={{ x: 1200 }}
                     rowClassName="hover:bg-gray-50"
-                    expandable={{
+                    expandable={isProducer ? undefined : {
                         expandedRowRender,
                         rowExpandable: (record) => record.details && record.details.length > 0,
                     }}
@@ -738,7 +749,12 @@ const SummaryReport = ({
             key: 'marking',
             label: 'Marking and Labeling',
             children: (
-                <MarkingLabeling clientId={clientId} API_URL={import.meta.env.VITE_API_URL} />
+                <MarkingLabeling 
+                    clientId={clientId} 
+                    API_URL={import.meta.env.VITE_API_URL} 
+                    isProducer={isProducer}
+                    productRows={productRows}
+                />
             )
         },
         {
@@ -785,7 +801,10 @@ const SummaryReport = ({
                 </div>
             )
         }
-    ];
+    ].filter(item => {
+        if (isProducer && item.key === 'analysis') return false;
+        return true;
+    });
 
     if (onlyTable) {
         return (

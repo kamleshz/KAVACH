@@ -661,6 +661,15 @@ export const saveProductSupplierComplianceController = asyncHandler(async (req, 
     try {
         const { clientId } = req.params;
         const { type, itemId, rows, rowIndex, row } = req.body;
+        
+        console.log(`[Save Supplier Compliance] Client: ${clientId}, Type: ${type}, Item: ${itemId}`);
+        if (rows && Array.isArray(rows)) {
+            console.log(`[Save Supplier Compliance] Rows count: ${rows.length}`);
+            if (rows.length > 0) {
+                console.log(`[Save Supplier Compliance] First row sample:`, JSON.stringify(rows[0]));
+            }
+        }
+
         const userId = req.userId;
         const emitter = req.app.get('realtimeEmitter');
 

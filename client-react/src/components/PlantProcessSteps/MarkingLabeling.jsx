@@ -13,7 +13,7 @@ const getBase64 = (file) =>
     reader.onerror = (error) => reject(error);
   });
 
-const MarkingLabeling = ({ clientId, API_URL, readOnly = false }) => {
+const MarkingLabeling = ({ clientId, API_URL, readOnly = false, isProducer = false, productRows = [] }) => {
     // Preview state for file uploads
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewImage, setPreviewImage] = useState('');
@@ -34,7 +34,7 @@ const MarkingLabeling = ({ clientId, API_URL, readOnly = false }) => {
         handleSkuPageSizeChange,
         handleSaveSkuCompliance: saveSkuRow,
         fetchSkuComplianceData
-    } = useSkuCompliance(clientId);
+    } = useSkuCompliance(clientId, isProducer, productRows);
 
     useEffect(() => {
         if (clientId) {
@@ -69,7 +69,7 @@ const MarkingLabeling = ({ clientId, API_URL, readOnly = false }) => {
             )
         },
         { 
-            title: 'SKU CODE', 
+            title: isProducer ? 'COMPONENT CODE' : 'SKU CODE', 
             dataIndex: 'skuCode', 
             key: 'skuCode', 
             width: 130,
@@ -89,7 +89,7 @@ const MarkingLabeling = ({ clientId, API_URL, readOnly = false }) => {
             ) 
         },
         { 
-            title: 'SKU DESCRIPTION', 
+            title: isProducer ? 'COMPONENT DESCRIPTION' : 'SKU DESCRIPTION', 
             dataIndex: 'skuDescription', 
             key: 'skuDescription', 
             width: 220, 
@@ -105,7 +105,7 @@ const MarkingLabeling = ({ clientId, API_URL, readOnly = false }) => {
                 )
             ) 
         },
-        { 
+        !isProducer && { 
             title: 'SKU UOM', 
             dataIndex: 'skuUm', 
             key: 'skuUm', 
@@ -124,7 +124,7 @@ const MarkingLabeling = ({ clientId, API_URL, readOnly = false }) => {
             ) 
         },
         { 
-            title: 'PRODUCT IMAGE', 
+            title: isProducer ? 'COMPONENT IMAGE' : 'PRODUCT IMAGE', 
             dataIndex: 'productImage', 
             key: 'productImage', 
             width: 150, 
@@ -491,10 +491,22 @@ const MarkingLabeling = ({ clientId, API_URL, readOnly = false }) => {
                 </div>
             )
         }
-    ];
+    ].filter(Boolean);
 
     const skuTableDataSource = useMemo(() => {
         let data = skuComplianceData || [];
+
+        // For Brand Owner (isProducer=false), ensure unique SKUs
+        if (!isProducer) {
+            const uniqueSkus = new Map();
+            data.forEach(item => {
+                if (item.skuCode && !uniqueSkus.has(item.skuCode)) {
+                    uniqueSkus.set(item.skuCode, item);
+                }
+            });
+            data = Array.from(uniqueSkus.values());
+        }
+
         if (skuSearchText) {
             const lower = skuSearchText.toLowerCase();
             data = data.filter(item => 
@@ -506,7 +518,7 @@ const MarkingLabeling = ({ clientId, API_URL, readOnly = false }) => {
             data = data.filter(item => item.complianceStatus === skuStatusFilter);
         }
         return data;
-    }, [skuComplianceData, skuSearchText, skuStatusFilter]);
+    }, [skuComplianceData, skuSearchText, skuStatusFilter, isProducer]);
 
     // Filter out columns if readOnly
     const visibleColumns = useMemo(() => {

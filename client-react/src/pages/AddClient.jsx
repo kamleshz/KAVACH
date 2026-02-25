@@ -176,6 +176,26 @@ const AddClientContent = () => {
   const [postValidationGotoPage, setPostValidationGotoPage] = useState('');
   const [postValidationActiveTab, setPostValidationActiveTab] = useState('productAssessment');
 
+  const isProducer = formData?.clientType === 'Producer' || formData?.entityType === 'Producer';
+  const [productRows, setProductRows] = useState([]);
+
+  useEffect(() => {
+    const fetchProductRows = async () => {
+      if (clientId && fullClientData?.productionFacility?.ctoDetailsList?.[0]?._id) {
+        try {
+          const params = { type: 'CTO', itemId: fullClientData.productionFacility.ctoDetailsList[0]._id };
+          const res = await api.get(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(clientId), { params });
+          if (res.data?.success) {
+            setProductRows(res.data.data || []);
+          }
+        } catch (error) {
+          console.error('Error fetching product rows:', error);
+        }
+      }
+    };
+    fetchProductRows();
+  }, [clientId, fullClientData]);
+
   const {
       skuComplianceData,
       setSkuComplianceData,
@@ -198,7 +218,7 @@ const AddClientContent = () => {
       handleSkuStatusChange,
       handleSaveSkuCompliance,
       fetchSkuComplianceData
-  } = useSkuCompliance(clientId);
+  } = useSkuCompliance(clientId, isProducer, productRows);
   
   // Alias for prop consistency
   // const saveSkuRow = handleSaveSkuCompliance;
@@ -2803,6 +2823,17 @@ const AddClientContent = () => {
   const skuTableDataSource = useMemo(() => {
     let data = skuComplianceData || [];
 
+    // For Brand Owner (isProducer=false), ensure unique SKUs
+    if (!isProducer) {
+        const uniqueSkus = new Map();
+        data.forEach(item => {
+            if (item.skuCode && !uniqueSkus.has(item.skuCode)) {
+                uniqueSkus.set(item.skuCode, item);
+            }
+        });
+        data = Array.from(uniqueSkus.values());
+    }
+
     if (skuSearchText) {
       const lower = skuSearchText.toLowerCase();
       data = data.filter(item => 
@@ -2816,7 +2847,7 @@ const AddClientContent = () => {
     }
 
     return data;
-  }, [skuComplianceData, skuSearchText, skuStatusFilter]);
+  }, [skuComplianceData, skuSearchText, skuStatusFilter, isProducer]);
 
   const handleSkuRemark = (key, field) => {
        const record = skuComplianceData.find(item => item.key === key);
@@ -2860,7 +2891,7 @@ const AddClientContent = () => {
       }
   }, [postValidationActiveTab, clientId, fetchSkuComplianceData]);
 
-  const skuComplianceColumns = [
+  const skuComplianceColumns = useMemo(() => [
     {
         title: 'S.No.',
         key: 'sno',
@@ -2874,7 +2905,7 @@ const AddClientContent = () => {
         )
     },
     { 
-        title: 'SKU CODE', 
+        title: isProducer ? 'COMPONENT CODE' : 'SKU CODE', 
         dataIndex: 'skuCode', 
         key: 'skuCode', 
         width: 130,
@@ -2883,43 +2914,44 @@ const AddClientContent = () => {
         render: (text, record) => (
             <Input 
                 value={text} 
-                onChange={(e) => handleSkuComplianceChange(record.key, 'skuCode', e.target.value)} 
-                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:border-blue-400 transition-colors h-9"
-                placeholder="SKU Code"
+                readOnly
+                className="rounded-md border-gray-200 shadow-sm bg-gray-100 text-gray-600 cursor-not-allowed h-9"
+                placeholder={isProducer ? "Component Code" : "SKU Code"}
             />
         ) 
     },
-        { 
-            title: 'SKU DESCRIPTION', 
-            dataIndex: 'skuDescription', 
-            key: 'skuDescription', 
-            width: 220, 
-            render: (text, record) => (
-                <Input 
-                    value={text} 
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'skuDescription', e.target.value)} 
-                    className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:border-blue-400 transition-colors h-9"
-                    placeholder="Description"
-                />
-            ) 
-        },
-        { 
-            title: 'SKU UOM', 
-            dataIndex: 'skuUm', 
-            key: 'skuUm', 
-            width: 100, 
-            render: (text, record) => (
-                <Input 
-                    value={text} 
-                    onChange={(e) => handleSkuComplianceChange(record.key, 'skuUm', e.target.value)} 
-                    className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:border-blue-400 transition-colors h-9"
-                    placeholder="UOM"
-                />
-            ) 
-        },
-        { 
-             title: 'PRODUCT IMAGE', 
-             dataIndex: 'productImage', 
+    { 
+        title: isProducer ? 'COMPONENT DESCRIPTION' : 'SKU DESCRIPTION', 
+        dataIndex: 'skuDescription', 
+        key: 'skuDescription', 
+        width: 220, 
+        render: (text, record) => (
+            <Input.TextArea 
+                value={text} 
+                readOnly
+                className="rounded-md border-gray-200 shadow-sm bg-gray-100 text-gray-600 cursor-not-allowed min-h-[36px]"
+                placeholder="Description"
+                autoSize={{ minRows: 1, maxRows: 3 }}
+            />
+        ) 
+    },
+    !isProducer && { 
+        title: 'UOM', 
+        dataIndex: 'skuUm', 
+        key: 'skuUm', 
+        width: 100, 
+        render: (text, record) => (
+            <Input 
+                value={text} 
+                readOnly
+                className="rounded-md border-gray-200 shadow-sm bg-gray-100 text-gray-600 cursor-not-allowed h-9"
+                placeholder="UOM"
+            />
+        ) 
+    },
+    { 
+            title: isProducer ? 'COMPONENT IMAGE' : 'PRODUCT IMAGE', 
+            dataIndex: 'productImage', 
              key: 'productImage', 
              width: 150, 
              render: (value) => {
@@ -3179,30 +3211,15 @@ const AddClientContent = () => {
             width: 250, 
             render: (_, record) => {
                 const remarks = Array.isArray(record.remarks) ? record.remarks : (record.remarks ? [record.remarks] : []);
+                const val = remarks.join('\n');
                 return (
-                    <div className="flex flex-col gap-2">
-                        {remarks.length > 0 && (
-                            <div className="flex flex-col gap-1 mb-1">
-                                {remarks.map((r, i) => (
-                                    <div key={i} className="flex items-start gap-1.5 bg-gray-50 p-1.5 rounded border border-gray-100">
-                                        <span className="text-[10px] text-gray-400 mt-0.5">•</span>
-                                        <span className="text-xs text-gray-700 leading-snug break-words">{r}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        {/* 
-                        <Button 
-                            size="small" 
-                            type="dashed" 
-                            onClick={() => handleSkuRemark(record.key, 'remarks')}
-                            className="w-full flex items-center justify-center gap-1 text-xs text-gray-600 border-gray-300 hover:text-primary-600 hover:border-primary-400 h-7"
-                        >
-                            <FaPencilAlt className="text-[10px]" />
-                            {remarks.length > 0 ? 'Edit Remarks' : 'Add Remarks'}
-                        </Button>
-                        */}
-                    </div>
+                    <Input.TextArea
+                        className="w-full border border-gray-200 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white min-h-[50px]"
+                        value={val}
+                        onChange={(e) => handleSkuComplianceChange(record.key, 'remarks', e.target.value.split('\n'))}
+                        placeholder="Auditor remarks..."
+                        autoSize={{ minRows: 2, maxRows: 6 }}
+                    />
                 );
             }
         },
@@ -3211,35 +3228,20 @@ const AddClientContent = () => {
             dataIndex: 'complianceRemarks', 
             key: 'complianceRemarks', 
             width: 250, 
-            render: (_, record) => {
-                const remarks = Array.isArray(record.complianceRemarks) ? record.complianceRemarks : (record.complianceRemarks ? [record.complianceRemarks] : []);
-                return (
-                    <div className="flex flex-col gap-2">
-                        {remarks.length > 0 && (
-                            <div className="flex flex-col gap-1 mb-1">
-                                {remarks.map((r, i) => (
-                                    <div key={i} className="flex items-start gap-1.5 bg-gray-50 p-1.5 rounded border border-gray-100">
-                                        <span className="text-[10px] text-gray-400 mt-0.5">•</span>
-                                        <span className="text-xs text-gray-700 leading-snug break-words">{r}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        <Button 
-                            size="small" 
-                            type="dashed" 
-                            onClick={() => handleOpenRemarksModal(record, 'complianceRemarks')}
-                            className="w-full flex items-center justify-center gap-1 text-xs text-gray-600 border-gray-300 hover:text-primary-600 hover:border-primary-400 h-7"
-                        >
-                            <FaPencilAlt className="text-[10px]" />
-                            {remarks.length > 0 ? 'Edit Remarks' : 'Add Remarks'}
-                        </Button>
-                    </div>
-                );
+            render: (text) => {
+                 const remarks = Array.isArray(text) ? text : (text ? [text] : []);
+                 if (remarks.length === 0) return <span className="text-gray-400 text-xs">-</span>;
+                 return (
+                     <ul className="list-disc pl-4 m-0 text-xs text-gray-700">
+                         {remarks.map((r, i) => (
+                             <li key={i}>{r}</li>
+                         ))}
+                     </ul>
+                 );
             }
         },
         { 
-            title: 'COMPLIANCE STATUS', 
+            title: 'Marking and Labeling Compliance Status', 
             dataIndex: 'complianceStatus', 
             key: 'complianceStatus', 
             width: 200, 
@@ -3320,7 +3322,7 @@ const AddClientContent = () => {
                 </div>
             )
         }
-    ];
+    ].filter(Boolean), [skuPagination, isProducer, handleSkuComplianceChange, handleSaveSkuCompliance, API_URL]);
 
     const loadSkuComplianceData = async () => {
         if (!clientId || !fullClientData?.productionFacility) {
@@ -3860,6 +3862,8 @@ const AddClientContent = () => {
                 handleSkuRemark={handleSkuRemark}
                 handleSkuStatusChange={handleSkuStatusChange}
                 handleSkuPageSizeChange={handleSkuPageSizeChange}
+                isProducer={isProducer}
+                productRows={productRows}
                 regulationsCoveredUnderCto={regulationsCoveredUnderCto}
                 waterRegulationsRows={waterRegulationsRows}
                 airRegulationsRows={airRegulationsRows}
