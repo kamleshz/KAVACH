@@ -188,6 +188,7 @@ const useSkuCompliance = (clientId, isProducer = false, externalProductRows = []
             });
 
             const mergedData = [];
+            const seenSkus = new Set();
             
             // First, add or update from Product Data
             productRows.forEach((prod, index) => {
@@ -207,6 +208,12 @@ const useSkuCompliance = (clientId, isProducer = false, externalProductRows = []
                  }
 
                  if (!code) return; // Skip if no code
+
+                 // For Brand Owner, ensure unique SKU to prevent duplicates
+                 if (!isProducer) {
+                    if (seenSkus.has(code)) return;
+                    seenSkus.add(code);
+                 }
 
                  const existing = skuMap.get(code);
 

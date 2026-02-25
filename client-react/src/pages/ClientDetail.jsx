@@ -313,6 +313,10 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
         ? 'Compliant'
         : '';
 
+      const finalStatus = isProducerEntity 
+        ? (firstProduct.productComplianceStatus || firstProduct.complianceStatus || '') 
+        : derivedProductStatus;
+
       return {
         key: index,
         skuCode,
@@ -325,14 +329,16 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
         virginQty: totalVirginQty.toFixed(3),
         virginAmount: totalVirginAmount.toFixed(2),
         details: details,
-        productComplianceStatus: derivedProductStatus,
-        computedRemarks: details.map(d => d.auditorRemarks).filter(Boolean).join('\n'),
+        productComplianceStatus: finalStatus,
+        computedRemarks: isProducerEntity 
+            ? (firstProduct.remarks || firstProduct.auditorRemarks || '') 
+            : details.map(d => d.auditorRemarks).filter(Boolean).join('\n'),
         clientRemarks: firstProduct.clientRemarks || '',
         additionalDocument: firstProduct.additionalDocument,
         managerRemarks: firstProduct.managerRemarks || '',
       };
     });
-  }, [summaryProductRows, summaryMonthlyRows, summarySupplierRows, summaryComponentRows, summaryRecycledRows]);
+  }, [summaryProductRows, summaryMonthlyRows, summarySupplierRows, summaryComponentRows, summaryRecycledRows, isProducerEntity]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1564,7 +1570,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
     const compliantPct = totalWithStatus ? ((compliantCount / totalWithStatus) * 100).toFixed(1) : '0.0';
     const nonCompliantPct = totalWithStatus ? ((nonCompliantCount / totalWithStatus) * 100).toFixed(1) : '0.0';
 
-    const detailColumns = [
+    let detailColumns = [
       { title: 'Component Code', dataIndex: 'componentCode', key: 'componentCode', width: 120 },
       {
         title: 'Component Image',
@@ -1626,6 +1632,12 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
       }
     ];
 
+    if (isProducerEntity) {
+      detailColumns = detailColumns.filter(col => 
+        !['supplierName', 'supplierStatus', 'eprCertificateNumber'].includes(col.key)
+      );
+    }
+
     const expandedRowRender = (record) => {
       return (
         <Table
@@ -1642,7 +1654,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
 
     const columns = [
       {
-        title: 'SKU Code',
+        title: isProducerEntity ? 'Component Code' : 'SKU Code',
         dataIndex: 'skuCode',
         key: 'skuCode',
         width: 120,
@@ -1650,7 +1662,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
         render: text => <span className="font-semibold text-gray-700">{text}</span>,
       },
       {
-        title: 'SKU Description',
+        title: isProducerEntity ? 'Component Description' : 'SKU Description',
         dataIndex: 'skuDescription',
         key: 'skuDescription',
         width: 220,
@@ -2023,7 +2035,13 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                 )}
                 {clientConnectTab === 'industry' && renderSkuSummary()}
                 {clientConnectTab === 'marking' && (
-                  <MarkingLabeling clientId={id} API_URL={api.defaults.baseURL} readOnly={true} />
+                  <MarkingLabeling 
+                    clientId={id} 
+                    API_URL={api.defaults.baseURL} 
+                    readOnly={true} 
+                    isProducer={isProducerEntity}
+                    productRows={summaryProductRows}
+                  />
                 )}
                 {clientConnectTab === 'portal' && (
                   <div className="space-y-8">
