@@ -170,177 +170,267 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
       }
     });
 
+    if (isProducerEntity) {
+      // For Producer, return flat list of all component details
+      const allDetails = [];
+      groupedBySku.forEach(group => {
+        const { skuCode, skuDescription, industryCategory, productImage, componentCodes, products } = group;
+        
+        let details = [];
+
+        componentCodes.forEach(compCode => {
+            const procurementRecords = monthlyRows.filter(m => (m.componentCode || '').trim() === compCode);
+            const matchingRecycledRows = recycledRows.filter(r => (r.componentCode || '').trim() === compCode);
+    
+            if (procurementRecords.length > 0) {
+              const procDetails = procurementRecords.map((procurement, idx) => {
+                const componentRow =
+                  componentRows.find(c => (c.componentCode || '').trim() === compCode) || {};
+                const supplierRow =
+                  supplierRows.find(
+                    s =>
+                      (s.componentCode || '').trim() === compCode &&
+                      (s.supplierName || '').trim().toLowerCase() ===
+                        (procurement.supplierName || '').trim().toLowerCase()
+                  ) || {};
+    
+                const productRow =
+                  products.find(p => (p.componentCode || '').trim() === compCode) || {};
+    
+                const recycledRow =
+                  matchingRecycledRows.find(
+                    r =>
+                      (r.supplierName || '').trim().toLowerCase() ===
+                      (procurement.supplierName || '').trim().toLowerCase()
+                  ) || matchingRecycledRows[0] || {};
+    
+                return {
+                  key: `${skuCode}-${compCode}-${idx}`,
+                  skuCode, 
+                  industryCategory,
+                  productComplianceStatus: productRow.componentComplianceStatus || productRow.complianceStatus || '',
+                  componentCode: compCode,
+                  componentImage: productRow.componentImage,
+                  componentDescription:
+                    componentRow.componentDescription ||
+                    procurement.componentDescription ||
+                    productRow.componentDescription ||
+                    '-',
+                  supplierName: procurement.supplierName || '-',
+                  supplierStatus: supplierRow.supplierStatus || '-',
+                  eprCertificateNumber: supplierRow.eprCertificateNumber || '-',
+                  polymerType: componentRow.polymerType || procurement.polymerType || '-',
+                  componentPolymer:
+                    componentRow.componentPolymer || procurement.componentPolymer || '-',
+                  category: componentRow.category || procurement.category || '-',
+                  categoryIIType: componentRow.categoryIIType || '-',
+                  containerCapacity: componentRow.containerCapacity || '-',
+                  layerType: componentRow.layerType || '-',
+                  thickness: componentRow.thickness || '-',
+                  monthlyPurchaseMt: procurement.monthlyPurchaseMt || '0',
+                  recycledPercent:
+                    recycledRow.usedRecycledPercent || procurement.recycledPercent || '0',
+                  recycledQty: recycledRow.usedRecycledQtyMt || procurement.recycledQty || '0',
+                  recycledAmount: procurement.recycledQrtAmount || '0',
+                  virginQty: procurement.virginQty || '0',
+                  virginAmount: procurement.virginQtyAmount || '0',
+                  componentComplianceStatus:
+                    productRow.componentComplianceStatus || productRow.complianceStatus || '',
+                  auditorRemarks: productRow.auditorRemarks || '',
+                  additionalDocument: productRow.additionalDocument,
+                  managerRemarks: productRow.managerRemarks || '',
+                };
+              });
+              details.push(...procDetails);
+            } else {
+              const componentRow =
+                componentRows.find(c => (c.componentCode || '').trim() === compCode) || {};
+              const productRow =
+                products.find(p => (p.componentCode || '').trim() === compCode) || {};
+    
+              const totalRecycledQtyForComp = matchingRecycledRows.reduce(
+                (sum, r) => sum + (parseFloat(r.usedRecycledQtyMt) || 0),
+                0
+              );
+              const recycledPercentForComp =
+                matchingRecycledRows.find(r => parseFloat(r.usedRecycledPercent) > 0)
+                  ?.usedRecycledPercent || '0';
+    
+              // Try to find supplier info from product row or supplier row if no procurement
+              // Often for Producers, supplier might be in supplierRows even if not in procurement
+              const supplierRow = supplierRows.find(s => (s.componentCode || '').trim() === compCode) || {};
+
+              details.push({
+                key: `${skuCode}-${compCode}-stub`,
+                skuCode,
+                industryCategory,
+                productComplianceStatus: productRow.componentComplianceStatus || productRow.complianceStatus || '',
+                componentCode: compCode,
+                componentImage: productRow.componentImage,
+                componentDescription:
+                  componentRow.componentDescription || productRow.componentDescription || '-',
+                supplierName: supplierRow.supplierName || '-',
+                supplierStatus: supplierRow.supplierStatus || '-',
+                eprCertificateNumber: supplierRow.eprCertificateNumber || '-',
+                polymerType: componentRow.polymerType || '-',
+                componentPolymer: componentRow.componentPolymer || '-',
+                category: componentRow.category || '-',
+                categoryIIType: componentRow.categoryIIType || '-',
+                containerCapacity: componentRow.containerCapacity || '-',
+                layerType: componentRow.layerType || '-',
+                thickness: componentRow.thickness || '-',
+                monthlyPurchaseMt: '0',
+                recycledPercent: recycledPercentForComp,
+                recycledQty: totalRecycledQtyForComp.toFixed(3),
+                recycledAmount: '0',
+                virginQty: '0',
+                virginAmount: '0',
+                componentComplianceStatus:
+                  productRow.componentComplianceStatus || productRow.complianceStatus || '',
+                auditorRemarks: productRow.auditorRemarks || '',
+                additionalDocument: productRow.additionalDocument,
+                managerRemarks: productRow.managerRemarks || '',
+              });
+            }
+        });
+        allDetails.push(...details);
+      });
+      return allDetails;
+    }
+
     return Array.from(groupedBySku.values()).map((group, index) => {
       const { skuCode, skuDescription, industryCategory, productImage, componentCodes, products } = group;
 
       let details = [];
+      let totalRecycledQty = 0;
+      let hasNonCompliant = false;
+      let allCompliant = true;
+      let remarksList = [];
 
       componentCodes.forEach(compCode => {
         const procurementRecords = monthlyRows.filter(m => (m.componentCode || '').trim() === compCode);
         const matchingRecycledRows = recycledRows.filter(r => (r.componentCode || '').trim() === compCode);
 
+        // Calculate metrics for this component across all procurements
+        let compRecycledQty = 0;
+        
         if (procurementRecords.length > 0) {
-          const procDetails = procurementRecords.map((procurement, idx) => {
-            const componentRow =
-              componentRows.find(c => (c.componentCode || '').trim() === compCode) || {};
-            const supplierRow =
-              supplierRows.find(
-                s =>
-                  (s.componentCode || '').trim() === compCode &&
-                  (s.supplierName || '').trim().toLowerCase() ===
-                    (procurement.supplierName || '').trim().toLowerCase()
-              ) || {};
+             procurementRecords.forEach((procurement, idx) => {
+                const componentRow = componentRows.find(c => (c.componentCode || '').trim() === compCode) || {};
+                const supplierRow = supplierRows.find(s => 
+                    (s.componentCode || '').trim() === compCode && 
+                    (s.supplierName || '').trim().toLowerCase() === (procurement.supplierName || '').trim().toLowerCase()
+                ) || {};
+                const productRow = products.find(p => (p.componentCode || '').trim() === compCode) || {};
+                const recycledRow = matchingRecycledRows.find(r => 
+                    (r.supplierName || '').trim().toLowerCase() === (procurement.supplierName || '').trim().toLowerCase()
+                ) || matchingRecycledRows[0] || {};
 
-            const productRow =
-              products.find(p => (p.componentCode || '').trim() === compCode) || {};
+                const recQty = parseFloat(recycledRow.usedRecycledQtyMt || procurement.recycledQty || 0);
+                compRecycledQty += recQty;
 
-            const recycledRow =
-              matchingRecycledRows.find(
-                r =>
-                  (r.supplierName || '').trim().toLowerCase() ===
-                  (procurement.supplierName || '').trim().toLowerCase()
-              ) || matchingRecycledRows[0] || {};
+                // Compliance Status Logic
+                const status = productRow.componentComplianceStatus || productRow.complianceStatus || '';
+                if (status === 'Non-Compliant') {
+                    hasNonCompliant = true;
+                    allCompliant = false;
+                } else if (status !== 'Compliant') {
+                    allCompliant = false;
+                }
 
-            return {
-              key: `${skuCode}-${compCode}-${idx}`,
-              skuCode,
-              componentCode: compCode,
-              componentImage: productRow.componentImage,
-              componentDescription:
-                componentRow.componentDescription ||
-                procurement.componentDescription ||
-                productRow.componentDescription ||
-                '-',
-              supplierName: procurement.supplierName || '-',
-              supplierStatus: supplierRow.supplierStatus || '-',
-              eprCertificateNumber: supplierRow.eprCertificateNumber || '-',
-              polymerType: componentRow.polymerType || procurement.polymerType || '-',
-              componentPolymer:
-                componentRow.componentPolymer || procurement.componentPolymer || '-',
-              category: componentRow.category || procurement.category || '-',
-              categoryIIType: componentRow.categoryIIType || '-',
-              containerCapacity: componentRow.containerCapacity || '-',
-              layerType: componentRow.layerType || '-',
-              thickness: componentRow.thickness || '-',
-              monthlyPurchaseMt: procurement.monthlyPurchaseMt || '0',
-              recycledPercent:
-                recycledRow.usedRecycledPercent || procurement.recycledPercent || '0',
-              recycledQty: recycledRow.usedRecycledQtyMt || procurement.recycledQty || '0',
-              recycledAmount: procurement.recycledQrtAmount || '0',
-              virginQty: procurement.virginQty || '0',
-              virginAmount: procurement.virginQtyAmount || '0',
-              componentComplianceStatus:
-                productRow.componentComplianceStatus || productRow.complianceStatus || '',
-              auditorRemarks: productRow.auditorRemarks || '',
-              additionalDocument: productRow.additionalDocument,
-              managerRemarks: productRow.managerRemarks || '',
-            };
-          });
-          details.push(...procDetails);
+                // Remarks
+                if (productRow.auditorRemarks) {
+                    remarksList.push(`${compCode}: ${productRow.auditorRemarks}`);
+                }
+
+                details.push({
+                    key: `${skuCode}-${compCode}-${idx}`,
+                    componentCode: compCode,
+                    componentImage: productRow.componentImage,
+                    componentDescription: componentRow.componentDescription || procurement.componentDescription || productRow.componentDescription || '-',
+                    supplierName: procurement.supplierName || '-',
+                    supplierStatus: supplierRow.supplierStatus || '-',
+                    eprCertificateNumber: supplierRow.eprCertificateNumber || '-',
+                    polymerType: componentRow.polymerType || procurement.polymerType || '-',
+                    componentPolymer: componentRow.componentPolymer || procurement.componentPolymer || '-',
+                    category: componentRow.category || procurement.category || '-',
+                    categoryIIType: componentRow.categoryIIType || '-',
+                    containerCapacity: componentRow.containerCapacity || '-',
+                    layerType: componentRow.layerType || '-',
+                    thickness: componentRow.thickness || '-',
+                    monthlyPurchaseMt: procurement.monthlyPurchaseMt || '0',
+                    recycledQty: (recycledRow.usedRecycledQtyMt || procurement.recycledQty || 0).toString(),
+                    componentComplianceStatus: status,
+                    auditorRemarks: productRow.auditorRemarks || '',
+                    additionalDocument: productRow.additionalDocument,
+                    managerRemarks: productRow.managerRemarks || ''
+                });
+             });
         } else {
-          const componentRow =
-            componentRows.find(c => (c.componentCode || '').trim() === compCode) || {};
-          const productRow =
-            products.find(p => (p.componentCode || '').trim() === compCode) || {};
+             // No procurement records, but component exists in product definition
+             const componentRow = componentRows.find(c => (c.componentCode || '').trim() === compCode) || {};
+             const productRow = products.find(p => (p.componentCode || '').trim() === compCode) || {};
+             const supplierRow = supplierRows.find(s => (s.componentCode || '').trim() === compCode) || {};
+             
+             // Sum recycled qty for component (if any recycled rows exist without procurement link)
+             const recQty = matchingRecycledRows.reduce((sum, r) => sum + (parseFloat(r.usedRecycledQtyMt) || 0), 0);
+             compRecycledQty += recQty;
 
-          const totalRecycledQtyForComp = matchingRecycledRows.reduce(
-            (sum, r) => sum + (parseFloat(r.usedRecycledQtyMt) || 0),
-            0
-          );
-          const recycledPercentForComp =
-            matchingRecycledRows.find(r => parseFloat(r.usedRecycledPercent) > 0)
-              ?.usedRecycledPercent || '0';
+             const status = productRow.componentComplianceStatus || productRow.complianceStatus || '';
+             if (status === 'Non-Compliant') {
+                hasNonCompliant = true;
+                allCompliant = false;
+             } else if (status !== 'Compliant') {
+                allCompliant = false;
+             }
 
-          details.push({
-            key: `${skuCode}-${compCode}-stub`,
-            skuCode,
-            componentCode: compCode,
-            componentImage: productRow.componentImage,
-            componentDescription:
-              componentRow.componentDescription || productRow.componentDescription || '-',
-            supplierName: '-',
-            supplierStatus: '-',
-            eprCertificateNumber: '-',
-            polymerType: componentRow.polymerType || '-',
-            componentPolymer: componentRow.componentPolymer || '-',
-            category: componentRow.category || '-',
-            categoryIIType: componentRow.categoryIIType || '-',
-            containerCapacity: componentRow.containerCapacity || '-',
-            layerType: componentRow.layerType || '-',
-            thickness: componentRow.thickness || '-',
-            monthlyPurchaseMt: '0',
-            recycledPercent: recycledPercentForComp,
-            recycledQty: totalRecycledQtyForComp.toFixed(3),
-            recycledAmount: '0',
-            virginQty: '0',
-            virginAmount: '0',
-            componentComplianceStatus:
-              productRow.componentComplianceStatus || productRow.complianceStatus || '',
-            auditorRemarks: productRow.auditorRemarks || '',
-            additionalDocument: productRow.additionalDocument,
-            managerRemarks: productRow.managerRemarks || '',
-          });
+             if (productRow.auditorRemarks) {
+                remarksList.push(`${compCode}: ${productRow.auditorRemarks}`);
+             }
+
+             details.push({
+                key: `${skuCode}-${compCode}-stub`,
+                componentCode: compCode,
+                componentImage: productRow.componentImage,
+                componentDescription: componentRow.componentDescription || productRow.componentDescription || '-',
+                supplierName: supplierRow.supplierName || '-',
+                supplierStatus: supplierRow.supplierStatus || '-',
+                eprCertificateNumber: supplierRow.eprCertificateNumber || '-',
+                polymerType: componentRow.polymerType || '-',
+                componentPolymer: componentRow.componentPolymer || '-',
+                category: componentRow.category || '-',
+                categoryIIType: componentRow.categoryIIType || '-',
+                containerCapacity: componentRow.containerCapacity || '-',
+                layerType: componentRow.layerType || '-',
+                thickness: componentRow.thickness || '-',
+                monthlyPurchaseMt: '0',
+                recycledQty: recQty.toFixed(3),
+                componentComplianceStatus: status,
+                auditorRemarks: productRow.auditorRemarks || '',
+                additionalDocument: productRow.additionalDocument,
+                managerRemarks: productRow.managerRemarks || ''
+             });
         }
+        
+        totalRecycledQty += compRecycledQty;
       });
 
-      let totalRecycledQty = 0;
-      let totalRecycledAmount = 0;
-      let totalVirginQty = 0;
-      let totalVirginAmount = 0;
-      let recycledPercent = 0;
+      let productComplianceStatus = '';
+      if (hasNonCompliant) productComplianceStatus = 'Non-Compliant';
+      else if (allCompliant && componentCodes.size > 0) productComplianceStatus = 'Compliant';
 
-      details.forEach(d => {
-        totalRecycledQty += parseFloat(d.recycledQty) || 0;
-        totalRecycledAmount += parseFloat(d.recycledAmount) || 0;
-        totalVirginQty += parseFloat(d.virginQty) || 0;
-        totalVirginAmount += parseFloat(d.virginAmount) || 0;
-      });
-
-      if (totalVirginQty + totalRecycledQty > 0) {
-        recycledPercent = (
-          (totalRecycledQty / (totalVirginQty + totalRecycledQty)) *
-          100
-        ).toFixed(2);
-      }
-
-      const firstProduct = products[0] || {};
-
-      const isAnyNonCompliant = details.some(
-        d => d.componentComplianceStatus === 'Non-Compliant'
-      );
-      const hasAnyStatus = details.some(
-        d => d.componentComplianceStatus && d.componentComplianceStatus !== 'Select'
-      );
-
-      const derivedProductStatus = isAnyNonCompliant
-        ? 'Non-Compliant'
-        : hasAnyStatus
-        ? 'Compliant'
-        : '';
-
-      const finalStatus = isProducerEntity 
-        ? (firstProduct.productComplianceStatus || firstProduct.complianceStatus || '') 
-        : derivedProductStatus;
+      const uniqueRemarks = [...new Set(remarksList)].join('\n');
 
       return {
-        key: index,
+        key: skuCode,
         skuCode,
         skuDescription,
         industryCategory,
         productImage,
         recycledQty: totalRecycledQty.toFixed(3),
-        recycledAmount: totalRecycledAmount.toFixed(2),
-        recycledPercent: `${recycledPercent}%`,
-        virginQty: totalVirginQty.toFixed(3),
-        virginAmount: totalVirginAmount.toFixed(2),
-        details: details,
-        productComplianceStatus: finalStatus,
-        computedRemarks: isProducerEntity 
-            ? (firstProduct.remarks || firstProduct.auditorRemarks || '') 
-            : details.map(d => d.auditorRemarks).filter(Boolean).join('\n'),
-        clientRemarks: firstProduct.clientRemarks || '',
-        additionalDocument: firstProduct.additionalDocument,
-        managerRemarks: firstProduct.managerRemarks || '',
+        productComplianceStatus,
+        computedRemarks: uniqueRemarks,
+        details: details
       };
     });
   }, [summaryProductRows, summaryMonthlyRows, summarySupplierRows, summaryComponentRows, summaryRecycledRows, isProducerEntity]);
@@ -1576,7 +1666,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
     const nonCompliantPct = totalWithStatus ? ((nonCompliantCount / totalWithStatus) * 100).toFixed(1) : '0.0';
 
     let detailColumns = [
-      { title: 'Component Code', dataIndex: 'componentCode', key: 'componentCode', width: 120 },
+      { title: 'Component Code', dataIndex: 'componentCode', key: 'componentCode', width: 120, fixed: 'left', render: text => <span className="font-semibold text-gray-700">{text}</span> },
       {
         title: 'Component Image',
         dataIndex: 'componentImage',
@@ -1634,14 +1724,41 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
             {val || '-'}
           </div>
         )
+      },
+      {
+        title: 'Additional Document',
+        dataIndex: 'additionalDocument',
+        key: 'additionalDocument',
+        width: 120,
+        align: 'center',
+        render: (doc) => (
+          <div className="flex flex-col items-center gap-1">
+            {doc ? (
+              <button 
+                onClick={() => {
+                  const url = typeof doc === 'string' ? resolveUrl(doc) : '';
+                  if (url) window.open(url, '_blank');
+                }}
+                className="text-[10px] font-bold text-primary-600 hover:text-primary-800 underline"
+              >
+                View
+              </button>
+            ) : <span className="text-gray-300">-</span>}
+          </div>
+        )
+      },
+      {
+        title: 'Manager Remarks',
+        dataIndex: 'managerRemarks',
+        key: 'managerRemarks',
+        width: 200,
+        render: (val) => (
+          <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">
+            {val || '-'}
+          </div>
+        )
       }
     ];
-
-    if (isProducerEntity) {
-      detailColumns = detailColumns.filter(col => 
-        !['supplierName', 'supplierStatus', 'eprCertificateNumber'].includes(col.key)
-      );
-    }
 
     const expandedRowRender = (record) => {
       return (
@@ -1660,150 +1777,8 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
     let columns = [];
 
     if (isProducerEntity) {
-        // Flat "Component Table" for Producers
-        columns = [
-            {
-                title: 'Component Code',
-                dataIndex: 'skuCode', // skuCode holds componentCode for Producers
-                key: 'skuCode',
-                width: 120,
-                fixed: 'left',
-                render: text => <span className="font-semibold text-gray-700">{text}</span>,
-            },
-            {
-                title: 'Component Description',
-                dataIndex: 'skuDescription',
-                key: 'skuDescription',
-                width: 220,
-                render: text => <span className="text-gray-600 text-xs">{text}</span>,
-            },
-            {
-                title: 'Component Image',
-                dataIndex: 'productImage',
-                key: 'productImage',
-                width: 120,
-                align: 'center',
-                render: img =>
-                  img ? (
-                    <div className="w-10 h-10 mx-auto rounded bg-gray-50 border border-gray-200 overflow-hidden flex items-center justify-center">
-                      <Image
-                        src={typeof img === 'string' ? resolveUrl(img) : ''}
-                        alt="Product"
-                        className="w-full h-full object-cover"
-                        preview={img ? { src: typeof img === 'string' ? resolveUrl(img) : '' } : false}
-                      />
-                    </div>
-                  ) : (
-                    <span className="text-gray-300">-</span>
-                  ),
-            },
-            {
-                title: 'Industry Category',
-                dataIndex: 'industryCategory',
-                key: 'industryCategory',
-                width: 180,
-                render: text => <span className="text-gray-600 text-xs">{text}</span>,
-            },
-            // Add other component details directly here since we don't expand
-            {
-                title: 'Polymer Type',
-                key: 'polymerType',
-                width: 120,
-                render: (_, record) => {
-                    const detail = record.details && record.details[0];
-                    return <span className="text-gray-600 text-xs">{detail ? (detail.polymerType || detail.componentPolymer || '-') : '-'}</span>;
-                }
-            },
-            {
-                title: 'Category',
-                key: 'category',
-                width: 100,
-                render: (_, record) => {
-                    const detail = record.details && record.details[0];
-                    return <span className="text-gray-600 text-xs">{detail ? (detail.category || '-') : '-'}</span>;
-                }
-            },
-             {
-                title: 'Thickness',
-                key: 'thickness',
-                width: 100,
-                render: (_, record) => {
-                    const detail = record.details && record.details[0];
-                    return <span className="text-gray-600 text-xs">{detail ? (detail.thickness || '-') : '-'}</span>;
-                }
-            },
-            {
-                title: 'Recycled Qty',
-                dataIndex: 'recycledQty',
-                key: 'recycledQty',
-                width: 120,
-                align: 'right',
-                render: val => <span className="font-medium text-green-700">{val}</span>,
-            },
-            {
-                title: 'Compliance Status',
-                dataIndex: 'productComplianceStatus',
-                key: 'productComplianceStatus',
-                width: 180,
-                render: val => (
-                  <span
-                    className={`px-2 py-1 rounded text-xs font-semibold ${
-                      val === 'Compliant'
-                        ? 'bg-green-100 text-green-700'
-                        : val === 'Non-Compliant'
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {val || '-'}
-                  </span>
-                ),
-            },
-            {
-                title: 'Remarks',
-                dataIndex: 'computedRemarks',
-                key: 'computedRemarks',
-                width: 200,
-                render: (val) => (
-                  <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">
-                    {val || '-'}
-                  </div>
-                )
-            },
-             {
-                title: 'Additional Document',
-                dataIndex: 'additionalDocument',
-                key: 'additionalDocument',
-                width: 120,
-                align: 'center',
-                render: (doc) => (
-                  <div className="flex flex-col items-center gap-1">
-                    {doc ? (
-                      <button 
-                        onClick={() => {
-                          const url = typeof doc === 'string' ? resolveUrl(doc) : '';
-                          if (url) window.open(url, '_blank');
-                        }}
-                        className="text-[10px] font-bold text-primary-600 hover:text-primary-800 underline"
-                      >
-                        View
-                      </button>
-                    ) : <span className="text-gray-300">-</span>}
-                  </div>
-                )
-            },
-            {
-                title: 'Manager Remarks',
-                dataIndex: 'managerRemarks',
-                key: 'managerRemarks',
-                width: 200,
-                render: (val) => (
-                  <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">
-                    {val || '-'}
-                  </div>
-                )
-            }
-        ];
+        // Use standard component table columns for Producer (flat view)
+        columns = detailColumns;
     } else {
         // Standard SKU -> Component Table for Brand Owners
         columns = [

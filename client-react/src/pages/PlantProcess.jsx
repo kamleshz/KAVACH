@@ -3212,6 +3212,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     // Look in productRows as well (since we added Supplier Name there)
     const prodMatch = productRows.find(r => (r.componentCode || '').trim() === (code || '').trim() && (r.supplierName || '').trim());
     const supplierFromProduct = (prodMatch?.supplierName || '').trim();
+    const supplierTypeFromProduct = (prodMatch?.supplierType || '').trim();
 
     const existingRowsSameCode = supplierRows.filter(r => (r.componentCode || '').trim() === (code || '').trim());
     const registeredExisting = existingRowsSameCode.find(r => r.supplierStatus === 'Registered' && (r.supplierName || '').trim());
@@ -3223,7 +3224,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         ...copy[index],
         componentCode: code,
         componentDescription: descFromComponent || (opt ? opt.description : ''),
-        supplierName: supplierFromComponent || supplierFromProduct || supplierFromExisting || ''
+        supplierName: supplierFromComponent || supplierFromProduct || supplierFromExisting || '',
+        supplierType: supplierTypeFromProduct || ''
       };
       return copy;
     });
@@ -3862,7 +3864,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         // 3. Supplier Compliance
         supplierRows.forEach((row, idx) => {
             const initialRow = lastSavedSupplierRows[idx] || {};
-            const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo'];
+            const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo'];
             fields.forEach(field => {
                 const prevVal = (initialRow[field] ?? '').toString().trim();
                 const currVal = (row[field] ?? '').toString().trim();
