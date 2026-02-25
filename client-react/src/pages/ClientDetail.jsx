@@ -56,7 +56,7 @@ const WASTE_THEME = {
   'Used Oil': { color: '#b45309', bg: '#fffbeb', icon: FaOilCan },
 };
 
-const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComplete }) => {
+const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComplete, onContextReady }) => {
   const { id: paramId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -112,6 +112,12 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
     const computedItemId = primary?._id;
     return { type: computedType, itemId: computedItemId };
   }, [client]);
+
+  useEffect(() => {
+    if (client && onContextReady) {
+      onContextReady({ id, client, type, itemId });
+    }
+  }, [client, type, itemId, id, onContextReady]);
 
   const toggleSection = (plantKey, section) => {
     const key = `${plantKey}-${section}`;
@@ -1433,38 +1439,6 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
             <FaFileContract className="text-primary-600" />
             Company Documents
           </span>
-          {(client.wasteType || '').toLowerCase().includes('plastic') && (
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  setLoading(true);
-                  const response = await api.get(
-                    API_ENDPOINTS.ANALYSIS.COMPLIANCE_REPORT(id) + `?type=${type}&itemId=${itemId}`,
-                    { responseType: 'blob' }
-                  );
-                  const url = window.URL.createObjectURL(new Blob([response.data]));
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.setAttribute(
-                    'download',
-                    `Plastic_Compliance_Report_${client.clientName || id}.pdf`
-                  );
-                  document.body.appendChild(link);
-                  link.click();
-                  link.remove();
-                } catch (err) {
-                  console.error('Report download failed:', err);
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-primary-200 bg-white text-primary-700 text-xs font-semibold hover:bg-primary-50 transition-colors"
-            >
-              <FaFilePdf className="text-sm" />
-              Download Complete Report
-            </button>
-          )}
         </div>
         <div className="p-6 space-y-3">
           {(client.documents || [])
@@ -1938,7 +1912,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
               </button>
             </>
           )}
-          {(client.wasteType || '').toLowerCase().includes('plastic') && (
+          {(client.wasteType || '').toLowerCase().includes('plastic') && initialViewMode !== 'client-connect' && (
             <button
               type="button"
               onClick={async () => {

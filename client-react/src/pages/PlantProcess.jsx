@@ -925,7 +925,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 type: 'list',
                 allowBlank: true,
                 sqref: 'J2:J500',
-                formulae: ['"Contract Manufacture,Co-Processer,Co-Packaging"']
+                formulae: ['"Contract Manufacture,Co-Processer,Co-Packaging,Not Applicable"']
             },
             {
                 type: 'list',
@@ -1152,7 +1152,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 setProductRows(validatedRows);
                 notify('warning', 'No valid rows to save. Please check for missing fields.');
                 setIsBulkSaving(false);
-                return;
+                return false;
             }
 
             const payload = validRows.map(r => {
@@ -1208,14 +1208,17 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 // If I am careful, I should verify if invalid rows are preserved.
                 // But for now, I will stick to the implementation:
                 setLastSavedRows([...res.data.data]); 
+                return true;
             } else {
                 notify('error', res.data.message || 'Failed to save rows');
                 setProductRows(validatedRows);
+                return false;
             }
 
         } catch (err) {
             console.error(err);
             notify('error', 'Failed to save rows');
+            return false;
         } finally {
             setIsBulkSaving(false);
         }
@@ -1299,13 +1302,13 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 setSupplierRows(validatedRows);
                 notify('warning', 'No valid rows to save. Please check for missing fields.');
                 setIsSupplierBulkSaving(false);
-                return;
+                return false;
             }
             
             // If strictly no rows at all
             if (validRows.length === 0 && invalidRows.length === 0) {
                  setIsSupplierBulkSaving(false);
-                 return;
+                 return true;
             }
 
             const payload = {
@@ -1330,14 +1333,17 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 // Merge saved rows with invalid rows (keep invalid ones in UI)
                 setSupplierRows([...savedRows, ...invalidRows]);
                 setLastSavedSupplierRows([...savedRows]);
+                return true;
             } else {
                 notify('error', res.data.message || 'Failed to save');
                 setSupplierRows(validatedRows); // Show errors
+                return false;
             }
 
         } catch (err) {
             console.error(err);
             notify('error', err.response?.data?.message || 'Failed to save supplier rows');
+            return false;
         } finally {
             setIsSupplierBulkSaving(false);
         }
@@ -1911,7 +1917,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 type: 'list',
                 allowBlank: true,
                 sqref: 'J2:J500',
-                formulae: ['"Contract Manufacture,Co-Processer,Co-Packaging"']
+                formulae: ['"Contract Manufacture,Co-Processer,Co-Packaging,Not Applicable"']
             },
             {
                 type: 'list',
@@ -2058,6 +2064,13 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
   const [lastSavedComponentRows, setLastSavedComponentRows] = useState([]);
   const [initialComponentRows, setInitialComponentRows] = useState([]);
   const handleComponentChange = (index, field, value) => {
+    if (field === 'systemCode' && value) {
+        const isDuplicate = componentRows.some((r, i) => i !== index && (r.systemCode || '').trim() === (value || '').trim());
+        if (isDuplicate) {
+          notify('error', 'System Code Already Used');
+          return;
+        }
+    }
     setComponentRows(prev => {
       const copy = [...prev];
       copy[index] = { ...copy[index], [field]: value };
@@ -2228,7 +2241,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
           setComponentRows(validatedRows);
           notify('warning', 'No rows to save');
           setIsComponentBulkSaving(false);
-          return;
+          return false;
         }
 
         const payload = rowsToSave.map((r) => {
@@ -2252,14 +2265,17 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             } else {
               notify('success', `Saved ${savedRows.length} rows successfully`);
             }
+            return true;
         } else {
             notify('error', res.data.message || 'Failed to save rows');
             setComponentRows(validatedRows);
+            return false;
         }
 
     } catch (err) {
         console.error(err);
         notify('error', 'Failed to save rows');
+        return false;
     } finally {
         setIsComponentBulkSaving(false);
     }
@@ -2331,7 +2347,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         'Supplier Name',
         'Polymer Type',
         'Component Polymer',
-        'Category',
+        'Category of EPR',
         'Category II Type',
         'Container Capacity',
         'Monolayer / Multilayer',
@@ -2388,7 +2404,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 supplierName: getValue([/supplier.*name/i, /^supplier$/i]),
                 polymerType: getValue([/polymer.*type/i, /^polymer$/i]),
                 componentPolymer: getValue([/component.*polymer/i]),
-                category: getValue([/^category$/i]),
+                category: getValue([/category.*epr/i, /^category$/i]),
                 categoryIIType: getValue([/category.*ii.*type/i, /category.*2/i]),
                 containerCapacity: getValue([/container.*capacity/i, /^capacity$/i]),
                 layerType: getValue([/layer.*type/i, /monolayer/i, /multilayer/i]),
@@ -2465,6 +2481,13 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         }));
     }, [recycledRows]);
   const handleRecycledChange = (index, field, value) => {
+    if (field === 'systemCode' && value) {
+        const isDuplicate = recycledRows.some((r, i) => i !== index && (r.systemCode || '').trim() === (value || '').trim());
+        if (isDuplicate) {
+          notify('error', 'System Code Already Used');
+          return;
+        }
+    }
     setRecycledRows(prev => {
       const copy = [...prev];
       const row = { ...copy[index], [field]: value };
@@ -2561,9 +2584,11 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         setLastSavedRecycledRows(savedRows);
         setInitialRecycledRows(savedRows);
         notify('success', 'All recycled quantity used data saved successfully');
+        return true;
     } catch (err) {
         console.error('Failed to save all recycled rows:', err);
         notify('error', 'Failed to save all recycled rows');
+        return false;
     }
   };
 
@@ -2778,8 +2803,9 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                  'component description': 'componentDescription',
                  'polymer type': 'polymerType',
                  'component polymer': 'componentPolymer',
-                 'category': 'category',
-                 'date of invoice': 'dateOfInvoice',
+                'category of epr': 'category',
+                'category': 'category',
+                'date of invoice': 'dateOfInvoice',
                  'purchase qty': 'purchaseQty',
                  'uom': 'uom',
                  'per piece weight': 'perPieceWeightKg',
@@ -2936,9 +2962,9 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                  'Component Code': row.componentCode || '',
                  'Component Description': row.componentDescription || '',
                  'Polymer Type': row.polymerType || '',
-                 'Component Polymer': row.componentPolymer || '',
-                 'Category': row.category || '',
-                  'Date of invoice': row.dateOfInvoice || '',
+                'Component Polymer': row.componentPolymer || '',
+                'Category of EPR': row.category || '',
+                 'Date of invoice': row.dateOfInvoice || '',
                   'Month Name': row.monthName || '',
                   'Quarter': row.quarter || '',
                   'Half Year': row.yearlyQuarter || '',
@@ -2980,7 +3006,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
           'Component Description',
           'Polymer Type',
           'Component Polymer',
-          'Category',
+          'Category of EPR',
           'Date of invoice',
           'Purchase Qty',
           'UOM',
@@ -3108,6 +3134,14 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
   };
 
   const handleSystemCodeSelect = (index, sysCode) => {
+    if (sysCode) {
+      const isDuplicate = supplierRows.some((r, i) => i !== index && (r.systemCode || '').trim() === (sysCode || '').trim());
+      if (isDuplicate) {
+        notify('error', 'System Code Already Used');
+        return;
+      }
+    }
+
     // Find the first matching product row
     const match = productRows.find(r => (r.systemCode || '').trim() === (sysCode || '').trim());
     
@@ -4269,6 +4303,9 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 indexOfFirstRow={indexOfFirstRow}
                 currentRows={currentRows}
                 lastSavedRows={lastSavedRows}
+                lastSavedSupplierRows={lastSavedSupplierRows}
+                lastSavedComponentRows={lastSavedComponentRows}
+                lastSavedRecycledRows={lastSavedRecycledRows}
                 isProductFieldChanged={isProductFieldChanged}
                 indexOfFirstSupplierRow={indexOfFirstSupplierRow}
                 currentSupplierRows={currentSupplierRows}

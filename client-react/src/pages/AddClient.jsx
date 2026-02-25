@@ -3539,7 +3539,7 @@ const AddClientContent = () => {
         <div className="sticky top-0 z-30 bg-white pt-0 pb-3 space-y-3">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3 flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                  <button onClick={() => navigate('/dashboard/clients')} className="group flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-all hover:bg-primary-600 hover:text-white">
+                  <button onClick={() => navigate('/dashboard')} className="group flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-all hover:bg-primary-600 hover:text-white">
                     <FaArrowLeft />
                   </button>
                   {clientId && formData.clientName && (
@@ -3765,7 +3765,7 @@ const AddClientContent = () => {
                         <div className="flex justify-between mt-8 pt-4 border-t">
                             <button
                                 type="button"
-                                onClick={currentStep === 1 ? () => navigate('/dashboard/clients') : () => setCurrentStep(prev => prev - 1)}
+                                onClick={currentStep === 1 ? () => navigate('/dashboard') : () => setCurrentStep(prev => prev - 1)}
                                 className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
                             >
                                 {currentStep === 1 ? 'Cancel' : 'Previous'}

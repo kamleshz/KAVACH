@@ -221,29 +221,9 @@ const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId, entityTy
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
                             <span className="w-1.5 h-5 bg-blue-500 rounded-full inline-block"></span>
-                            Analysis Results
+                            Pre/Post Check
                         </h3>
                     </div>
-                    
-                    {summary && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-                            <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl border border-blue-100 p-4">
-                                <div className="text-[11px] text-blue-600 font-semibold uppercase tracking-wide">Total Purchase</div>
-                                <div className="text-2xl font-bold text-gray-800 mt-1">{summary.total_purchase}</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-indigo-100 p-4">
-                                <div className="text-[11px] text-indigo-600 font-semibold uppercase tracking-wide">Total Consumption</div>
-                                <div className="text-2xl font-bold text-gray-800 mt-1">{summary.total_consumption}</div>
-                            </div>
-                            <div className={`rounded-xl border p-4 ${Math.abs(summary.difference_percent) > 5 ? 'bg-gradient-to-br from-red-50 to-white border-red-100' : 'bg-gradient-to-br from-green-50 to-white border-green-100'}`}>
-                                <div className={`text-[11px] font-semibold uppercase tracking-wide ${Math.abs(summary.difference_percent) > 5 ? 'text-red-600' : 'text-green-600'}`}>Difference</div>
-                                <div className={`text-2xl font-bold mt-1 ${Math.abs(summary.difference_percent) > 5 ? 'text-red-700' : 'text-green-700'}`}>
-                                    {summary.difference_percent}%
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                     <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm mb-5 [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700">
                         <Table 
                             dataSource={data} 

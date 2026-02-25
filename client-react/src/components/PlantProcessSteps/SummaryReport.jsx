@@ -446,7 +446,7 @@ const SummaryReport = ({
         { title: 'EPR Cert. No', dataIndex: 'eprCertificateNumber', key: 'eprCertificateNumber', width: 120 },
         { title: 'Polymer Type', dataIndex: 'polymerType', key: 'polymerType', width: 100 },
         { title: 'Component Polymer', dataIndex: 'componentPolymer', key: 'componentPolymer', width: 120 },
-        { title: 'Category', dataIndex: 'category', key: 'category', width: 100 },
+        { title: 'Category of EPR', dataIndex: 'category', key: 'category', width: 100 },
         { title: 'Category II Type', dataIndex: 'categoryIIType', key: 'categoryIIType', width: 120 },
         { title: 'Container Capacity', dataIndex: 'containerCapacity', key: 'containerCapacity', width: 120 },
         { title: 'Layer Type', dataIndex: 'layerType', key: 'layerType', width: 120 }, // Monolayer/Multilayer

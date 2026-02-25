@@ -74,6 +74,9 @@ class AnalysisService {
 
             doc.salesSummary = data.summary;
             doc.salesRows = data.rows;
+            if (data.preConsumerRows) {
+                doc.preConsumerRows = data.preConsumerRows;
+            }
             if (data.targetTables) {
                 doc.salesTargetTables = data.targetTables;
             }
@@ -102,6 +105,7 @@ class AnalysisService {
         return {
             salesSummary: doc.salesSummary,
             salesRows: doc.salesRows,
+            preConsumerRows: doc.preConsumerRows || [],
             salesTargetTables: doc.salesTargetTables || [],
             lastUpdated: doc.lastUpdated
         };

@@ -143,7 +143,7 @@ const ClientTypeSelection = () => {
             
             <div className="p-8 h-full flex flex-col">
               <div className="flex items-center justify-between mb-6">
-                <div className={`w-16 h-16 ${card.colorTheme.bg} rounded-2xl flex items-center justify-center group-hover:rotate-6 transition-transform duration-300`}>
+                <div className={`w-16 h-16 ${card.colorTheme.bg} rounded-2xl flex items-center justify-center transition-transform duration-300`}>
                   <card.icon className={`text-3xl ${card.colorTheme.text}`} />
                 </div>
                 <span className={`px-3 py-1 ${card.colorTheme.badgeBg} ${card.colorTheme.text} text-xs font-bold uppercase tracking-wider rounded-full`}>

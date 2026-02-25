@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Table, Button, Tooltip, Upload, Popconfirm, Select, Input, Card, Tag } from 'antd';
-import { SaveOutlined, DeleteOutlined, CheckCircleFilled, FileExcelOutlined, LoadingOutlined, PlusOutlined, FileImageOutlined, UploadOutlined, UndoOutlined, CodeSandboxOutlined, DownloadOutlined, SyncOutlined, DownOutlined, RightOutlined, HistoryOutlined, ArrowRightOutlined } from '@ant-design/icons';
+import { Table, Button, Tooltip, Upload, Popconfirm, Select, Input, Card, Tag, Modal } from 'antd';
+import { SaveOutlined, DeleteOutlined, CheckCircleFilled, FileExcelOutlined, LoadingOutlined, PlusOutlined, FileImageOutlined, UploadOutlined, UndoOutlined, CodeSandboxOutlined, DownloadOutlined, SyncOutlined, DownOutlined, RightOutlined, HistoryOutlined, ArrowRightOutlined, ExclamationCircleFilled } from '@ant-design/icons';
 import Pagination from '../Pagination';
 import api from '../../services/api';
 import { API_ENDPOINTS } from '../../services/apiEndpoints';
@@ -116,6 +116,9 @@ const ProductCompliance = ({
     changeSummaryData = [],
     handleNext,
     isSaving,
+    lastSavedSupplierRows,
+    lastSavedComponentRows,
+    lastSavedRecycledRows,
     
     // Recycled Props
     handleRecycledExcelUpload,
@@ -160,9 +163,112 @@ const ProductCompliance = ({
     
     const [savingMonthlyRow, setSavingMonthlyRow] = useState(null);
     const [isChangeSummaryExpanded, setIsChangeSummaryExpanded] = useState(false);
+    
+    // Tab switching logic for unsaved changes
+    const [pendingTab, setPendingTab] = useState(null);
+    const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+    const [isSavingTab, setIsSavingTab] = useState(false);
+
+    const checkUnsavedChanges = (tab) => {
+        try {
+            if (tab === 'product-compliance') {
+                // If rows differ from last saved
+                if (!lastSavedRows) return false;
+                return JSON.stringify(productRows) !== JSON.stringify(lastSavedRows);
+            }
+            if (tab === 'supplier-compliance') {
+                if (!lastSavedSupplierRows) return false;
+                return JSON.stringify(supplierRows) !== JSON.stringify(lastSavedSupplierRows);
+            }
+            if (tab === 'component-details') {
+                if (!lastSavedComponentRows) return false;
+                return JSON.stringify(componentRows) !== JSON.stringify(lastSavedComponentRows);
+            }
+            if (tab === 'recycled-quantity-used') {
+                if (!lastSavedRecycledRows) return false;
+                return JSON.stringify(recycledRows) !== JSON.stringify(lastSavedRecycledRows);
+            }
+        } catch (e) {
+            console.error('Error checking unsaved changes', e);
+            return false;
+        }
+        return false;
+    };
+
+    const handleTabClick = (newTab) => {
+        if (newTab === subTab) return;
+        
+        if (checkUnsavedChanges(subTab)) {
+            setPendingTab(newTab);
+            setShowUnsavedModal(true);
+        } else {
+            setSubTab(newTab);
+        }
+    };
+
+    const confirmSaveAndSwitch = async () => {
+        setIsSavingTab(true);
+        try {
+            let success = false;
+            if (subTab === 'product-compliance') {
+                success = await handleBulkSave();
+            } else if (subTab === 'supplier-compliance') {
+                success = await handleSupplierBulkSave();
+            } else if (subTab === 'component-details') {
+                success = await handleComponentBulkSave();
+            } else if (subTab === 'recycled-quantity-used') {
+                success = await handleRecycledBulkSave();
+            }
+            
+            if (success) {
+                setSubTab(pendingTab);
+                setShowUnsavedModal(false);
+                setPendingTab(null);
+            }
+        } catch (error) {
+            console.error('Failed to save before switch', error);
+            // Keep modal open or notify?
+            notify('error', 'Failed to save changes. Please try again.');
+        } finally {
+            setIsSavingTab(false);
+        }
+    };
+
+    const discardAndSwitch = () => {
+        setSubTab(pendingTab);
+        setShowUnsavedModal(false);
+        setPendingTab(null);
+    };
 
     return (
             <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-2">
+                {/* Unsaved Changes Modal */}
+                <Modal
+                    title={<div className="flex items-center gap-2 text-amber-600"><ExclamationCircleFilled /> Unsaved Changes</div>}
+                    open={showUnsavedModal}
+                    onCancel={() => setShowUnsavedModal(false)}
+                    footer={[
+                        <Button key="cancel" onClick={() => setShowUnsavedModal(false)}>
+                            Cancel
+                        </Button>,
+                        <Button key="discard" onClick={discardAndSwitch} danger>
+                            Don't Save
+                        </Button>,
+                        <Button 
+                            key="save" 
+                            type="primary" 
+                            onClick={confirmSaveAndSwitch}
+                            loading={isSavingTab}
+                            icon={<SaveOutlined />}
+                        >
+                            Save & Switch
+                        </Button>
+                    ]}
+                >
+                    <p>You have unsaved changes in the <strong>{subSteps.find(s => s.id === subTab)?.label}</strong> tab.</p>
+                    <p>Do you want to save your changes before switching?</p>
+                </Modal>
+
                 {/* Sub-Navigation Stepper */}
                 <div className="flex flex-wrap gap-2 mb-6 p-1 bg-gray-50 rounded-xl border border-gray-200">
                     {subSteps.map((step) => {
@@ -172,7 +278,7 @@ const ProductCompliance = ({
                         return (
                         <button
                             key={step.id}
-                            onClick={() => setSubTab(step.id)}
+                            onClick={() => handleTabClick(step.id)}
                             className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
                                 isActive
                                     ? 'bg-white text-primary-700 shadow-sm border border-gray-200'
@@ -597,6 +703,7 @@ const ProductCompliance = ({
                                                 <option value="Contract Manufacture">Contract Manufacture</option>
                                                 <option value="Co-Processer">Co-Processer</option>
                                                 <option value="Co-Packaging">Co-Packaging</option>
+                                                <option value="Not Applicable">Not Applicable</option>
                                             </select>
                                             )}
                                             {supplierTypeChanged && (
@@ -894,17 +1001,12 @@ const ProductCompliance = ({
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.componentCode || '-'}</div>
                                             ) : (
-                                            <select
-                                                className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
-                                                value={row.componentCode}
-                                                onChange={(e) => handleSupplierCodeSelect(idx, e.target.value)}
-                                                disabled={isManager}
-                                            >
-                                                <option value="">Select</option>
-                                                {componentOptions.map(opt => (
-                                                    <option key={opt.code} value={opt.code}>{opt.code}{opt.description ? ` - ${opt.description}` : ''}</option>
-                                                ))}
-                                            </select>
+                                            <input
+                                                className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
+                                                value={row.componentCode || ''}
+                                                readOnly
+                                                placeholder="Auto-fetched"
+                                            />
                                             )}
                                         </td>
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
@@ -912,12 +1014,10 @@ const ProductCompliance = ({
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.componentDescription || '-'}</div>
                                             ) : (
                                             <input 
-                                                className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
+                                                className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
                                                 placeholder="Description" 
                                                 value={row.componentDescription} 
-                                                onChange={(e)=>handleSupplierChange(idx,'componentDescription',e.target.value)} 
-                                                readOnly={isManager}
-                                                disabled={isManager}
+                                                readOnly
                                             />
                                             )}
                                         </td>
@@ -926,12 +1026,10 @@ const ProductCompliance = ({
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.supplierName || '-'}</div>
                                             ) : (
                                             <input 
-                                                className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
+                                                className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
                                                 placeholder="Supplier Name" 
                                                 value={row.supplierName} 
-                                                onChange={(e)=>handleSupplierChange(idx,'supplierName',e.target.value)} 
-                                                readOnly={isManager}
-                                                disabled={isManager}
+                                                readOnly
                                             />
                                             )}
                                         </td>
@@ -1106,7 +1204,7 @@ const ProductCompliance = ({
                                         { label: 'Polymer Type', width: 'min-w-[130px]' },
                                         { label: 'Component Polymer', width: 'min-w-[130px]' },
                                         { label: 'Polymer Code', width: 'min-w-[100px]' },
-                                        { label: 'Category', width: 'min-w-[130px]' },
+                                        { label: 'Category of EPR', width: 'min-w-[130px]' },
                                         { label: 'Category II Type', width: 'min-w-[180px]' },
                                         { label: 'Container Capacity', width: 'min-w-[220px]' },
                                         { label: 'Monolayer / Multilayer', width: 'min-w-[150px]' },
@@ -1158,30 +1256,12 @@ const ProductCompliance = ({
                                         {isManager ? (
                                             <div className="text-center text-xs text-gray-700 py-1.5">{row.componentCode || '-'}</div>
                                         ) : (
-                                        <select
-                                            className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all text-center hover:border-primary-400"
-                                            value={row.componentCode}
-                                            disabled={isManager}
-                                        onChange={(e) => {
-                                                const code = e.target.value;
-                                                const match = componentOptions.find(opt => opt.code === code);
-                                                handleComponentChange(idx,'componentCode',code);
-                                                if (match) {
-                                                    handleComponentChange(idx,'componentDescription',match.description || '');
-                                                }
-                                                const candidates = supplierRows.filter(r => (r.componentCode || '').trim() === (code || '').trim());
-                                                const registered = candidates.find(r => r.supplierStatus === 'Registered' && (r.supplierName || '').trim());
-                                                const supplierName = (registered?.supplierName || candidates[0]?.supplierName || '') || '';
-                                                handleComponentChange(idx,'supplierName', supplierName);
-                                            }}
-                                            >
-                                                <option value="">Select</option>
-                                                {componentOptions.map(opt => (
-                                                    <option key={opt.code} value={opt.code}>
-                                                        {opt.code}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                        <input
+                                            className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
+                                            value={row.componentCode || ''}
+                                            readOnly
+                                            placeholder="Auto-fetched"
+                                        />
                                         )}
                                         </td>
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
@@ -1189,12 +1269,10 @@ const ProductCompliance = ({
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.componentDescription || '-'}</div>
                                             ) : (
                                             <input 
-                                                className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
+                                                className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
                                                 placeholder="Description" 
                                                 value={row.componentDescription} 
-                                                onChange={(e)=>handleComponentChange(idx,'componentDescription',e.target.value)} 
-                                                readOnly={isManager}
-                                                disabled={isManager}
+                                                readOnly
                                             />
                                             )}
                                         </td>
@@ -1203,12 +1281,10 @@ const ProductCompliance = ({
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.supplierName || '-'}</div>
                                             ) : (
                                             <input 
-                                                className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
+                                                className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
                                                 placeholder="Supplier Name" 
                                                 value={row.supplierName} 
-                                                onChange={(e)=>handleComponentChange(idx,'supplierName',e.target.value)} 
-                                                readOnly={isManager}
-                                                disabled={isManager}
+                                                readOnly
                                             />
                                             )}
                                         </td>
@@ -1518,7 +1594,7 @@ const ProductCompliance = ({
                                 <tr>
                                     <th className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 w-12 ${isManager ? "bg-green-50" : "bg-gray-50"}`}>#</th>
             {[
-            'System Code','SKU Code','Supplier Name','Component code','Component Description','Polymer Type','Component Polymer','Category','Date of invoice','Purchase Qty','UOM','Per Piece Weight','Monthly purchase MT','Recycled %','Recycled QTY','Recycled Rate','Recycled Qrt Amount','Virgin Rate','Virgin Qty','Virgin Qty Amount','RC % Mentioned','Actions'
+            'System Code','SKU Code','Supplier Name','Component code','Component Description','Polymer Type','Component Polymer','Category of EPR','Date of invoice','Purchase Qty','UOM','Per Piece Weight','Monthly purchase MT','Recycled %','Recycled QTY','Recycled Rate','Recycled Qrt Amount','Virgin Rate','Virgin Qty','Virgin Qty Amount','RC % Mentioned','Actions'
         ].filter(label => !isManager || (label !== 'Actions' && label !== 'System Code')).map((label) => (
             <th key={label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 bg-white' : ''} ${label === 'UOM' ? 'min-w-[100px]' : ''} ${isManager ? "bg-green-50" : "bg-gray-50"}`}>
                 {label}
@@ -1558,6 +1634,13 @@ const ProductCompliance = ({
                                         return curr;
                                     };
                                     const updateField = (field, value) => {
+                                        if (field === 'systemCode' && value) {
+                                            const isDuplicate = monthlyRows.some((r, i) => i !== idx && (r.systemCode || '').trim() === (value || '').trim());
+                                            if (isDuplicate) {
+                                                notify('error', 'System Code already used in Monthly Procurement Data');
+                                                return;
+                                            }
+                                        }
                                         setMonthlyRows(prev => {
                                             const copy = [...prev];
                                             let curr = { ...copy[idx], [field]: value };
@@ -1677,16 +1760,16 @@ const ProductCompliance = ({
                                             {[
                                                 { key:'systemCode', placeholder:'System Code', type:'select-system' },
                                                 { key:'skuCode', placeholder:'SKU Code', type:'text', readOnly: true },
-                                                { key:'supplierName', placeholder:'Supplier Name', type:'text' },
-                                                { key:'componentCode', placeholder:'Component code', type:'text' },
-                                                { key:'componentDescription', placeholder:'Component Description', type:'text' },
-                                                { key:'polymerType', placeholder:'Polymer Type', type:'text' },
-                                                { key:'componentPolymer', placeholder:'Component Polymer', type:'text' },
-                                                { key:'category', placeholder:'Category', type:'text' },
+                                                { key:'supplierName', placeholder:'Supplier Name', type:'text', readOnly: true },
+                                                { key:'componentCode', placeholder:'Component code', type:'text', readOnly: true },
+                                                { key:'componentDescription', placeholder:'Component Description', type:'text', readOnly: true },
+                                                { key:'polymerType', placeholder:'Polymer Type', type:'text', readOnly: true },
+                                                { key:'componentPolymer', placeholder:'Component Polymer', type:'text', readOnly: true },
+                                                { key:'category', placeholder:'Category of EPR', type:'text', readOnly: true },
                                                 { key:'dateOfInvoice', placeholder:'Date of invoice', type:'text' },
-                                                { key:'purchaseQty', placeholder:'Purchase Qty', type:'number' },
+                                                { key:'purchaseQty', placeholder:'Purchase Qty', type:'text' },
                                                 { key:'uom', type:'select' },
-                                                { key:'perPieceWeightKg', placeholder:'Per Piece Weight', type:'number' },
+                                                { key:'perPieceWeightKg', placeholder:'Per Piece Weight', type:'text' },
                                             ].filter(col => !isManager || col.key !== 'systemCode').map((col) => (
                                                 <td key={col.key} className="px-2 py-2 whitespace-nowrap align-middle">
                                                     {isManager ? (
@@ -1730,10 +1813,12 @@ const ProductCompliance = ({
                                                     ) : (
                                                         <input
                                                             type={col.type}
-                                                            className={`w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${
+                                                            className={`w-full text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${
+                                                                col.readOnly || 
                                                                 (col.key === 'dateOfInvoice' && row[col.key] === 'Not Applicable') || 
                                                                 (row.uom === 'Not Applicable' && ['purchaseQty', 'perPieceWeightKg'].includes(col.key)) 
-                                                                ? 'bg-gray-100 cursor-not-allowed' : ''
+                                                                ? 'bg-gray-100 border border-gray-300 text-gray-700 cursor-not-allowed' 
+                                                                : 'bg-white border border-gray-300 text-gray-700'
                                                             }`}
                                                             placeholder={col.placeholder}
                                                             value={row[col.key] ?? ''}
@@ -2012,19 +2097,12 @@ const ProductCompliance = ({
                                         {isManager ? (
                                             <div className="text-center text-xs text-gray-700 py-1.5">{row.componentCode || '-'}</div>
                                         ) : (
-                                        <select
-                                                    className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
-                                                    value={row.componentCode}
-                                                    onChange={(e)=>handleRecycledCodeSelect(idx, e.target.value)}
-                                                    disabled={isManager}
-                                                >
-                                                    <option value="">Select</option>
-                                                    {componentOptions.map(opt => (
-                                                        <option key={opt.code} value={opt.code}>
-                                                            {opt.code}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                        <input
+                                            className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
+                                            value={row.componentCode || ''}
+                                            readOnly
+                                            placeholder="Auto-fetched"
+                                        />
                                         )}
                                             </td>
                                             <td className="px-2 py-2 whitespace-nowrap align-middle">
@@ -2032,12 +2110,10 @@ const ProductCompliance = ({
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.componentDescription || '-'}</div>
                                                 ) : (
                                                 <input
-                                                    className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
+                                                    className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
                                                     placeholder="Description"
                                                     value={row.componentDescription}
-                                                    onChange={(e)=>handleRecycledChange(idx,'componentDescription',e.target.value)}
-                                                    readOnly={isManager}
-                                                    disabled={isManager}
+                                                    readOnly
                                                 />
                                                 )}
                                             </td>
@@ -2046,12 +2122,10 @@ const ProductCompliance = ({
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.supplierName || '-'}</div>
                                                 ) : (
                                                 <input
-                                                    className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
+                                                    className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
                                                     placeholder="Supplier Name"
                                                     value={row.supplierName || ''}
-                                                    onChange={(e)=>handleRecycledChange(idx,'supplierName',e.target.value)}
-                                                    readOnly={isManager}
-                                                    disabled={isManager}
+                                                    readOnly
                                                 />
                                                 )}
                                             </td>
@@ -2060,12 +2134,10 @@ const ProductCompliance = ({
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.category || '-'}</div>
                                                 ) : (
                                                 <input
-                                                    className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
+                                                    className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
                                                     placeholder="Category"
                                                     value={row.category}
-                                                    onChange={(e)=>handleRecycledChange(idx,'category',e.target.value)}
-                                                    readOnly={isManager}
-                                                    disabled={isManager}
+                                                    readOnly
                                                 />
                                                 )}
                                             </td>
@@ -2074,7 +2146,7 @@ const ProductCompliance = ({
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.annualConsumption ?? ''}</div>
                                                 ) : (
                                                 <input
-                                                    type="number"
+                                                    type="text"
                                                     className={`w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${row.uom === 'Not Applicable' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                     placeholder="Annual Consumption"
                                                     value={row.annualConsumption ?? ''}
@@ -2109,7 +2181,7 @@ const ProductCompliance = ({
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.perPieceWeight ?? ''}</div>
                                                 ) : (
                                                 <input
-                                                    type="number"
+                                                    type="text"
                                                     className={`w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${row.uom === 'Not Applicable' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                     placeholder="Per Piece Weight"
                                                     value={row.perPieceWeight ?? ''}
@@ -2137,7 +2209,7 @@ const ProductCompliance = ({
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.usedRecycledPercent ?? ''}</div>
                                                 ) : (
                                                 <input
-                                                    type="number"
+                                                    type="text"
                                                     className={`w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${row.uom === 'Not Applicable' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                     placeholder="Used Recycled %"
                                                     value={row.usedRecycledPercent ?? ''}

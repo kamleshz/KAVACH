@@ -113,7 +113,7 @@ const ClientConnect = () => {
         </div>
 
         {/* Waste Type Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
           {Object.entries(WASTE_CONFIG).map(([type, cfg]) => {
             const count = wasteStats[type] || 0;
             const isActive = wasteType === type;
@@ -124,7 +124,7 @@ const ClientConnect = () => {
                 type="button"
                 onClick={() => setWasteType(isActive ? 'ALL' : type)}
                 className={`
-                  relative flex items-center gap-3 px-3.5 py-3 rounded-xl border-2 transition-all duration-200 text-left
+                  relative flex items-center gap-4 px-5 py-4 rounded-xl border-2 transition-all duration-200 text-left
                   ${isActive
                     ? 'shadow-md scale-[1.02]'
                     : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
@@ -133,14 +133,14 @@ const ClientConnect = () => {
                 style={isActive ? { borderColor: cfg.color, backgroundColor: cfg.bg } : {}}
               >
                 <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: isActive ? cfg.color + '22' : '#f3f4f6' }}
                 >
-                  <Icon style={{ color: isActive ? cfg.color : '#9ca3af' }} className="text-sm" />
+                  <Icon style={{ color: isActive ? cfg.color : '#9ca3af' }} className="text-lg" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-lg font-bold leading-tight" style={{ color: isActive ? cfg.color : '#1f2937' }}>{count}</div>
-                  <div className="text-[10px] font-medium text-gray-500 truncate leading-tight">{cfg.label}</div>
+                  <div className="text-2xl font-extrabold leading-tight" style={{ color: isActive ? cfg.color : '#1f2937' }}>{count}</div>
+                  <div className="text-xs font-semibold text-gray-500 truncate leading-tight mt-0.5">{cfg.label}</div>
                 </div>
                 {isActive && (
                   <div

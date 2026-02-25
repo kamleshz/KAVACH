@@ -13,6 +13,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
     
     // rawRows: keeps the detailed data if needed for backend save
     const [rawRows, setRawRows] = useState([]);
+    const [preConsumerRows, setPreConsumerRows] = useState([]);
     // summaryData: for the display table
     const [summaryData, setSummaryData] = useState([]);
     // fySummaryData: for the Financial Year display table
@@ -31,7 +32,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
 
     // Calculate Main Summary and FY Summary whenever rawRows changes
     useEffect(() => {
-        if (rawRows.length > 0) {
+        if (rawRows.length > 0 || preConsumerRows.length > 0) {
             calculateMainSummary(rawRows);
         } else {
             setSummaryData([]);
@@ -39,7 +40,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             setFinancialYears([]);
             setTargetTables([]);
         }
-    }, [rawRows]);
+    }, [rawRows, preConsumerRows]);
 
     const calculateMainSummary = (rows) => {
         // 1. Extract Unique Financial Years
@@ -131,7 +132,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
         
         // Also calculate FY Summary table
         calculateFySummary(rows);
-        // And Producer EPR Target Calculation based on Sales
+        // And Producer EPR Target Calculation based on Sales and Pre-Consumer
         calculateProducerTargetsFromSales(rows, years);
     };
 
@@ -213,16 +214,38 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             },
             'Cat-IV': {},
         };
-        const yearlyAgg = {};
-        categories.forEach(cat => { yearlyAgg[cat] = {}; });
+        const salesAgg = {};
+        const preConsumerAgg = {};
+        const totalAgg = {};
+        categories.forEach(cat => { 
+            salesAgg[cat] = {}; 
+            preConsumerAgg[cat] = {}; 
+            totalAgg[cat] = {}; 
+        });
 
         rows.forEach(row => {
             const cat = normalizeSalesCategory(row.plasticCategory);
             const fy = row.financialYear || 'Unknown';
             const qty = parseFloat(row.totalPlasticQty) || 0;
             if (!cat) return;
-            const val = qty;
-            yearlyAgg[cat][fy] = (yearlyAgg[cat][fy] || 0) + val;
+            salesAgg[cat][fy] = (salesAgg[cat][fy] || 0) + qty;
+        });
+
+        preConsumerRows.forEach(row => {
+            const cat = normalizeSalesCategory(row.plasticCategory);
+            const fy = row.financialYear || 'Unknown';
+            const qty = parseFloat(row.preConsumerQty || row.preConsumerWastePlasticQuantityTpa || 0) || 0;
+            if (!cat) return;
+            preConsumerAgg[cat][fy] = (preConsumerAgg[cat][fy] || 0) + qty;
+        });
+
+        categories.forEach(cat => {
+            const yearsForCat = Object.keys({ ...(salesAgg[cat] || {}), ...(preConsumerAgg[cat] || {}) });
+            yearsForCat.forEach(fy => {
+                const base = parseFloat(salesAgg[cat]?.[fy] || 0);
+                const pre = parseFloat(preConsumerAgg[cat]?.[fy] || 0);
+                totalAgg[cat][fy] = base + pre;
+            });
         });
 
         const sortedYears = [...years].sort();
@@ -234,9 +257,13 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                 const targetYear = sortedYears[i + 2] || getNextFinancialYear(year2);
 
                 const data = categories.map(cat => {
-                    const val1 = parseFloat(yearlyAgg[cat]?.[year1] || 0);
-                    const val2 = parseFloat(yearlyAgg[cat]?.[year2] || 0);
-                    const avg = (val1 + val2) / 2;
+                    const sales1 = parseFloat(salesAgg[cat]?.[year1] || 0);
+                    const sales2 = parseFloat(salesAgg[cat]?.[year2] || 0);
+                    const pre1 = parseFloat(preConsumerAgg[cat]?.[year1] || 0);
+                    const pre2 = parseFloat(preConsumerAgg[cat]?.[year2] || 0);
+                    const total1 = sales1 + pre1;
+                    const total2 = sales2 + pre2;
+                    const avg = (total1 + total2) / 2;
 
                     // Registered Sales for Year2 (Producer logic)
                     // Using FY summary derived from rows (registered only)
@@ -283,8 +310,12 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
 
                     const row = {
                         "Category of Plastic": cat,
-                        [year1]: parseFloat(val1.toFixed(4)),
-                        [year2]: parseFloat(val2.toFixed(4)),
+                        [`${year1} Post Consumer`]: parseFloat(sales1.toFixed(4)),
+                        [`${year1} Pre Consumer`]: parseFloat(pre1.toFixed(4)),
+                        [`${year1} Total`]: parseFloat(total1.toFixed(4)),
+                        [`${year2} Post Consumer`]: parseFloat(sales2.toFixed(4)),
+                        [`${year2} Pre Consumer`]: parseFloat(pre2.toFixed(4)),
+                        [`${year2} Total`]: parseFloat(total2.toFixed(4)),
                         "Avg": parseFloat(avg.toFixed(4)),
                         [`Registered Sales (${year2})`]: parseFloat(regYear2.toFixed(4)),
                         [`Recycled Plastic % (${year2})`]: parseFloat(recycledPct.toFixed(2)),
@@ -295,14 +326,28 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                 });
 
                 const columns = [
-                    "Category of Plastic",
-                    year1,
-                    year2,
-                    "Avg",
-                    `Registered Sales (${year2})`,
-                    `Recycled Plastic % (${year2})`,
-                    "Recycled Qty",
-                    `Target Of Virgin ${targetYear}`
+                    { title: "Category of Plastic", dataIndex: "Category of Plastic", key: "Category of Plastic", align: "left" },
+                    {
+                        title: year1,
+                        children: [
+                            { title: "Post Consumer", dataIndex: `${year1} Post Consumer`, key: `${year1} Post Consumer` },
+                            { title: "Pre consumer", dataIndex: `${year1} Pre Consumer`, key: `${year1} Pre Consumer` },
+                            { title: "Total", dataIndex: `${year1} Total`, key: `${year1} Total` }
+                        ]
+                    },
+                    {
+                        title: year2,
+                        children: [
+                            { title: "Post Consumer", dataIndex: `${year2} Post Consumer`, key: `${year2} Post Consumer` },
+                            { title: "Pre consumer", dataIndex: `${year2} Pre Consumer`, key: `${year2} Pre Consumer` },
+                            { title: "Total", dataIndex: `${year2} Total`, key: `${year2} Total` }
+                        ]
+                    },
+                    { title: "Avg", dataIndex: "Avg", key: "Avg" },
+                    { title: `Registered Sales (${year2})`, dataIndex: `Registered Sales (${year2})`, key: `Registered Sales (${year2})` },
+                    { title: `Recycled Plastic % (${year2})`, dataIndex: `Recycled Plastic % (${year2})`, key: `Recycled Plastic % (${year2})` },
+                    { title: "Recycled Qty", dataIndex: "Recycled Qty", key: "Recycled Qty" },
+                    { title: `Target Of Virgin ${targetYear}`, dataIndex: `Target Of Virgin ${targetYear}`, key: `Target Of Virgin ${targetYear}` }
                 ];
                 tables.push({ title: `Target Calculation for ${targetYear} (Producer)`, data, columns });
             }
@@ -317,7 +362,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             const urepData = categories.map(cat => {
                 const catTargets = UREP_TARGET_MATRIX[cat] || {};
                 const pct = catTargets[activeYear] !== undefined ? catTargets[activeYear] : 0;
-                const baseQty = parseFloat(yearlyAgg[cat]?.[activeYear] || 0);
+                const baseQty = parseFloat(totalAgg[cat]?.[activeYear] || 0);
                 const qty = (baseQty * pct) / 100;
                 return {
                     "Plastic Category": cat,
@@ -348,6 +393,9 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                 // or returns data: null if not found
                 if (response.data.salesRows || response.data.salesSummary) {
                     setRawRows(response.data.salesRows || []);
+                    if (response.data.preConsumerRows) {
+                        setPreConsumerRows(response.data.preConsumerRows);
+                    }
                     
                     // Sanitize summary data to ensure no objects are passed as children
                     // Check if salesSummary is an array, otherwise default to empty array
@@ -404,7 +452,8 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                 itemId,
                 summary: summaryData,
                 rows: rawRows,
-                targetTables
+                targetTables,
+                preConsumerRows
             });
 
             if (response.data.success) {
@@ -494,6 +543,78 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
         reader.readAsBinaryString(file);
         // If using standard input, reset value
         if (e.target) e.target.value = null; 
+    };
+
+    const handlePreConsumerExcelUpload = (e) => {
+        if (isBrandOwner) {
+            message.info('Your category is Brand Owner. Sales data upload is not applicable.');
+            return;
+        }
+        const file = e.target ? e.target.files[0] : e.file;
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const bstr = evt.target.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+                if (data.length < 2) {
+                    message.error('Excel file is empty or missing headers');
+                    return;
+                }
+
+                const headers = data[0].map(h => (h || '').toString().trim().toLowerCase());
+                const headerMap = {
+                    'state name': 'stateName',
+                    'year': 'financialYear',
+                    'category of plastic': 'plasticCategory',
+                    'material type': 'materialType',
+                    'pre consumer waste plastic quantity (tpa)': 'preConsumerQty',
+                    'pre consumer qty': 'preConsumerQty',
+                    'pre-consumer qty': 'preConsumerQty',
+                    'pre consumer quantity': 'preConsumerQty',
+                    'quantity': 'preConsumerQty',
+                    'qty': 'preConsumerQty'
+                };
+
+                const processedRows = [];
+
+                for (let i = 1; i < data.length; i++) {
+                    const rowData = data[i];
+                    if (!rowData || rowData.length === 0) continue;
+
+                    const newRow = {};
+                    let hasData = false;
+
+                    headers.forEach((h, idx) => {
+                        if (headerMap[h]) {
+                            newRow[headerMap[h]] = (rowData[idx] || '').toString();
+                            hasData = true;
+                        }
+                    });
+
+                    if (hasData) {
+                        processedRows.push({ ...newRow, key: Date.now() + i });
+                    }
+                }
+
+                setPreConsumerRows(processedRows);
+                if (rawRows.length > 0 && financialYears.length > 0) {
+                    calculateProducerTargetsFromSales(rawRows, financialYears);
+                }
+
+                message.success(`Uploaded and processed ${processedRows.length} pre-consumer rows`);
+            } catch (err) {
+                console.error('Pre-consumer Excel upload error:', err);
+                message.error('Failed to parse pre-consumer Excel file');
+            }
+        };
+        reader.readAsBinaryString(file);
+        if (e.target) e.target.value = null;
     };
 
     const columns = useMemo(() => {
@@ -742,19 +863,16 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
         <div className="space-y-5">
             {tables.map((table, idx) => {
                 const isUrep = table.title.toLowerCase().includes('urep');
-                return (
-                    <div key={idx} className="rounded-xl border border-gray-200 overflow-hidden shadow-sm [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700">
-                        <div className={`px-5 py-3 border-b flex items-center gap-2 ${isUrep ? 'bg-gradient-to-r from-purple-50 to-white border-purple-100' : 'bg-gradient-to-r from-blue-50 to-white border-blue-100'}`}>
-                            <div className={`w-1.5 h-5 rounded-full ${isUrep ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
-                            <span className="font-semibold text-gray-700 text-sm">{table.title}</span>
-                        </div>
-                            <Table
-                            dataSource={table.data}
-                            columns={table.columns.map((col, colIdx) => ({
+
+                const processColumns = (cols) => {
+                    return cols.map((col, colIdx) => {
+                        // Handle legacy string columns
+                        if (typeof col === 'string') {
+                            return {
                                 title: <span className="text-xs font-bold text-gray-600 uppercase">{col}</span>,
                                 dataIndex: col,
                                 key: col,
-                                align: colIdx === 0 ? "left" : "right",
+                                align: colIdx === 0 ? "left" : "center",
                                 render: (val) => {
                                     if (colIdx === 0) return <span className="font-medium text-gray-700">{val}</span>;
                                     const num = parseFloat(val);
@@ -762,7 +880,50 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                                     if (col.toLowerCase().includes('target') && num <= 0) return <span className="font-bold text-green-600">{val}</span>;
                                     return <span className="text-gray-600">{val}</span>;
                                 }
-                            }))}
+                            };
+                        }
+
+                        // Handle object columns
+                        const newCol = { ...col };
+                        
+                        if (newCol.children) {
+                            newCol.children = processColumns(newCol.children);
+                            newCol.title = <span className="text-xs font-bold text-gray-600 uppercase">{newCol.title}</span>;
+                            newCol.align = 'center';
+                        } else {
+                            if (typeof newCol.title === 'string') {
+                                newCol.title = <span className="text-xs font-bold text-gray-600 uppercase">{newCol.title}</span>;
+                            }
+                            
+                            if (!newCol.render) {
+                                newCol.align = newCol.align || 'center';
+                                newCol.render = (val, record) => {
+                                    const isFirstCol = newCol.dataIndex === "Category of Plastic" || newCol.dataIndex === "Plastic Category";
+                                    if (isFirstCol) return <span className="font-medium text-gray-700">{val}</span>;
+                                    
+                                    const num = parseFloat(val);
+                                    const colName = newCol.dataIndex || '';
+                                    if (colName.toLowerCase().includes('target') && num > 0) return <span className="font-bold text-blue-700">{val}</span>;
+                                    if (colName.toLowerCase().includes('target') && num <= 0) return <span className="font-bold text-green-600">{val}</span>;
+                                    return <span className="text-gray-600">{val}</span>;
+                                };
+                            }
+                        }
+                        return newCol;
+                    });
+                };
+
+                const processedColumns = processColumns(table.columns);
+
+                return (
+                    <div key={idx} className="rounded-xl border border-gray-200 overflow-hidden shadow-sm [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700 [&_.ant-table-cell]:!border-gray-300">
+                        <div className={`px-5 py-3 border-b flex items-center gap-2 ${isUrep ? 'bg-gradient-to-r from-purple-50 to-white border-purple-100' : 'bg-gradient-to-r from-blue-50 to-white border-blue-100'}`}>
+                            <div className={`w-1.5 h-5 rounded-full ${isUrep ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
+                            <span className="font-semibold text-gray-700 text-sm">{table.title}</span>
+                        </div>
+                        <Table
+                            dataSource={table.data}
+                            columns={processedColumns}
                             pagination={false}
                             size="small"
                             bordered
@@ -799,7 +960,16 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                                     onChange={handleSalesExcelUpload}
                                 />
                             </label>
-                            
+                            <label className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors">
+                                <UploadOutlined className="mr-2 text-gray-500" />
+                                Select Pre-consumer File
+                                <input
+                                    type="file"
+                                    accept=".xlsx, .xls"
+                                    className="hidden"
+                                    onChange={handlePreConsumerExcelUpload}
+                                />
+                            </label>
                             {rawRows.length > 0 && (
                                 <>
                                     <Button 
@@ -860,7 +1030,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                     </div>
                     {isExpanded && (
                     <div className="px-5 pb-5 space-y-5">
-                        <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700">
+                        <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700 [&_.ant-table-cell]:!border-gray-300">
                             <Table
                                 dataSource={summaryData}
                                 columns={columns}
@@ -881,7 +1051,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                                     <span className="w-1 h-4 bg-blue-400 rounded-full inline-block"></span>
                                     Financial Year Analysis
                                 </h4>
-                                <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700">
+                                <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-bold [&_.ant-table-thead_th]:!text-gray-700 [&_.ant-table-cell]:!border-gray-300">
                                     <Table
                                         dataSource={fySummaryData}
                                         columns={fyColumns}

@@ -971,6 +971,7 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
                     <option value="Contract Manufacture">Contract Manufacture</option>
                     <option value="Co-Processer">Co-Processer</option>
                     <option value="Co-Packaging">Co-Packaging</option>
+                    <option value="Not Applicable">Not Applicable</option>
                 </select>
             )
         },

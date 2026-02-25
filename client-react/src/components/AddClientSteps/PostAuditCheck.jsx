@@ -417,7 +417,6 @@ const PostAuditCheck = ({
                                     size="large"
                                     options={[
                                         { value: 'productAssessment', label: 'Product Assessment' },
-                                        { value: 'markingLabelling', label: 'Packaging Assessment & Marking' },
                                         { value: 'sku', label: 'SKU Compliance' },
                                         { value: 'analysis', label: 'Analysis' },
                                         { value: 'analysis2', label: 'Analysis 2' },
@@ -430,7 +429,7 @@ const PostAuditCheck = ({
 
                             {/* Desktop Tab Grid */}
                             <div className="hidden md:block w-full rounded-2xl border border-gray-200 bg-gray-100 p-1">
-                                <div className={`grid ${wasteType === 'Plastic' ? 'grid-cols-9' : 'grid-cols-8'} gap-1`}>
+                                <div className={`grid ${wasteType === 'Plastic' ? 'grid-cols-8' : 'grid-cols-7'} gap-1`}>
                                     <button
                                         type="button"
                                         onClick={() => setPostValidationActiveTab('productAssessment')}
@@ -441,17 +440,6 @@ const PostAuditCheck = ({
                                         }`}
                                     >
                                         Product Assessment
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setPostValidationActiveTab('markingLabelling')}
-                                        className={`w-full rounded-xl px-4 py-2 text-xs font-semibold leading-tight transition-all ${
-                                            postValidationActiveTab === 'markingLabelling'
-                                                ? 'bg-white text-orange-600 shadow-sm'
-                                                : 'text-gray-700 hover:bg-white/70'
-                                        }`}
-                                    >
-                                        Packaging Assessment &amp; Marking or Labelling
                                     </button>
                                     <button
                                         type="button"
@@ -567,7 +555,7 @@ const PostAuditCheck = ({
                                     )}
                                 </div>
                             )}
-                            {postValidationActiveTab === 'markingLabelling' && (
+                            {false && postValidationActiveTab === 'markingLabelling' && (
                                 <div className="border border-gray-200 rounded-xl bg-white p-4">
                                     <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
                                         <div className="text-left">
