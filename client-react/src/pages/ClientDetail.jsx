@@ -144,11 +144,16 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
 
     productRows.forEach(product => {
       const skuCode = (product.skuCode || '').trim();
-      if (!skuCode) return;
+      const componentCode = (product.componentCode || '').trim();
+      
+      // For Producer, if skuCode is missing, use componentCode as skuCode
+      const effectiveSkuCode = isProducerEntity && !skuCode ? componentCode : skuCode;
 
-      if (!groupedBySku.has(skuCode)) {
-        groupedBySku.set(skuCode, {
-          skuCode,
+      if (!effectiveSkuCode) return;
+
+      if (!groupedBySku.has(effectiveSkuCode)) {
+        groupedBySku.set(effectiveSkuCode, {
+          skuCode: effectiveSkuCode,
           skuDescription: product.skuDescription || '-',
           industryCategory: product.industryCategory || '-',
           productImage: product.productImage,
@@ -157,7 +162,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
         });
       }
 
-      const group = groupedBySku.get(skuCode);
+      const group = groupedBySku.get(effectiveSkuCode);
       group.products.push(product);
 
       if (product.componentCode) {
@@ -1652,121 +1657,271 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
       );
     };
 
-    const columns = [
-      {
-        title: isProducerEntity ? 'Component Code' : 'SKU Code',
-        dataIndex: 'skuCode',
-        key: 'skuCode',
-        width: 120,
-        fixed: 'left',
-        render: text => <span className="font-semibold text-gray-700">{text}</span>,
-      },
-      {
-        title: isProducerEntity ? 'Component Description' : 'SKU Description',
-        dataIndex: 'skuDescription',
-        key: 'skuDescription',
-        width: 220,
-        render: text => <span className="text-gray-600 text-xs">{text}</span>,
-      },
-      {
-        title: 'Industry Category',
-        dataIndex: 'industryCategory',
-        key: 'industryCategory',
-        width: 180,
-        render: text => <span className="text-gray-600 text-xs">{text}</span>,
-      },
-      {
-        title: 'Product Image',
-        dataIndex: 'productImage',
-        key: 'productImage',
-        width: 120,
-        align: 'center',
-        render: img =>
-          img ? (
-            <div className="w-10 h-10 mx-auto rounded bg-gray-50 border border-gray-200 overflow-hidden flex items-center justify-center">
-              <Image
-                src={typeof img === 'string' ? resolveUrl(img) : ''}
-                alt="Product"
-                className="w-full h-full object-cover"
-                preview={img ? { src: typeof img === 'string' ? resolveUrl(img) : '' } : false}
-              />
-            </div>
-          ) : (
-            <span className="text-gray-300">-</span>
-          ),
-      },
-      {
-        title: 'Recycled Qty',
-        dataIndex: 'recycledQty',
-        key: 'recycledQty',
-        width: 120,
-        align: 'right',
-        render: val => <span className="font-medium text-green-700">{val}</span>,
-      },
-      {
-        title: 'Product Compliance Status',
-        dataIndex: 'productComplianceStatus',
-        key: 'productComplianceStatus',
-        width: 180,
-        render: val => (
-          <span
-            className={`px-2 py-1 rounded text-xs font-semibold ${
-              val === 'Compliant'
-                ? 'bg-green-100 text-green-700'
-                : val === 'Non-Compliant'
-                ? 'bg-red-100 text-red-700'
-                : 'bg-gray-100 text-gray-700'
-            }`}
-          >
-            {val || '-'}
-          </span>
-        ),
-      },
-      {
-        title: 'Remarks',
-        dataIndex: 'computedRemarks',
-        key: 'computedRemarks',
-        width: 200,
-        render: (val) => (
-          <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">
-            {val || '-'}
-          </div>
-        )
-      },
-      {
-        title: 'Additional Document',
-        dataIndex: 'additionalDocument',
-        key: 'additionalDocument',
-        width: 120,
-        align: 'center',
-        render: (doc) => (
-          <div className="flex flex-col items-center gap-1">
-            {doc ? (
-              <button 
-                onClick={() => {
-                  const url = typeof doc === 'string' ? resolveUrl(doc) : '';
-                  if (url) window.open(url, '_blank');
-                }}
-                className="text-[10px] font-bold text-primary-600 hover:text-primary-800 underline"
+    let columns = [];
+
+    if (isProducerEntity) {
+        // Flat "Component Table" for Producers
+        columns = [
+            {
+                title: 'Component Code',
+                dataIndex: 'skuCode', // skuCode holds componentCode for Producers
+                key: 'skuCode',
+                width: 120,
+                fixed: 'left',
+                render: text => <span className="font-semibold text-gray-700">{text}</span>,
+            },
+            {
+                title: 'Component Description',
+                dataIndex: 'skuDescription',
+                key: 'skuDescription',
+                width: 220,
+                render: text => <span className="text-gray-600 text-xs">{text}</span>,
+            },
+            {
+                title: 'Component Image',
+                dataIndex: 'productImage',
+                key: 'productImage',
+                width: 120,
+                align: 'center',
+                render: img =>
+                  img ? (
+                    <div className="w-10 h-10 mx-auto rounded bg-gray-50 border border-gray-200 overflow-hidden flex items-center justify-center">
+                      <Image
+                        src={typeof img === 'string' ? resolveUrl(img) : ''}
+                        alt="Product"
+                        className="w-full h-full object-cover"
+                        preview={img ? { src: typeof img === 'string' ? resolveUrl(img) : '' } : false}
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-gray-300">-</span>
+                  ),
+            },
+            {
+                title: 'Industry Category',
+                dataIndex: 'industryCategory',
+                key: 'industryCategory',
+                width: 180,
+                render: text => <span className="text-gray-600 text-xs">{text}</span>,
+            },
+            // Add other component details directly here since we don't expand
+            {
+                title: 'Polymer Type',
+                key: 'polymerType',
+                width: 120,
+                render: (_, record) => {
+                    const detail = record.details && record.details[0];
+                    return <span className="text-gray-600 text-xs">{detail ? (detail.polymerType || detail.componentPolymer || '-') : '-'}</span>;
+                }
+            },
+            {
+                title: 'Category',
+                key: 'category',
+                width: 100,
+                render: (_, record) => {
+                    const detail = record.details && record.details[0];
+                    return <span className="text-gray-600 text-xs">{detail ? (detail.category || '-') : '-'}</span>;
+                }
+            },
+             {
+                title: 'Thickness',
+                key: 'thickness',
+                width: 100,
+                render: (_, record) => {
+                    const detail = record.details && record.details[0];
+                    return <span className="text-gray-600 text-xs">{detail ? (detail.thickness || '-') : '-'}</span>;
+                }
+            },
+            {
+                title: 'Recycled Qty',
+                dataIndex: 'recycledQty',
+                key: 'recycledQty',
+                width: 120,
+                align: 'right',
+                render: val => <span className="font-medium text-green-700">{val}</span>,
+            },
+            {
+                title: 'Compliance Status',
+                dataIndex: 'productComplianceStatus',
+                key: 'productComplianceStatus',
+                width: 180,
+                render: val => (
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                      val === 'Compliant'
+                        ? 'bg-green-100 text-green-700'
+                        : val === 'Non-Compliant'
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {val || '-'}
+                  </span>
+                ),
+            },
+            {
+                title: 'Remarks',
+                dataIndex: 'computedRemarks',
+                key: 'computedRemarks',
+                width: 200,
+                render: (val) => (
+                  <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">
+                    {val || '-'}
+                  </div>
+                )
+            },
+             {
+                title: 'Additional Document',
+                dataIndex: 'additionalDocument',
+                key: 'additionalDocument',
+                width: 120,
+                align: 'center',
+                render: (doc) => (
+                  <div className="flex flex-col items-center gap-1">
+                    {doc ? (
+                      <button 
+                        onClick={() => {
+                          const url = typeof doc === 'string' ? resolveUrl(doc) : '';
+                          if (url) window.open(url, '_blank');
+                        }}
+                        className="text-[10px] font-bold text-primary-600 hover:text-primary-800 underline"
+                      >
+                        View
+                      </button>
+                    ) : <span className="text-gray-300">-</span>}
+                  </div>
+                )
+            },
+            {
+                title: 'Manager Remarks',
+                dataIndex: 'managerRemarks',
+                key: 'managerRemarks',
+                width: 200,
+                render: (val) => (
+                  <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">
+                    {val || '-'}
+                  </div>
+                )
+            }
+        ];
+    } else {
+        // Standard SKU -> Component Table for Brand Owners
+        columns = [
+          {
+            title: 'SKU Code',
+            dataIndex: 'skuCode',
+            key: 'skuCode',
+            width: 120,
+            fixed: 'left',
+            render: text => <span className="font-semibold text-gray-700">{text}</span>,
+          },
+          {
+            title: 'SKU Description',
+            dataIndex: 'skuDescription',
+            key: 'skuDescription',
+            width: 220,
+            render: text => <span className="text-gray-600 text-xs">{text}</span>,
+          },
+          {
+            title: 'Industry Category',
+            dataIndex: 'industryCategory',
+            key: 'industryCategory',
+            width: 180,
+            render: text => <span className="text-gray-600 text-xs">{text}</span>,
+          },
+          {
+            title: 'Product Image',
+            dataIndex: 'productImage',
+            key: 'productImage',
+            width: 120,
+            align: 'center',
+            render: img =>
+              img ? (
+                <div className="w-10 h-10 mx-auto rounded bg-gray-50 border border-gray-200 overflow-hidden flex items-center justify-center">
+                  <Image
+                    src={typeof img === 'string' ? resolveUrl(img) : ''}
+                    alt="Product"
+                    className="w-full h-full object-cover"
+                    preview={img ? { src: typeof img === 'string' ? resolveUrl(img) : '' } : false}
+                  />
+                </div>
+              ) : (
+                <span className="text-gray-300">-</span>
+              ),
+          },
+          {
+            title: 'Recycled Qty',
+            dataIndex: 'recycledQty',
+            key: 'recycledQty',
+            width: 120,
+            align: 'right',
+            render: val => <span className="font-medium text-green-700">{val}</span>,
+          },
+          {
+            title: 'Product Compliance Status',
+            dataIndex: 'productComplianceStatus',
+            key: 'productComplianceStatus',
+            width: 180,
+            render: val => (
+              <span
+                className={`px-2 py-1 rounded text-xs font-semibold ${
+                  val === 'Compliant'
+                    ? 'bg-green-100 text-green-700'
+                    : val === 'Non-Compliant'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
               >
-                View
-              </button>
-            ) : <span className="text-gray-300">-</span>}
-          </div>
-        )
-      },
-      {
-        title: 'Manager Remarks',
-        dataIndex: 'managerRemarks',
-        key: 'managerRemarks',
-        width: 200,
-        render: (val) => (
-          <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">
-            {val || '-'}
-          </div>
-        )
-      }
-    ];
+                {val || '-'}
+              </span>
+            ),
+          },
+          {
+            title: 'Remarks',
+            dataIndex: 'computedRemarks',
+            key: 'computedRemarks',
+            width: 200,
+            render: (val) => (
+              <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">
+                {val || '-'}
+              </div>
+            )
+          },
+          {
+            title: 'Additional Document',
+            dataIndex: 'additionalDocument',
+            key: 'additionalDocument',
+            width: 120,
+            align: 'center',
+            render: (doc) => (
+              <div className="flex flex-col items-center gap-1">
+                {doc ? (
+                  <button 
+                    onClick={() => {
+                      const url = typeof doc === 'string' ? resolveUrl(doc) : '';
+                      if (url) window.open(url, '_blank');
+                    }}
+                    className="text-[10px] font-bold text-primary-600 hover:text-primary-800 underline"
+                  >
+                    View
+                  </button>
+                ) : <span className="text-gray-300">-</span>}
+              </div>
+            )
+          },
+          {
+            title: 'Manager Remarks',
+            dataIndex: 'managerRemarks',
+            key: 'managerRemarks',
+            width: 200,
+            render: (val) => (
+              <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">
+                {val || '-'}
+              </div>
+            )
+          }
+        ];
+    }
 
     if (summaryLoading) {
       return (
@@ -1843,13 +1998,13 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
             dataSource={filteredData}
             pagination={false}
             rowKey={(row, index) => row.key || row._id || `${row.skuCode || 'sku'}-${index}`}
-            scroll={{ x: 1200 }}
-            size="middle"
-            expandable={{
-              expandedRowRender,
-              rowExpandable: (record) => record.details && record.details.length > 0,
-            }}
-          />
+          scroll={{ x: 1200 }}
+          size="middle"
+          expandable={isProducerEntity ? undefined : {
+            expandedRowRender,
+            rowExpandable: (record) => record.details && record.details.length > 0,
+          }}
+        />
         </div>
       </div>
     );
