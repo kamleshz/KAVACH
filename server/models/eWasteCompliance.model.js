@@ -7,10 +7,10 @@ const eWasteCategoryRowSchema = new mongoose.Schema({
     categoryEEE: { type: String, default: "" },
     eeeCode: { type: String, default: "" },
     listEEE: { type: String, default: "" },
-    avgLife: { type: String, default: "" },
+    avgLife: { type: Number, default: 0 },
     salesDate: { type: String, default: "" },
     tentativeEndLife: { type: String, default: "" },
-    quantity: { type: String, default: "" }
+    quantity: { type: Number, default: 0 }
 }, { _id: true }); // Keep _id for React keys
 
 const eWasteROHSRowSchema = new mongoose.Schema({
@@ -19,8 +19,8 @@ const eWasteROHSRowSchema = new mongoose.Schema({
     listEEE: { type: String, default: "" },
     substance: { type: String, default: "" },
     symbol: { type: String, default: "" },
-    maxLimit: { type: String, default: "" },
-    actualPercentage: { type: String, default: "" },
+    maxLimit: { type: Number, default: 0 },
+    actualPercentage: { type: Number, default: 0 },
     isCompliant: { type: String, default: "" }
 }, { _id: true });
 
@@ -38,7 +38,7 @@ const eWasteStorageAuditRowSchema = new mongoose.Schema({
     dateOfStorage: { type: String, default: "" },
     endDate: { type: String, default: "" },
     difference: { type: String, default: "" },
-    quantity: { type: String, default: "" }, // In MT
+    quantity: { type: Number, default: 0 }, // In MT
     remarks: { type: String, default: "" }
 }, { _id: true });
 

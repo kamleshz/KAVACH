@@ -644,6 +644,12 @@ const EditClient = () => {
       ctoResults.forEach(res => { if (res) updatedCtoRows[res.index] = { ...updatedCtoRows[res.index], documentFile: res.url }; });
       msmeResults.forEach(res => { if (res) updatedMsmeRows[res.index] = { ...updatedMsmeRows[res.index], certificateFile: res.url }; });
 
+      // Cast numeric fields for MSME
+      const finalMsmeRows = updatedMsmeRows.map(row => ({
+        ...row,
+        turnover: row.turnover ? Number(row.turnover) : 0
+      }));
+
       // 3. Update Client Data
       const clientData = {
         clientName: formData.clientName,
@@ -663,7 +669,7 @@ const EditClient = () => {
             email: formData.coordinatingPersonEmail
         },
         // complianceContact and msmeContact removed from payload
-        msmeDetails: updatedMsmeRows,
+        msmeDetails: finalMsmeRows,
         contactPerson: {
           name: formData.contactPersonName,
           email: formData.contactPersonEmail,
@@ -686,9 +692,12 @@ const EditClient = () => {
           cte: formData.cte || client?.productionFacility?.cte || '',
           cteDetailsList: updatedCteRows,
           ctoDetailsList: updatedCtoRows,
-          cteProduction: cteProductionRows.map(r => ({ plantName: r.plantName || '', productName: r.productName, maxCapacityPerYear: r.maxCapacityPerYear })),
-          ctoProducts: ctoProductRows.map(r => ({ plantName: r.plantName || '', productName: r.productName, quantity: r.quantity })),
+          cteProduction: cteProductionRows.map(r => ({ plantName: r.plantName || '', productName: r.productName, maxCapacityPerYear: r.maxCapacityPerYear ? Number(r.maxCapacityPerYear) : 0 })),
+          ctoProducts: ctoProductRows.map(r => ({ plantName: r.plantName || '', productName: r.productName, quantity: r.quantity ? Number(r.quantity) : 0 })),
           plantLocationNumber: client.productionFacility?.plantLocationNumber || '',
+          waterRegulations: client.productionFacility?.waterRegulations?.map(r => ({ ...r, permittedQuantity: r.permittedQuantity ? Number(r.permittedQuantity) : 0 })) || [],
+          airRegulations: client.productionFacility?.airRegulations?.map(r => ({ ...r, permittedLimit: r.permittedLimit ? Number(r.permittedLimit) : 0 })) || [],
+          hazardousWasteRegulations: client.productionFacility?.hazardousWasteRegulations?.map(r => ({ ...r, quantityMtYr: r.quantityMtYr ? Number(r.quantityMtYr) : 0 })) || [],
         },
       };
 
@@ -1367,7 +1376,7 @@ const EditClient = () => {
                                     />
                                 </td>
                                 <td className="p-3 border-b">
-                                    <input type="text" name="turnover" value={currentMsmeRow.turnover} onChange={handleMsmeInput} className="w-full p-2 border rounded text-sm" placeholder="Turnover" />
+                                    <input type="number" name="turnover" value={currentMsmeRow.turnover} onChange={handleMsmeInput} className="w-full p-2 border rounded text-sm" placeholder="Turnover" />
                                 </td>
                                 <td className="p-3 border-b">
                                     <input type="file" name="certificateFile" onChange={handleMsmeFile} className="w-full text-xs" />
@@ -1583,7 +1592,7 @@ const EditClient = () => {
                             </select>
                           </td>
                           <td className="p-3 border-b"><input type="text" name="productName" value={currentCteProductionRow.productName} onChange={handleCteProductionInput} className="w-full p-2 border rounded text-sm" placeholder="Product Name" /></td>
-                          <td className="p-3 border-b"><input type="text" name="maxCapacityPerYear" value={currentCteProductionRow.maxCapacityPerYear} onChange={handleCteProductionInput} className="w-full p-2 border rounded text-sm" placeholder="Max Capacity" /></td>
+                          <td className="p-3 border-b"><input type="number" name="maxCapacityPerYear" value={currentCteProductionRow.maxCapacityPerYear} onChange={handleCteProductionInput} className="w-full p-2 border rounded text-sm" placeholder="Max Capacity" /></td>
                           <td className="p-3 border-b">
                             <select name="uom" value={currentCteProductionRow.uom} onChange={handleCteProductionInput} className="w-full p-2 border rounded text-sm">
                                 <option value="">Select UOM</option>
@@ -1784,7 +1793,7 @@ const EditClient = () => {
                             </select>
                           </td>
                           <td className="p-3 border-b"><input type="text" name="productName" value={currentCtoProductRow.productName} onChange={handleCtoProductInput} className="w-full p-2 border rounded text-sm" placeholder="Product Name" /></td>
-                          <td className="p-3 border-b"><input type="text" name="quantity" value={currentCtoProductRow.quantity} onChange={handleCtoProductInput} className="w-full p-2 border rounded text-sm" placeholder="Quantity" /></td>
+                          <td className="p-3 border-b"><input type="number" name="quantity" value={currentCtoProductRow.quantity} onChange={handleCtoProductInput} className="w-full p-2 border rounded text-sm" placeholder="Quantity" /></td>
                           <td className="p-3 border-b">
                             <select name="uom" value={currentCtoProductRow.uom} onChange={handleCtoProductInput} className="w-full p-2 border rounded text-sm">
                                 <option value="">Select UOM</option>

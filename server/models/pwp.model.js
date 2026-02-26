@@ -148,7 +148,7 @@ const pwpSchema = new mongoose.Schema({
             required: true
         },
         turnover: {
-            type: String,
+            type: Number,
             required: true
         },
         certificateFile: {
@@ -201,18 +201,18 @@ const pwpSchema = new mongoose.Schema({
         },
         waterRegulations: [{
             description: { type: String, default: "" },
-            permittedQuantity: { type: String, default: "" },
+            permittedQuantity: { type: Number, default: 0 },
             uom: { type: String, default: "" }
         }],
         airRegulations: [{
             parameter: { type: String, default: "" },
-            permittedLimit: { type: String, default: "" },
+            permittedLimit: { type: Number, default: 0 },
             uom: { type: String, default: "" }
         }],
         hazardousWasteRegulations: [{
             nameOfHazardousWaste: { type: String, default: "" },
             facilityModeOfDisposal: { type: String, default: "" },
-            quantityMtYr: { type: String, default: "" },
+            quantityMtYr: { type: Number, default: 0 },
             uom: { type: String, default: "" }
         }],
         cteDetailsList: [{
@@ -265,10 +265,10 @@ const pwpSchema = new mongoose.Schema({
                 polymerType: { type: String, default: "" },
                 componentPolymer: { type: String, default: "" },
                 category: { type: String, default: "" },
-                containerCapacity: { type: String, default: "" },
+                containerCapacity: { type: Number, default: 0 },
                 foodGrade: { type: String, default: "" },
                 layerType: { type: String, default: "" },
-                thickness: { type: String, default: "" },
+                thickness: { type: Number, default: 0 },
                 supplierName: { type: String, default: "" }
             }],
             productSupplierCompliance: [{
@@ -284,7 +284,7 @@ const pwpSchema = new mongoose.Schema({
         cteProduction: [{
             plantName: { type: String, default: "" },
             productName: { type: String, required: true },
-            maxCapacityPerYear: { type: String, required: true },
+            maxCapacityPerYear: { type: Number, required: true },
             uom: { type: String, default: "" }
         }],
         ctoDetailsList: [{
@@ -334,10 +334,10 @@ const pwpSchema = new mongoose.Schema({
                 polymerType: { type: String, default: "" },
                 componentPolymer: { type: String, default: "" },
                 category: { type: String, default: "" },
-                containerCapacity: { type: String, default: "" },
+                containerCapacity: { type: Number, default: 0 },
                 foodGrade: { type: String, default: "" },
                 layerType: { type: String, default: "" },
-                thickness: { type: String, default: "" },
+                thickness: { type: Number, default: 0 },
                 supplierName: { type: String, default: "" }
             }],
             productSupplierCompliance: [{
@@ -353,7 +353,7 @@ const pwpSchema = new mongoose.Schema({
         ctoProducts: [{
             plantName: { type: String, default: "" },
             productName: { type: String, required: true },
-            quantity: { type: String, required: true },
+            quantity: { type: Number, required: true },
             uom: { type: String, default: "" }
         }]
     },

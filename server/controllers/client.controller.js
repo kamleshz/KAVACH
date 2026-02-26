@@ -500,7 +500,8 @@ export const uploadProductComplianceRowController = async (req, res) => {
             generateSupplierCode: single.generateSupplierCode || 'No',
             supplierCode: single.supplierCode || '',
             componentImage: componentImageUrl || '',
-            thickness: single.thickness || '',
+            thickness: single.thickness ? Number(single.thickness) : 0,
+            rcPercent: single.rcPercent ? Number(single.rcPercent) : 0,
             componentComplianceStatus: single.componentComplianceStatus || single.complianceStatus || '',
             clientRemarks: single.clientRemarks || '',
             additionalDocument: additionalDocumentUrl || ''

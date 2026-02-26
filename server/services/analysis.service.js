@@ -1462,7 +1462,7 @@ class AnalysisService {
         const regs = Array.isArray(pf.regulationsCoveredUnderCto) ? pf.regulationsCoveredUnderCto : [];
         const additionalDetails = {
             investment: pf.totalCapitalInvestmentLakhs ?? '-',
-            waterUsage: pf.groundWaterUsage || '-',
+            waterUsage: pf.groundWaterUsage ?? '-',
             cgwaNocReq: pf.cgwaNocRequirement || '-',
             regulations: regs.length ? regs.join(', ') : 'None',
             hasWater: regs.includes('Water'),
@@ -1493,20 +1493,20 @@ class AnalysisService {
             waterRegs: (pf.waterRegulations || []).map((r, i) => ({
                 sr: i + 1,
                 desc: r.description || '-',
-                qty: r.permittedQuantity || '-',
+                qty: (r.permittedQuantity !== undefined && r.permittedQuantity !== null) ? r.permittedQuantity : '-',
                 uom: r.uom || '-'
             })),
             airRegs: (pf.airRegulations || []).map((r, i) => ({
                 sr: i + 1,
                 param: r.parameter || '-',
-                limit: r.permittedLimit || '-',
+                limit: (r.permittedLimit !== undefined && r.permittedLimit !== null) ? r.permittedLimit : '-',
                 uom: r.uom || '-'
             })),
             hazardousRegs: (pf.hazardousWasteRegulations || []).map((r, i) => ({
                 sr: i + 1,
                 name: r.nameOfHazardousWaste || '-',
                 disposal: r.facilityModeOfDisposal || '-',
-                qty: r.quantityMtYr || '-',
+                qty: (r.quantityMtYr !== undefined && r.quantityMtYr !== null) ? r.quantityMtYr : '-',
                 uom: r.uom || '-'
             }))
         };

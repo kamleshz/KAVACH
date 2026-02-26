@@ -458,7 +458,7 @@ Date: ___________________`;
         m.status || '-',
         m.majorActivity || '-',
         m.udyamNumber || '-',
-        m.turnover || '-'
+        m.turnover !== undefined && m.turnover !== null ? Number(m.turnover).toFixed(2) : '-'
     ]);
 
     if (msmeList.length > 0) {

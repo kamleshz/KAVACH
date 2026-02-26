@@ -1,17 +1,42 @@
 import mongoose from "mongoose";
 
+const salesRowSchema = new mongoose.Schema({
+  dateOfInvoice: { type: String, default: "" },
+  invoiceNumber: { type: String, default: "" },
+  nameOfEntity: { type: String, default: "" },
+  gstNumber: { type: String, default: "" },
+  state: { type: String, default: "" },
+  plasticMaterialType: { type: String, default: "" },
+  category: { type: String, default: "" },
+  quantity: { type: Number, default: 0 },
+  skuCode: { type: String, default: "" },
+  hsnCode: { type: String, default: "" }
+}, { _id: false });
+
+const purchaseRowSchema = new mongoose.Schema({
+  dateOfInvoice: { type: String, default: "" },
+  invoiceNumber: { type: String, default: "" },
+  supplierName: { type: String, default: "" },
+  gstNumber: { type: String, default: "" },
+  state: { type: String, default: "" },
+  plasticMaterialType: { type: String, default: "" },
+  category: { type: String, default: "" },
+  quantity: { type: Number, default: 0 },
+  skuCode: { type: String, default: "" }
+}, { _id: false });
+
 const plasticAnalysisSchema = new mongoose.Schema({
   client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
   type: { type: String, required: true }, // e.g., 'CTO' or 'CTE'
-  itemId: { type: String, required: true }, // e.g., Plant ID
+  itemId: { type: mongoose.Schema.Types.ObjectId, required: true }, // e.g., Plant ID
   summary: { type: Object, default: {} },
   rows: { type: Array, default: [] },
   salesSummary: { type: Array, default: [] },
-  salesRows: { type: Array, default: [] },
-  preConsumerRows: { type: Array, default: [] },
+  salesRows: { type: [salesRowSchema], default: [] },
+  preConsumerRows: { type: [salesRowSchema], default: [] },
   salesTargetTables: { type: Array, default: [] },
   purchaseSummary: { type: Array, default: [] },
-  purchaseRows: { type: Array, default: [] },
+  purchaseRows: { type: [purchaseRowSchema], default: [] },
   lastUpdated: { type: Date, default: Date.now }
 }, { timestamps: true });
 

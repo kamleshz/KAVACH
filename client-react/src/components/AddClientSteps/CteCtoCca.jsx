@@ -1259,7 +1259,7 @@ const CteCtoCca = ({
                                                                 <span className="block px-2 py-1 text-sm text-gray-600">{row.quantityMtYr || '-'}</span>
                                                             ) : (
                                                                 <input
-                                                                    type="text"
+                                                                    type="number"
                                                                     value={row.quantityMtYr || ''}
                                                                     onChange={(e) => updateHazardousWasteRegulationRow(idx, 'quantityMtYr', e.target.value)}
                                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"

@@ -17,7 +17,8 @@ const rowSchema = new mongoose.Schema({
     generateSupplierCode: { type: String, default: "No" },
     supplierCode: { type: String, default: "" },
   componentImage: { type: String, default: "" },
-  rcPercent: { type: String, default: "" },
+  thickness: { type: Number, default: 0 },
+  rcPercent: { type: Number, default: 0 },
   auditorRemarks: { type: String, default: "" },
   clientRemarks: { type: String, default: "" },
   additionalDocument: { type: String, default: "" },
@@ -38,10 +39,10 @@ const componentRowSchema = new mongoose.Schema({
   polymerCode: { type: Number, default: null },
   category: { type: String, default: "" },
   categoryIIType: { type: String, default: "" },
-  containerCapacity: { type: String, default: "" },
+  containerCapacity: { type: Number, default: 0 },
   foodGrade: { type: String, default: "" },
   layerType: { type: String, default: "" },
-  thickness: { type: String, default: "" }
+  thickness: { type: Number, default: 0 }
 }, { _id: false });
 
 const supplierComplianceRowSchema = new mongoose.Schema({

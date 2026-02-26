@@ -12,7 +12,7 @@ const skuComplianceSchema = new mongoose.Schema({
   thicknessMentioned: { type: String, default: "" },
   polymerUsed: [{ type: String }],
   polymerMentioned: { type: String, default: "" },
-  recycledPercent: { type: String, default: "" },
+  recycledPercent: { type: Number, default: 0 },
   complianceStatus: { type: String, default: "" },
   markingImage: [{ type: String }], 
   compostableRegNo: { type: String, default: "" },

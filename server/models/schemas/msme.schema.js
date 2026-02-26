@@ -20,7 +20,7 @@ const msmeDetailsSchema = new mongoose.Schema({
         required: true
     },
     turnover: {
-        type: String,
+        type: Number,
         required: true
     },
     certificateFile: {

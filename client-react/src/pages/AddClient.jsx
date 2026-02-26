@@ -179,6 +179,11 @@ const AddClientContent = () => {
   const isProducer = formData?.clientType === 'Producer' || formData?.entityType === 'Producer';
   const [productRows, setProductRows] = useState([]);
 
+  // Scroll to top on tab/step change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab, currentStep, postValidationActiveTab]);
+
   useEffect(() => {
     const fetchProductRows = async () => {
       if (clientId && fullClientData?.productionFacility?.ctoDetailsList?.[0]?._id) {
@@ -1243,7 +1248,7 @@ const AddClientContent = () => {
                 status: r.status || '',
                 majorActivity: r.majorActivity || '',
                 udyamNumber: (r.udyamNumber || '').trim(),
-                turnover: String(r.turnover ?? '').trim(),
+                turnover: r.turnover ? Number(r.turnover) : 0,
                 certificateFile: typeof r.certificateFile === 'string' ? r.certificateFile : ''
             })), // Note: File handling uses separate upload
             productionFacility: {
@@ -1259,20 +1264,20 @@ const AddClientContent = () => {
                 waterRegulations: normalizedCtoRegs.includes('Water')
                     ? (Array.isArray(waterRegulationsRows) ? waterRegulationsRows : []).map(r => ({
                         description: (r?.description || '').toString(),
-                        permittedQuantity: (r?.permittedQuantity || '').toString()
+                        permittedQuantity: r?.permittedQuantity ? Number(r.permittedQuantity) : 0
                     }))
                     : [],
                 airRegulations: normalizedCtoRegs.includes('Air')
                     ? (Array.isArray(airRegulationsRows) ? airRegulationsRows : []).map(r => ({
                         parameter: (r?.parameter || '').toString(),
-                        permittedLimit: (r?.permittedLimit || '').toString()
+                        permittedLimit: r?.permittedLimit ? Number(r.permittedLimit) : 0
                     }))
                     : [],
                 hazardousWasteRegulations: normalizedCtoRegs.includes('Hazardous Waste')
                     ? (Array.isArray(hazardousWasteRegulationsRows) ? hazardousWasteRegulationsRows : []).map(r => ({
                         nameOfHazardousWaste: (r?.nameOfHazardousWaste || '').toString(),
                         facilityModeOfDisposal: (r?.facilityModeOfDisposal || '').toString(),
-                        quantityMtYr: (r?.quantityMtYr || '').toString()
+                        quantityMtYr: r?.quantityMtYr ? Number(r.quantityMtYr) : 0
                     }))
                     : [],
                 cteDetailsList: cteDetailRows.map(r => ({
@@ -1281,14 +1286,20 @@ const AddClientContent = () => {
                     validUpto: r.validUpto ? r.validUpto : null,
                     documentFile: typeof r.documentFile === 'string' ? r.documentFile : ''
                 })),
-                cteProduction: cteProductionRows,
+                cteProduction: cteProductionRows.map(r => ({
+                    ...r,
+                    maxCapacityPerYear: r.maxCapacityPerYear ? Number(r.maxCapacityPerYear) : 0
+                })),
                 ctoDetailsList: ctoDetailRows.map(r => ({
                     ...r,
                     dateOfIssue: r.dateOfIssue ? r.dateOfIssue : null,
                     validUpto: r.validUpto ? r.validUpto : null,
                     documentFile: typeof r.documentFile === 'string' ? r.documentFile : ''
                 })),
-                ctoProducts: ctoProductRows
+                ctoProducts: ctoProductRows.map(r => ({
+                    ...r,
+                    quantity: r.quantity ? Number(r.quantity) : 0
+                }))
             },
             lastCompletedStep: 4,
             ...(processPreValidation ? { clientStatus: 'SUBMITTED' } : (!clientId ? { clientStatus: 'DRAFT' } : {}))
@@ -1351,7 +1362,7 @@ const AddClientContent = () => {
                             status: row.status || '',
                             majorActivity: row.majorActivity || '',
                             udyamNumber: (row.udyamNumber || '').trim(),
-                            turnover: String(row.turnover ?? '').trim(),
+                            turnover: row.turnover ? Number(row.turnover) : 0,
                             certificateFile: path 
                         };
                     } catch (e) {
@@ -1362,7 +1373,7 @@ const AddClientContent = () => {
                             status: row.status || '',
                             majorActivity: row.majorActivity || '',
                             udyamNumber: (row.udyamNumber || '').trim(),
-                            turnover: String(row.turnover ?? '').trim(),
+                            turnover: row.turnover ? Number(row.turnover) : 0,
                             certificateFile: '' // Fallback
                         };
                     }
@@ -1373,7 +1384,7 @@ const AddClientContent = () => {
                     status: row.status || '',
                     majorActivity: row.majorActivity || '',
                     udyamNumber: (row.udyamNumber || '').trim(),
-                    turnover: String(row.turnover ?? '').trim(),
+                    turnover: row.turnover ? Number(row.turnover) : 0,
                     certificateFile: typeof row.certificateFile === 'string' ? row.certificateFile : ''
                 };
             }));
