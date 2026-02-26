@@ -2054,7 +2054,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
               </button>
             </>
           )}
-          {(client.wasteType || '').toLowerCase().includes('plastic') && initialViewMode !== 'client-connect' && (
+          {/* {(client.wasteType || '').toLowerCase().includes('plastic') && initialViewMode !== 'client-connect' && (
             <button
               type="button"
               onClick={async () => {
@@ -2085,7 +2085,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
               <FaFilePdf className="text-sm" />
               Download Complete Report
             </button>
-          )}
+          )} */}
         </div>
       </div>
 
