@@ -690,192 +690,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                     </div>
                   )}
 
-                  {hasCto && (
-                    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                      <div className="px-6 py-5 border-b bg-gray-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-8 w-1 bg-emerald-500 rounded-full"></div>
-                          <h4 className="font-bold text-gray-800 text-sm md:text-base">CTO/CCA Additional Details</h4>
-                        </div>
-                      </div>
 
-                      <div className="p-6 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                            <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-                              Total Capital Investment (Lakhs)
-                            </div>
-                            <div className="mt-2 text-sm font-semibold text-gray-900">
-                              {pf.totalCapitalInvestmentLakhs ?? '-'}
-                            </div>
-                          </div>
-                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                            <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-                              Ground/Bore Well Water Usage
-                            </div>
-                            <div className="mt-2 text-sm font-semibold text-gray-900">
-                              {pf.groundWaterUsage || '-'}
-                            </div>
-                          </div>
-                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                            <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-                              CGWA NOC Requirement
-                            </div>
-                            <div className="mt-2 text-sm font-semibold text-gray-900">
-                              {pf.cgwaNocRequirement || '-'}
-                            </div>
-                          </div>
-                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                            <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-                              CGWA NOC Document
-                            </div>
-                            <div className="mt-2">
-                              {pf.cgwaNocDocument ? (
-                                <button
-                                  onClick={() =>
-                                    handleViewDocument(pf.cgwaNocDocument, 'CGWA', 'CGWA NOC')
-                                  }
-                                  className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                                >
-                                  <FaEye className="mr-1" /> View
-                                </button>
-                              ) : (
-                                <span className="text-gray-400 text-xs italic">No Doc</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                            <div className="flex items-center gap-2">
-                              <div className="h-8 w-1 bg-emerald-500 rounded-full"></div>
-                              <h4 className="font-bold text-gray-800 text-sm md:text-base">
-                                Regulations Covered under CTO
-                              </h4>
-                            </div>
-                          </div>
-
-                          <div className="mt-1 flex flex-wrap gap-2">
-                            {regs.length ? (
-                              regs.map(r => (
-                                <span
-                                  key={r}
-                                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                >
-                                  {r}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-gray-400 text-sm italic">Not selected</span>
-                            )}
-                          </div>
-
-                          {hasWater && (
-                            <div className="mt-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="text-sm font-bold text-gray-700">Water</div>
-                              </div>
-                              <div className="overflow-x-auto rounded-lg border border-gray-200">
-                                <table className="w-full text-left border-collapse">
-                                  <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
-                                    <tr>
-                                      <th className="p-3 font-semibold border-b w-20">SR No</th>
-                                      <th className="p-3 font-semibold border-b">
-                                        Description (water consumption / waste)
-                                      </th>
-                                      <th className="p-3 font-semibold border-b w-48">Permitted quantity</th>
-                                      <th className="p-3 font-semibold border-b w-24">UOM</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="text-sm divide-y divide-gray-100">
-                                    {(waterRegs.length ? waterRegs : [{}]).map((row, idx) => (
-                                      <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
-                                        <td className="p-3 text-gray-700">{row.description || '-'}</td>
-                                        <td className="p-3 text-gray-700">{row.permittedQuantity || '-'}</td>
-                                        <td className="p-3 text-gray-700">{row.uom || '-'}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-
-                          {hasAir && (
-                            <div className="mt-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="text-sm font-bold text-gray-700">Air</div>
-                              </div>
-                              <div className="overflow-x-auto rounded-lg border border-gray-200">
-                                <table className="w-full text-left border-collapse">
-                                  <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
-                                    <tr>
-                                      <th className="p-3 font-semibold border-b w-20">SR No</th>
-                                      <th className="p-3 font-semibold border-b">Parameters</th>
-                                      <th className="p-3 font-semibold border-b w-80">
-                                        Permissible annual / daily limit
-                                      </th>
-                                      <th className="p-3 font-semibold border-b w-24">UOM</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="text-sm divide-y divide-gray-100">
-                                    {(airRegs.length ? airRegs : [{}]).map((row, idx) => (
-                                      <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
-                                        <td className="p-3 text-gray-700">{row.parameter || '-'}</td>
-                                        <td className="p-3 text-gray-700">{row.permittedLimit || '-'}</td>
-                                        <td className="p-3 text-gray-700">{row.uom || '-'}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-
-                          {hasHazardousWaste && (
-                            <div className="mt-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="text-sm font-bold text-gray-700">Hazardous Waste</div>
-                              </div>
-                              <div className="overflow-x-auto rounded-lg border border-gray-200">
-                                <table className="w-full text-left border-collapse">
-                                  <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
-                                    <tr>
-                                      <th className="p-3 font-semibold border-b w-20">SR No</th>
-                                      <th className="p-3 font-semibold border-b">Name of Hazardous Waste</th>
-                                      <th className="p-3 font-semibold border-b">
-                                        Facility &amp; Mode of Disposal
-                                      </th>
-                                      <th className="p-3 font-semibold border-b w-40">Quantity MT/YR</th>
-                                      <th className="p-3 font-semibold border-b w-24">UOM</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="text-sm divide-y divide-gray-100">
-                                    {(hazardousRegs.length ? hazardousRegs : [{}]).map((row, idx) => (
-                                      <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
-                                        <td className="p-3 text-gray-700">
-                                          {row.nameOfHazardousWaste || '-'}
-                                        </td>
-                                        <td className="p-3 text-gray-700">
-                                          {row.facilityModeOfDisposal || '-'}
-                                        </td>
-                                        <td className="p-3 text-gray-700">{row.quantityMtYr || '-'}</td>
-                                        <td className="p-3 text-gray-700">{row.uom || '-'}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -1488,6 +1303,193 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                               ))}
                             </div>
                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasCto && (
+                    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                      <div className="px-6 py-5 border-b bg-gray-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-1 bg-emerald-500 rounded-full"></div>
+                          <h4 className="font-bold text-gray-800 text-sm md:text-base">CTO/CCA Additional Details</h4>
+                        </div>
+                      </div>
+
+                      <div className="p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              Total Capital Investment (Lakhs)
+                            </div>
+                            <div className="mt-2 text-sm font-semibold text-gray-900">
+                              {pf.totalCapitalInvestmentLakhs ?? '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              Ground/Bore Well Water Usage
+                            </div>
+                            <div className="mt-2 text-sm font-semibold text-gray-900">
+                              {pf.groundWaterUsage || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              CGWA NOC Requirement
+                            </div>
+                            <div className="mt-2 text-sm font-semibold text-gray-900">
+                              {pf.cgwaNocRequirement || '-'}
+                            </div>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              CGWA NOC Document
+                            </div>
+                            <div className="mt-2">
+                              {pf.cgwaNocDocument ? (
+                                <button
+                                  onClick={() =>
+                                    handleViewDocument(pf.cgwaNocDocument, 'CGWA', 'CGWA NOC')
+                                  }
+                                  className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                                >
+                                  <FaEye className="mr-1" /> View
+                                </button>
+                              ) : (
+                                <span className="text-gray-400 text-xs italic">No Doc</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                            <div className="flex items-center gap-2">
+                              <div className="h-8 w-1 bg-emerald-500 rounded-full"></div>
+                              <h4 className="font-bold text-gray-800 text-sm md:text-base">
+                                Regulations Covered under CTO
+                              </h4>
+                            </div>
+                          </div>
+
+                          <div className="mt-1 flex flex-wrap gap-2">
+                            {regs.length ? (
+                              regs.map(r => (
+                                <span
+                                  key={r}
+                                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                >
+                                  {r}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-gray-400 text-sm italic">Not selected</span>
+                            )}
+                          </div>
+
+                          {hasWater && (
+                            <div className="mt-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-sm font-bold text-gray-700">Water</div>
+                              </div>
+                              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                <table className="w-full text-left border-collapse">
+                                  <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                                    <tr>
+                                      <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                      <th className="p-3 font-semibold border-b">
+                                        Description (water consumption / waste)
+                                      </th>
+                                      <th className="p-3 font-semibold border-b w-48">Permitted quantity</th>
+                                      <th className="p-3 font-semibold border-b w-24">UOM</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="text-sm divide-y divide-gray-100">
+                                    {(waterRegs.length ? waterRegs : [{}]).map((row, idx) => (
+                                      <tr key={idx} className="hover:bg-gray-50">
+                                        <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                        <td className="p-3 text-gray-700">{row.description || '-'}</td>
+                                        <td className="p-3 text-gray-700">{row.permittedQuantity || '-'}</td>
+                                        <td className="p-3 text-gray-700">{row.uom || '-'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+
+                          {hasAir && (
+                            <div className="mt-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-sm font-bold text-gray-700">Air</div>
+                              </div>
+                              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                <table className="w-full text-left border-collapse">
+                                  <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                                    <tr>
+                                      <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                      <th className="p-3 font-semibold border-b">Parameters</th>
+                                      <th className="p-3 font-semibold border-b w-80">
+                                        Permissible annual / daily limit
+                                      </th>
+                                      <th className="p-3 font-semibold border-b w-24">UOM</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="text-sm divide-y divide-gray-100">
+                                    {(airRegs.length ? airRegs : [{}]).map((row, idx) => (
+                                      <tr key={idx} className="hover:bg-gray-50">
+                                        <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                        <td className="p-3 text-gray-700">{row.parameter || '-'}</td>
+                                        <td className="p-3 text-gray-700">{row.permittedLimit || '-'}</td>
+                                        <td className="p-3 text-gray-700">{row.uom || '-'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+
+                          {hasHazardousWaste && (
+                            <div className="mt-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-sm font-bold text-gray-700">Hazardous Waste</div>
+                              </div>
+                              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                <table className="w-full text-left border-collapse">
+                                  <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                                    <tr>
+                                      <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                      <th className="p-3 font-semibold border-b">Name of Hazardous Waste</th>
+                                      <th className="p-3 font-semibold border-b">
+                                        Facility &amp; Mode of Disposal
+                                      </th>
+                                      <th className="p-3 font-semibold border-b w-40">Quantity MT/YR</th>
+                                      <th className="p-3 font-semibold border-b w-24">UOM</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="text-sm divide-y divide-gray-100">
+                                    {(hazardousRegs.length ? hazardousRegs : [{}]).map((row, idx) => (
+                                      <tr key={idx} className="hover:bg-gray-50">
+                                        <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                        <td className="p-3 text-gray-700">
+                                          {row.nameOfHazardousWaste || '-'}
+                                        </td>
+                                        <td className="p-3 text-gray-700">
+                                          {row.facilityModeOfDisposal || '-'}
+                                        </td>
+                                        <td className="p-3 text-gray-700">{row.quantityMtYr || '-'}</td>
+                                        <td className="p-3 text-gray-700">{row.uom || '-'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
