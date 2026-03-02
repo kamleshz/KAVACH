@@ -781,6 +781,9 @@ class AnalysisService {
         handlebars.registerHelper('ne', function (a, b) {
             return a !== b;
         });
+        handlebars.registerHelper('eq', function (a, b) {
+            return a === b;
+        });
 
         // 1. Fetch Client & Audit Details
         // Populate assignedTo (Auditor) and assignedManager

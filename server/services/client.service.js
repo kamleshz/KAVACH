@@ -271,6 +271,104 @@ class ClientService {
             doc.markModified('supplierCompliance');
         }
 
+            doc.componentDetails = afterRows;
+        }
+
+        // --- Notification Logic ---
+        try {
+            const normalize = (v) => (v === null || v === undefined) ? '' : String(v).trim();
+            const changed = [];
+            
+            if (typeof rowIndex !== 'undefined' && row !== undefined) {
+                // Single row update
+                const idx = parseInt(rowIndex, 10);
+                const before = (doc.componentDetails && doc.componentDetails[idx]) ? doc.componentDetails[idx] : {}; // This is AFTER update in memory but BEFORE save?
+                // Wait, doc.componentDetails is ALREADY updated above.
+                // I need the BEFORE state.
+                // The 'beforeRow' variable was captured earlier inside the if/else blocks!
+                // But those variables (beforeRow, beforeRows) are local to the blocks.
+                // I should capture changes inside the blocks or move this logic.
+                // Actually, let's rely on 'pushDiffs' calling logic? No, pushDiffs is for history.
+                
+                // Let's re-evaluate.
+                // In single row block:
+                // const beforeRow = doc.componentDetails?.[idx] || {}; -> This was captured BEFORE update.
+                // But 'beforeRow' is not available here (scope).
+                
+                // I should insert the notification logic INSIDE the blocks or modify variable scope.
+                // Or better, checking 'changeHistory' which was just pushed?
+                // doc.changeHistory contains the changes!
+                // I can check if 'Auditor Remarks' or 'Manager Remarks' is in the latest history entries.
+                
+                // Latest entries are appended to doc.changeHistory.
+                // But wait, doc.changeHistory is an array.
+                // I can filter doc.changeHistory for entries where 'at' is very recent (now).
+                // Or just assume the last few entries are from this operation.
+                
+                // Let's filter doc.changeHistory for entries added in this request.
+                // But changeHistory is persistent.
+                
+                // Better approach:
+                // Check changeHistory for entries created just now.
+                const now = new Date();
+                const recentChanges = doc.changeHistory.filter(h => 
+                    h.at && (now.getTime() - new Date(h.at).getTime() < 1000) && 
+                    (h.field === 'Auditor Remarks' || h.field === 'Manager Remarks')
+                );
+                
+                if (recentChanges.length > 0) {
+                     const fields = [...new Set(recentChanges.map(c => c.field))];
+                     // Send notification
+                     const toId = (v) => (v && typeof v === 'object' && v._id) ? String(v._id) : (v ? String(v) : '');
+                     const actorId = toId(userId);
+                     const creatorId = toId(clientExists?.createdBy);
+                     const managerId = toId(clientExists?.assignedManager) || toId(clientExists?.assignedTo);
+                     
+                     // If actor is creator (User), notify Manager. Else notify Creator (User).
+                     // But if Admin is updating, notify User.
+                     // Logic:
+                     // If Actor == AssignedTo (User) -> Notify AssignedManager
+                     // If Actor == AssignedManager (Admin) -> Notify AssignedTo
+                     // If Actor == Admin (but not assigned manager) -> Notify AssignedTo
+                     
+                     // Let's simplify:
+                     // If Actor is User (assignedTo), notify Manager.
+                     // If Actor is NOT User, notify User.
+                     
+                     const assignedToId = toId(clientExists?.assignedTo);
+                     const assignedManagerId = toId(clientExists?.assignedManager);
+                     
+                     let recipientId = null;
+                     if (actorId === assignedToId) {
+                         recipientId = assignedManagerId;
+                     } else {
+                         recipientId = assignedToId;
+                     }
+                     
+                     if (recipientId && recipientId !== actorId) {
+                         const clientName = (clientExists?.clientName || clientExists?.name || clientExists?.tradeName || '').toString();
+                         await NotificationModel.create({
+                             recipient: recipientId,
+                             sender: actorId,
+                             type: 'REMARKS_UPDATED',
+                             title: `${fields.join(' & ')} Updated`,
+                             message: `${clientName} • Component Details`,
+                             clientId,
+                             linkPath: `/dashboard/client/${clientId}/edit`,
+                             meta: {
+                                 clientId,
+                                 type,
+                                 itemId,
+                                 changedFields: fields
+                             }
+                         });
+                     }
+                }
+            }
+        } catch (err) {
+            console.error("Error sending notification:", err);
+        }
+
         if (doc.changeHistory.length > 5000) doc.changeHistory = doc.changeHistory.slice(-5000);
         doc.updatedBy = userId;
         await doc.save();
