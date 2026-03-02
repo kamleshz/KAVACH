@@ -15,6 +15,7 @@ import adminRouter from './routes/admin.route.js';
 import userRouter from './routes/user.route.js';
 import aiRouter from './routes/ai.route.js';
 import analysisRouter from './routes/analysis.route.js';
+import notificationRouter from './routes/notification.route.js';
 import { seedRoles } from './utils/roleSeeder.js';
 import { initAuditCron } from './cron/auditCron.js';
 import logger from './utils/logger.js';
@@ -149,6 +150,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/user', userRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/analysis', analysisRouter);
+app.use('/api/notification', notificationRouter);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

@@ -1,19 +1,63 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Breadcrumbs from '../components/Breadcrumbs';
 import useAuth from '../hooks/useAuth';
 import useOnClickOutside from '../hooks/useOnClickOutside';
-import { UserOutlined, DownOutlined, LogoutOutlined } from '@ant-design/icons';
+import { UserOutlined, DownOutlined, LogoutOutlined, BellOutlined } from '@ant-design/icons';
+import api from '../services/api';
+import { API_ENDPOINTS } from '../services/apiEndpoints';
 
 const DashboardLayout = () => {
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState([]);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
+  const notificationRef = useRef(null);
 
   useOnClickOutside(dropdownRef, () => setShowDropdown(false));
+  useOnClickOutside(notificationRef, () => setShowNotifications(false));
+
+  const fetchUnreadCount = async () => {
+    const response = await api.get(API_ENDPOINTS.NOTIFICATION.UNREAD_COUNT);
+    if (response.data?.success) {
+      setUnreadCount(Number(response.data?.data?.count) || 0);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    const response = await api.get(API_ENDPOINTS.NOTIFICATION.LIST(20));
+    if (response.data?.success) {
+      setNotifications(Array.isArray(response.data?.data) ? response.data.data : []);
+    }
+  };
+
+  useEffect(() => {
+    let interval;
+
+    (async () => {
+      try {
+        await fetchUnreadCount();
+      } catch {
+        setUnreadCount(0);
+      }
+    })();
+
+    interval = setInterval(() => {
+      fetchUnreadCount().catch(() => {});
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!showNotifications) return;
+    fetchNotifications().catch(() => setNotifications([]));
+  }, [showNotifications]);
 
   const handleLogout = async () => {
     await logout();
@@ -42,7 +86,97 @@ const DashboardLayout = () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-2">
+          <div className="relative" ref={notificationRef}>
+            <button
+              type="button"
+              onClick={() => setShowNotifications((prev) => !prev)}
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl hover:bg-gray-50 transition-all duration-200"
+              aria-label="Notifications"
+            >
+              <BellOutlined className="text-base text-gray-500" />
+              {unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white shadow">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="absolute right-0 mt-2 w-80 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl">
+                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                  <p className="text-sm font-semibold text-gray-900">Notifications</p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await api.patch(API_ENDPOINTS.NOTIFICATION.MARK_ALL_READ);
+                        await fetchUnreadCount();
+                        await fetchNotifications();
+                      } finally {
+                        setShowNotifications(false);
+                      }
+                    }}
+                    className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+                  >
+                    Mark all read
+                  </button>
+                </div>
+
+                <div className="max-h-96 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-sm text-gray-500">No notifications</div>
+                  ) : (
+                    notifications.map((n) => {
+                      const isUnread = !n?.readAt;
+                      const title = (n?.title || '').trim() || 'Notification';
+                      const message = (n?.message || '').trim();
+                      const when = n?.createdAt ? new Date(n.createdAt).toLocaleString() : '';
+
+                      return (
+                        <button
+                          key={n?._id}
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              if (isUnread && n?._id) {
+                                await api.patch(API_ENDPOINTS.NOTIFICATION.MARK_READ(n._id));
+                              }
+                              await fetchUnreadCount();
+                              if (n?.linkPath) {
+                                navigate(n.linkPath);
+                              }
+                            } finally {
+                              setShowNotifications(false);
+                            }
+                          }}
+                          className={`w-full px-4 py-3 text-left transition-colors hover:bg-gray-50 ${
+                            isUnread ? 'bg-orange-50/40' : 'bg-white'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={`mt-1 h-2.5 w-2.5 rounded-full ${
+                                isUnread ? 'bg-orange-500' : 'bg-gray-200'
+                              }`}
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-gray-900">{title}</p>
+                              {message && (
+                                <p className="mt-0.5 text-xs text-gray-600 whitespace-normal break-words">{message}</p>
+                              )}
+                              {when && <p className="mt-1 text-[10px] text-gray-400">{when}</p>}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowDropdown(!showDropdown)}

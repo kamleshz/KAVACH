@@ -466,9 +466,7 @@ const MarkingLabeling = ({ clientId, API_URL, readOnly = false, isProducer = fal
                     >
                         <option value="">Select</option>
                         <option value="Compliant">Compliant</option>
-                        <option value="Partially Compliant">Partially Compliant</option>
                         <option value="Non-Compliant">Non-Compliant</option>
-                        <option value="Pending">Pending</option>
                     </select>
                 )
             ) 
@@ -544,7 +542,6 @@ const MarkingLabeling = ({ clientId, API_URL, readOnly = false, isProducer = fal
                     >
                         <option value="all">All Status</option>
                         <option value="Compliant">Compliant</option>
-                        <option value="Partially Compliant">Partially Compliant</option>
                         <option value="Non-Compliant">Non-Compliant</option>
                     </select>
                 </div>

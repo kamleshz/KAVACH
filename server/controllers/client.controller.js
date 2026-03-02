@@ -318,7 +318,7 @@ export const verifyFacilityController = asyncHandler(async (req, res) => {
 export const saveProductComplianceController = asyncHandler(async (req, res) => {
     try {
         const { clientId } = req.params;
-        const { type, itemId, rows, rowIndex, row } = req.body;
+        const { type, itemId, rows, rowIndex, row, plantName } = req.body;
         const userId = req.userId;
         const emitter = req.app.get('realtimeEmitter');
         
@@ -330,7 +330,8 @@ export const saveProductComplianceController = asyncHandler(async (req, res) => 
             rowIndex, 
             row, 
             userId, 
-            emitter
+            emitter,
+            plantName
         );
 
         return res.status(200).json({
@@ -611,7 +612,7 @@ export const uploadProductComplianceRowController = async (req, res) => {
 export const saveProductComponentDetailsController = asyncHandler(async (req, res) => {
     try {
         const { clientId } = req.params;
-        const { type, itemId, rows, rowIndex, row } = req.body;
+        const { type, itemId, rows, rowIndex, row, plantName } = req.body;
         const userId = req.userId;
         const emitter = req.app.get('realtimeEmitter');
         
@@ -623,7 +624,8 @@ export const saveProductComponentDetailsController = asyncHandler(async (req, re
             rowIndex, 
             row, 
             userId, 
-            emitter
+            emitter,
+            plantName
         );
 
         return res.status(200).json({
@@ -661,7 +663,7 @@ export const getProductComponentDetailsController = async (req, res) => {
 export const saveProductSupplierComplianceController = asyncHandler(async (req, res) => {
     try {
         const { clientId } = req.params;
-        const { type, itemId, rows, rowIndex, row } = req.body;
+        const { type, itemId, rows, rowIndex, row, plantName } = req.body;
         
         console.log(`[Save Supplier Compliance] Client: ${clientId}, Type: ${type}, Item: ${itemId}`);
         if (rows && Array.isArray(rows)) {
@@ -682,7 +684,8 @@ export const saveProductSupplierComplianceController = asyncHandler(async (req, 
             rowIndex, 
             row, 
             userId, 
-            emitter
+            emitter,
+            plantName
         );
 
         return res.status(200).json({
@@ -792,7 +795,7 @@ export const importProductComplianceHistoryController = async (req, res) => {
 export const saveRecycledQuantityUsedController = asyncHandler(async (req, res) => {
     try {
         const { clientId } = req.params;
-        const { type, itemId, rows, rowIndex, row } = req.body;
+        const { type, itemId, rows, rowIndex, row, plantName } = req.body;
         const userId = req.userId;
 
         const result = await ClientService.saveRecycledQuantityUsed(
@@ -802,7 +805,8 @@ export const saveRecycledQuantityUsedController = asyncHandler(async (req, res) 
             rows, 
             rowIndex, 
             row, 
-            userId
+            userId,
+            plantName
         );
 
         return res.status(200).json({
@@ -840,7 +844,7 @@ export const getRecycledQuantityUsedController = async (req, res) => {
 export const saveMonthlyProcurementController = asyncHandler(async (req, res) => {
     try {
         const { clientId } = req.params;
-        const { type, itemId, rows, rowIndex, row } = req.body;
+        const { type, itemId, rows, rowIndex, row, plantName } = req.body;
         const userId = req.userId;
 
         const result = await ClientService.saveMonthlyProcurement(
@@ -850,7 +854,8 @@ export const saveMonthlyProcurementController = asyncHandler(async (req, res) =>
             rows, 
             rowIndex, 
             row, 
-            userId
+            userId,
+            plantName
         );
 
         return res.status(200).json({

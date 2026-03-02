@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
@@ -13,6 +13,40 @@ const ForgotPassword = () => {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
+
+  useEffect(() => {
+    let interval;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  const handleResendOtp = async () => {
+    if (resendTimer > 0) return;
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      // Re-trigger forgot password to send new OTP
+      const response = await api.post(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, { email });
+      if (response.data.success) {
+        setSuccess('Code resent successfully');
+        setResendTimer(30);
+      } else {
+        setError(response.data.message);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to resend OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
@@ -219,13 +253,26 @@ const ForgotPassword = () => {
               )}
             </button>
 
-            <div className="text-center">
+            <div className="flex items-center justify-between mt-4">
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="text-sm text-gray-600 hover:text-primary-600"
+                className="text-sm text-gray-600 hover:text-primary-600 font-medium transition-colors"
               >
                 Change Email
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={resendTimer > 0 || loading}
+                className={`text-sm font-medium transition-colors ${
+                  resendTimer > 0 
+                    ? 'text-gray-400 cursor-not-allowed' 
+                    : 'text-primary-600 hover:text-primary-700 cursor-pointer'
+                }`}
+              >
+                {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend Code'}
               </button>
             </div>
           </form>

@@ -24,7 +24,8 @@ const SummaryReport = ({
     handleComponentSave,
     savingRow,
     onlyTable = false,
-    isProducer = false
+    isProducer = false,
+    isManagerRemarksReadOnly = false
 }) => {
     const [isDownloading, setIsDownloading] = useState(false);
 
@@ -406,7 +407,7 @@ const SummaryReport = ({
             key: 'managerRemarks',
             width: 200,
             render: (val, record) => (
-                onlyTable ? (
+                onlyTable && !isManagerRemarksReadOnly ? (
                     <textarea
                         className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 min-h-[40px] bg-white"
                         value={val}
@@ -604,7 +605,7 @@ const SummaryReport = ({
             key: 'managerRemarks',
             width: 200,
             render: (val, record) => (
-                onlyTable ? (
+                onlyTable && !isManagerRemarksReadOnly ? (
                     <textarea
                         className="w-full border border-gray-300 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 min-h-[40px] bg-white"
                         value={val}
@@ -628,8 +629,11 @@ const SummaryReport = ({
             render: (_, record) => {
                 const isThisRowSaving = savingRow !== null && 
                     productRows[savingRow] &&
-                    (productRows[savingRow].skuCode || '').trim() === record.skuCode &&
-                    (productRows[savingRow].componentCode || '').trim() === record.componentCode;
+                    (isProducer 
+                        ? (productRows[savingRow].componentCode || '').trim() === record.componentCode
+                        : (productRows[savingRow].skuCode || '').trim() === record.skuCode && 
+                          (productRows[savingRow].componentCode || '').trim() === record.componentCode
+                    );
 
                 return (
                     <button

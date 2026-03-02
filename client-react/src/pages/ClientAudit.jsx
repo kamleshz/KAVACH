@@ -602,9 +602,11 @@ const ClientAudit = () => {
                             getPlantGroups().map((group, idx) => {
                                 const { displayName: plantName, cteDetails, ctoDetails, cteProd, ctoProds } = group;
                                 const plantKey = plantName || `plant-${idx}`;
+                                const plantCardKey = `${plantKey}-card`;
                                 const cteKey = `${plantKey}-cte`;
                                 const ctoKey = `${plantKey}-cto`;
                                 const prodKey = `${plantKey}-products`;
+                                const isPlantExpanded = !!expandedSections[plantCardKey];
                                 const isCteExpanded = !!expandedSections[cteKey];
                                 const isCtoExpanded = !!expandedSections[ctoKey];
                                 const isProdExpanded = !!expandedSections[prodKey];
@@ -637,7 +639,10 @@ const ClientAudit = () => {
                                 return (
                                     <div key={idx} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden mb-8">
                                         {/* Plant Header */}
-                                        <div className="px-6 py-5 border-b bg-gradient-to-r from-gray-50 to-white flex justify-between items-center">
+                                        <div 
+                                            className="px-6 py-5 border-b bg-gradient-to-r from-gray-50 to-white flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors"
+                                            onClick={() => toggleSection(plantKey, 'card')}
+                                        >
                                             <div className="flex items-center gap-3">
                                                 <div className="h-10 w-10 rounded-lg bg-primary-50 flex items-center justify-center text-primary-600">
                                                     <FaBuilding className="text-xl" />
@@ -648,29 +653,39 @@ const ClientAudit = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Start Audit Button */}
-                                            <button
-                                                onClick={() => handleStartPlantAudit(group)}
-                                                className="relative overflow-hidden group w-40 h-10 rounded-lg font-bold text-sm shadow-md hover:shadow-lg transition-all border border-blue-500 bg-white"
-                                            >
-                                                <div className="absolute inset-0 flex items-center justify-center gap-2 text-blue-600 z-0">
-                                                    {buttonContent}
-                                                </div>
-                                                <div 
-                                                    className="absolute top-0 left-0 h-full bg-blue-500 overflow-hidden transition-all duration-1000 ease-in-out z-10"
-                                                    style={{ 
-                                                        width: `${buttonIsComplete ? 100 : buttonProgress}%`,
-                                                        opacity: buttonProgress === 0 ? 0 : 1
+                                            <div className="flex items-center gap-4">
+                                                {/* Start Audit Button */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleStartPlantAudit(group);
                                                     }}
+                                                    className="relative overflow-hidden group w-40 h-10 rounded-lg font-bold text-sm shadow-md hover:shadow-lg transition-all border border-blue-500 bg-white"
                                                 >
-                                                    <div className="w-40 h-full flex items-center justify-center gap-2 text-white whitespace-nowrap">
+                                                    <div className="absolute inset-0 flex items-center justify-center gap-2 text-blue-600 z-0">
                                                         {buttonContent}
                                                     </div>
+                                                    <div 
+                                                        className="absolute top-0 left-0 h-full bg-blue-500 overflow-hidden transition-all duration-1000 ease-in-out z-10"
+                                                        style={{ 
+                                                            width: `${buttonIsComplete ? 100 : buttonProgress}%`,
+                                                            opacity: buttonProgress === 0 ? 0 : 1
+                                                        }}
+                                                    >
+                                                        <div className="w-40 h-full flex items-center justify-center gap-2 text-white whitespace-nowrap">
+                                                            {buttonContent}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                                
+                                                <div className={`transition-transform duration-300 text-gray-500 ${isPlantExpanded ? 'rotate-180' : ''}`}>
+                                                     <FaChevronDown />
                                                 </div>
-                                            </button>
+                                            </div>
                                         </div>
 
-                                        <div className="p-6 space-y-8">
+                                        {isPlantExpanded && (
+                                            <div className="p-6 space-y-8 animate-fadeIn">
                                             {cteDetails.length > 0 && (
                                                 <div
                                                     className={`rounded-lg border transition-all duration-300 ${
@@ -1004,6 +1019,7 @@ const ClientAudit = () => {
                                                 </div>
                                             )}
                                         </div>
+                                        )}
                                     </div>
                                 );
                             })

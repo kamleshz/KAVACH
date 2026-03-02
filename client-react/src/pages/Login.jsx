@@ -34,7 +34,8 @@ const Login = () => {
   const [isCapturing, setIsCapturing] = useState(false);
   const [location, setLocation] = useState(null);
   const [locationStatus, setLocationStatus] = useState('idle'); // idle, locating, captured, error, denied
-  
+  const [resendTimer, setResendTimer] = useState(0);
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const errorTimeoutRef = useRef(null);
@@ -50,6 +51,40 @@ const Login = () => {
       }
     };
   }, []);
+
+  // Resend OTP timer effect
+  useEffect(() => {
+    let interval;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  const handleResendOtp = async () => {
+    if (resendTimer > 0) return;
+    
+    // Set loading to true to prevent multiple clicks and disable submit
+    setLoading(true); 
+    
+    try {
+        const response = await api.post(API_ENDPOINTS.AUTH.LOGIN, {
+            email: formData.email,
+            password: formData.password
+        });
+        
+        if (response.data.success) {
+            toast.success("OTP resent successfully!");
+            setResendTimer(30); // 30 seconds cooldown
+        }
+    } catch (err) {
+        toast.error(err.response?.data?.message || "Failed to resend OTP");
+    } finally {
+        setLoading(false);
+    }
+  };
 
   const getLocation = () => {
     // Check if geolocation is available
@@ -391,6 +426,21 @@ const Login = () => {
                                     autoFocus
                                 />
                                 <FaKey className="absolute left-5 top-1/2 -translate-y-1/2 text-[#706B77] group-focus-within:text-[#E85D40] transition-colors duration-300" />
+                            </div>
+                            
+                            <div className="flex justify-end mt-1">
+                                <button
+                                    type="button"
+                                    onClick={handleResendOtp}
+                                    disabled={resendTimer > 0 || loading}
+                                    className={`text-xs font-medium transition-colors ${
+                                        resendTimer > 0 
+                                            ? 'text-gray-400 cursor-not-allowed' 
+                                            : 'text-[#E85D40] hover:text-[#F27519] hover:underline cursor-pointer'
+                                    }`}
+                                >
+                                    {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
+                                </button>
                             </div>
                         </div>
                     )}

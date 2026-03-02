@@ -71,7 +71,7 @@ const loadImageAsDataUrl = async (url) => {
     }
 };
 
-const ProductComplianceStep = ({ client, refreshData, plantNameFilter }) => {
+const ProductComplianceStepPlaceholder = ({ client, refreshData, plantNameFilter }) => {
     return (
         <div className="flex flex-col items-center justify-center min-h-[400px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
             <h2 className="text-2xl font-bold text-gray-400 mb-2">Coming Soon</h2>
@@ -81,7 +81,7 @@ const ProductComplianceStep = ({ client, refreshData, plantNameFilter }) => {
 };
 
 // Original implementation preserved but renamed
-const ProductComplianceStepOriginal = ({ client, refreshData, plantNameFilter }) => {
+const ProductComplianceStep = ({ client, refreshData, plantNameFilter }) => {
     const { user } = useAuth();
     const [selectedConsentId, setSelectedConsentId] = useState('');
     const [activeTab, setActiveTab] = useState('productCompliance');
@@ -196,6 +196,7 @@ const ProductComplianceStepOriginal = ({ client, refreshData, plantNameFilter })
                                     initialData={selectedConsent.data.productComplianceRows || []}
                                     refreshData={refreshData}
                                     item={selectedConsent.data}
+                                    plantName={plantNameFilter}
                                 />
                             </div>
                         )}
@@ -208,6 +209,7 @@ const ProductComplianceStepOriginal = ({ client, refreshData, plantNameFilter })
                                     index={selectedConsent.index}
                                     initialData={selectedConsent.data.productSupplierCompliance || []}
                                     refreshData={refreshData}
+                                    plantName={plantNameFilter}
                                 />
                             </div>
                         )}
@@ -220,6 +222,7 @@ const ProductComplianceStepOriginal = ({ client, refreshData, plantNameFilter })
                                     index={selectedConsent.index}
                                     initialData={selectedConsent.data.productComponentDetails || []}
                                     refreshData={refreshData}
+                                    plantName={plantNameFilter}
                                 />
                             </div>
                         )}
@@ -233,6 +236,7 @@ const ProductComplianceStepOriginal = ({ client, refreshData, plantNameFilter })
                                     initialData={selectedConsent.data.productRecycledQuantity || []}
                                     refreshData={refreshData}
                                     productRows={selectedConsent.data.productComplianceRows || []}
+                                    plantName={plantNameFilter}
                                 />
                             </div>
                         )}
@@ -352,7 +356,7 @@ const GenericTable = ({
 };
 
 // --- Sub-component: Product Compliance Table ---
-const ProductComplianceTable = ({ client, type, index, initialData, refreshData, item }) => {
+const ProductComplianceTable = ({ client, type, index, initialData, refreshData, item, plantName }) => {
     const { user, isManager } = useAuth();
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -768,6 +772,7 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
                 fd.append('type', type);
                 fd.append('itemId', index); // Use index as itemId
                 fd.append('rowIndex', idx);
+                fd.append('plantName', plantName);
                 
                 const rowJson = JSON.stringify({
                     ...row,
@@ -796,6 +801,7 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
                     type,
                     itemId: index,
                     rowIndex: idx,
+                    plantName,
                     row: {
                         ...row,
                         productImage: typeof row.productImage === 'string' ? row.productImage : '',
@@ -829,7 +835,8 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
             const payload = {
                 type,
                 itemId: index,
-                rows: rows
+                rows: rows,
+                plantName
             };
             await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(client._id), payload);
             toast.success("All data saved successfully");
@@ -1514,7 +1521,8 @@ const SupplierComplianceTable = ({ client, type, index, initialData, refreshData
                 type,
                 itemId: index,
                 rowIndex: idx,
-                row
+                row,
+                plantName
             };
             const res = await api.post(API_ENDPOINTS.CLIENT.PRODUCT_SUPPLIER_COMPLIANCE(client._id), payload);
             const savedRowForHistory = res.data?.data?.row || row;
@@ -1574,7 +1582,8 @@ const SupplierComplianceTable = ({ client, type, index, initialData, refreshData
             const payload = {
                 type,
                 itemId: index,
-                rows: rows
+                rows: rows,
+                plantName
             };
             await api.post(API_ENDPOINTS.CLIENT.PRODUCT_SUPPLIER_COMPLIANCE(client._id), payload);
             toast.success("All data saved successfully");
@@ -1758,7 +1767,7 @@ const SupplierComplianceTable = ({ client, type, index, initialData, refreshData
 };
 
 // --- Sub-component: Component Details Table ---
-const ComponentDetailsTable = ({ client, type, index, initialData, refreshData }) => {
+const ComponentDetailsTable = ({ client, type, index, initialData, refreshData, plantName }) => {
     const { user, isManager } = useAuth();
     const [rows, setRows] = useState(initialData);
     const [loading, setLoading] = useState(false);
@@ -1802,7 +1811,8 @@ const ComponentDetailsTable = ({ client, type, index, initialData, refreshData }
                 type,
                 itemId: index,
                 rowIndex: idx,
-                row
+                row,
+                plantName
             };
             const res = await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPONENT_DETAILS(client._id), payload);
             const savedRowForHistory = res.data?.data?.row || row;
@@ -1834,7 +1844,7 @@ const ComponentDetailsTable = ({ client, type, index, initialData, refreshData }
         if (!window.confirm("Are you sure you want to delete all rows?")) return;
         setLoading(true);
         try {
-            const payload = { type, itemId: index, rows: [] };
+            const payload = { type, itemId: index, rows: [], plantName };
             await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPONENT_DETAILS(client._id), payload);
             setRows([]);
             setLastSavedRows([]);
@@ -1854,7 +1864,8 @@ const ComponentDetailsTable = ({ client, type, index, initialData, refreshData }
             const payload = {
                 type,
                 itemId: index,
-                rows: rows
+                rows: rows,
+                plantName
             };
             await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPONENT_DETAILS(client._id), payload);
             toast.success("All data saved successfully");
@@ -2206,7 +2217,8 @@ const RecycledQuantityTable = ({ client, type, index, initialData, refreshData, 
                 type,
                 itemId: index,
                 rowIndex: idx,
-                row
+                row,
+                plantName
             };
             
             const res = await api.post(API_ENDPOINTS.CLIENT.RECYCLED_QUANTITY_USED(client._id), payload);
@@ -2236,7 +2248,8 @@ const RecycledQuantityTable = ({ client, type, index, initialData, refreshData, 
             const payload = {
                 type,
                 itemId: index,
-                rows: rows
+                rows: rows,
+                plantName
             };
             await api.post(API_ENDPOINTS.CLIENT.RECYCLED_QUANTITY_USED(client._id), payload);
             

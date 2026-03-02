@@ -17,7 +17,7 @@ const rowSchema = new mongoose.Schema({
     generateSupplierCode: { type: String, default: "No" },
     supplierCode: { type: String, default: "" },
   componentImage: { type: String, default: "" },
-  thickness: { type: Number, default: 0 },
+  thickness: { type: String, default: "" },
   rcPercent: { type: Number, default: 0 },
   auditorRemarks: { type: String, default: "" },
   clientRemarks: { type: String, default: "" },
@@ -39,10 +39,10 @@ const componentRowSchema = new mongoose.Schema({
   polymerCode: { type: Number, default: null },
   category: { type: String, default: "" },
   categoryIIType: { type: String, default: "" },
-  containerCapacity: { type: Number, default: 0 },
+  containerCapacity: { type: String, default: "" },
   foodGrade: { type: String, default: "" },
   layerType: { type: String, default: "" },
-  thickness: { type: Number, default: 0 }
+  thickness: { type: String, default: "" }
 }, { _id: false });
 
 const supplierComplianceRowSchema = new mongoose.Schema({
@@ -54,7 +54,8 @@ const supplierComplianceRowSchema = new mongoose.Schema({
   supplierStatus: { type: String, default: "" },
   foodGrade: { type: String, default: "" },
   eprCertificateNumber: { type: String, default: "" },
-  fssaiLicNo: { type: String, default: "" }
+  fssaiLicNo: { type: String, default: "" },
+  fssaiValidUpto: { type: String, default: "" }
 }, { _id: false });
 
 const skuComplianceRowSchema = new mongoose.Schema({
@@ -125,6 +126,7 @@ const changeHistorySchema = new mongoose.Schema({
 const productComplianceSchema = new mongoose.Schema({
   client: { type: mongoose.Schema.Types.ObjectId, ref: "Client", required: true },
   type: { type: String, enum: ['CTE', 'CTO'], required: true },
+  plantName: { type: String, default: "" },
   itemId: { type: mongoose.Schema.Types.ObjectId, required: true },
   rows: { type: [rowSchema], default: [] },
   skuCompliance: { type: [skuComplianceRowSchema], default: [] },

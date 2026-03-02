@@ -65,6 +65,13 @@ export const API_ENDPOINTS = {
         UNLOCK: (id) => `/api/user/${id}/unlock`,
         UPDATE_STATUS: (id) => `/api/user/${id}/status`
     },
+    NOTIFICATION: {
+        BASE: '/api/notification',
+        UNREAD_COUNT: '/api/notification/unread-count',
+        LIST: (limit = 20) => `/api/notification?limit=${limit}`,
+        MARK_READ: (id) => `/api/notification/${id}/read`,
+        MARK_ALL_READ: '/api/notification/read-all'
+    },
     ADMIN: {
         DASHBOARD_STATS: '/api/admin/dashboard-stats',
         BULK_UPDATE_STATUS: '/api/admin/bulk-update-status'

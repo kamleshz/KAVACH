@@ -980,6 +980,10 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 'FSSAI Lic No': row.fssaiLicNo
             });
 
+            if (!isProducer) {
+                data['FSSAI Valid Upto'] = row.fssaiValidUpto;
+            }
+
             if (!isManager) {
                 data['System Code'] = row.systemCode;
             }
@@ -1303,6 +1307,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                     foodGrade,
                     eprCertificateNumber,
                     fssaiLicNo,
+                    fssaiValidUpto,
                     _validationError: null
                 });
             });
@@ -3258,7 +3263,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       await api.post(API_ENDPOINTS.CLIENT.PRODUCT_SUPPLIER_COMPLIANCE(clientId), payload);
 
       const row = supplierRows[idx] || {};
-      const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo'];
+      const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo', 'fssaiValidUpto'];
       const entryBaseId = `${Date.now()}-${Math.random()}`;
       const historyEntries = [];
       fields.forEach((field) => {
@@ -3864,7 +3869,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         // 3. Supplier Compliance
         supplierRows.forEach((row, idx) => {
             const initialRow = lastSavedSupplierRows[idx] || {};
-            const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo'];
+            const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo', 'fssaiValidUpto'];
             fields.forEach(field => {
                 const prevVal = (initialRow[field] ?? '').toString().trim();
                 const currVal = (row[field] ?? '').toString().trim();

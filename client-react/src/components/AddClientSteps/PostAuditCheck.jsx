@@ -16,6 +16,7 @@ import PurchaseAnalysis from '../PlantProcessSteps/PurchaseAnalysis';
 import SummaryReport from '../PlantProcessSteps/SummaryReport';
 import api from '../../services/api';
 import { API_ENDPOINTS } from '../../services/apiEndpoints';
+import useAuth from '../../hooks/useAuth';
 
 const HoverRow = ({ children, ...props }) => {
     const { record, ...restProps } = props;
@@ -158,6 +159,9 @@ const PostAuditCheck = ({
     isProducer,
     productRows
 }) => {
+    const { user, hasRole, isAdmin, isManager } = useAuth();
+    const isManagerRemarksReadOnly = !isAdmin && !isManager;
+
     const [plasticAnalysisTab, setPlasticAnalysisTab] = useState('prePostValidation');
     
     // Toggle states for Polymer and Category Procurement
@@ -249,8 +253,15 @@ const PostAuditCheck = ({
 
     const handleSummaryChange = (skuCode, field, value) => {
         setSummaryProductRows(prev => prev.map(row => {
-            if ((row.skuCode || '').trim() === skuCode) {
-                return { ...row, [field]: value };
+            if (isProducer) {
+                // For Producer, skuCode param is actually componentCode
+                if ((row.componentCode || '').trim() === skuCode) {
+                    return { ...row, [field]: value };
+                }
+            } else {
+                if ((row.skuCode || '').trim() === skuCode) {
+                    return { ...row, [field]: value };
+                }
             }
             return row;
         }));
@@ -258,8 +269,15 @@ const PostAuditCheck = ({
 
     const handleComponentSummaryChange = (skuCode, componentCode, field, value) => {
         setSummaryProductRows(prev => prev.map(row => {
-            if ((row.skuCode || '').trim() === skuCode && (row.componentCode || '').trim() === componentCode) {
-                return { ...row, [field]: value };
+            if (isProducer) {
+                // For Producer, matching by componentCode is sufficient as it's the unique identifier in the view
+                if ((row.componentCode || '').trim() === componentCode) {
+                    return { ...row, [field]: value };
+                }
+            } else {
+                if ((row.skuCode || '').trim() === skuCode && (row.componentCode || '').trim() === componentCode) {
+                    return { ...row, [field]: value };
+                }
             }
             return row;
         }));
@@ -284,10 +302,13 @@ const PostAuditCheck = ({
 
     const handleComponentSave = async (skuCode, componentCode) => {
         // Find the row
-        const rowIndex = summaryProductRows.findIndex(r => 
-            (r.skuCode || '').trim() === skuCode && 
-            (r.componentCode || '').trim() === componentCode
-        );
+        const rowIndex = summaryProductRows.findIndex(r => {
+            if (isProducer) {
+                return (r.componentCode || '').trim() === componentCode;
+            }
+            return (r.skuCode || '').trim() === skuCode && 
+                   (r.componentCode || '').trim() === componentCode;
+        });
 
         if (rowIndex === -1) {
             msgApi.error("Row not found");
@@ -373,6 +394,7 @@ const PostAuditCheck = ({
     };
     const [expandedSuppliers, setExpandedSuppliers] = useState(new Set());
     const [expandedPolymers, setExpandedPolymers] = useState(new Set());
+    const [expandedCategories, setExpandedCategories] = useState(new Set());
 
     const toggleSupplierExpansion = (supplierName) => {
         const newSet = new Set(expandedSuppliers);
@@ -392,6 +414,16 @@ const PostAuditCheck = ({
             newSet.add(polymerName);
         }
         setExpandedPolymers(newSet);
+    };
+
+    const toggleCategoryExpansion = (categoryName) => {
+        const newSet = new Set(expandedCategories);
+        if (newSet.has(categoryName)) {
+            newSet.delete(categoryName);
+        } else {
+            newSet.add(categoryName);
+        }
+        setExpandedCategories(newSet);
     };
 
     return (
@@ -554,6 +586,7 @@ const PostAuditCheck = ({
                                             handleNext={() => {}} 
                                             onlyTable={true}
                                             isProducer={isProducer}
+                                            isManagerRemarksReadOnly={isManagerRemarksReadOnly}
                                         />
                                     )}
                                 </div>
@@ -1792,7 +1825,7 @@ const PostAuditCheck = ({
                                             { id: 'Polymer', label: 'Polymer' },
                                             { id: 'Category', label: 'Category' },
                                             { id: 'Supplier', label: 'Supplier' }
-                                        ].map((tab) => (
+                                        ].filter(tab => !isProducer || tab.id !== 'Product').map((tab) => (
                                             <button
                                                 key={tab.id}
                                                 onClick={() => setCostAnalysisSubTab(tab.id)}
@@ -1827,7 +1860,7 @@ const PostAuditCheck = ({
                                             <table className="min-w-full divide-y divide-gray-200">
                                                 <thead className="bg-gray-50">
                                                     <tr>
-                                                        {costAnalysisSubTab === 'Component' && (
+                                                        {costAnalysisSubTab === 'Component' && !isProducer && (
                                                             <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                                                                 Product Name
                                                             </th>
@@ -1928,6 +1961,16 @@ const PostAuditCheck = ({
                                                         }, {});
 
                                                         const rows = Object.entries(groupedData);
+
+                                                        // Sort rows for Category tab
+                                                        if (costAnalysisSubTab === 'Category') {
+                                                            const categoryOrder = { 'Category I': 1, 'Category II': 2, 'Category III': 3, 'Category IV': 4 };
+                                                            rows.sort((a, b) => {
+                                                                const orderA = categoryOrder[a[0]] || 99;
+                                                                const orderB = categoryOrder[b[0]] || 99;
+                                                                return orderA - orderB;
+                                                            });
+                                                        }
                                                         
                                                         if (rows.length === 0) {
                                                             return (
@@ -1942,15 +1985,19 @@ const PostAuditCheck = ({
                                                         return rows.map(([key, stats]) => {
                                                             const isSupplierTab = costAnalysisSubTab === 'Supplier';
                                                             const isPolymerTab = costAnalysisSubTab === 'Polymer';
-                                                            const isExpandable = isSupplierTab || isPolymerTab;
+                                                            const isCategoryTab = costAnalysisSubTab === 'Category';
+                                                            const isExpandable = isSupplierTab || isPolymerTab || isCategoryTab;
                                                             
                                                             const isExpanded = isSupplierTab 
                                                                 ? expandedSuppliers.has(key) 
-                                                                : (isPolymerTab ? expandedPolymers.has(key) : false);
+                                                                : (isPolymerTab 
+                                                                    ? expandedPolymers.has(key) 
+                                                                    : (isCategoryTab ? expandedCategories.has(key) : false));
 
                                                             const toggleExpansion = () => {
                                                                 if (isSupplierTab) toggleSupplierExpansion(key);
                                                                 if (isPolymerTab) togglePolymerExpansion(key);
+                                                                if (isCategoryTab) toggleCategoryExpansion(key);
                                                             };
 
                                                             return (
@@ -1959,7 +2006,7 @@ const PostAuditCheck = ({
                                                                         className={`hover:bg-gray-50 transition-colors ${isExpandable ? 'cursor-pointer' : ''}`}
                                                                         onClick={isExpandable ? toggleExpansion : undefined}
                                                                     >
-                                                                        {costAnalysisSubTab === 'Component' && (
+                                                                        {costAnalysisSubTab === 'Component' && !isProducer && (
                                                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                                                                 <div>{stats.productName}</div>
                                                                                 {stats.description && (
@@ -2016,10 +2063,12 @@ const PostAuditCheck = ({
                                                                                     <table className="min-w-full divide-y divide-gray-200">
                                                                                         <thead className="bg-gray-50">
                                                                                             <tr>
-                                                                                                {isPolymerTab && (
+                                                                                                {(isPolymerTab || isCategoryTab) && (
                                                                                                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Supplier Name</th>
                                                                                                 )}
-                                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
+                                                                                                {!isProducer && (
+                                                                                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
+                                                                                                )}
                                                                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Component Name</th>
                                                                                                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Recycled Qty</th>
                                                                                                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Recycled Amt (₹)</th>
@@ -2030,10 +2079,12 @@ const PostAuditCheck = ({
                                                                                         <tbody className="divide-y divide-gray-200">
                                                                                             {stats.items.map((item, idx) => (
                                                                                                 <tr key={idx} className="hover:bg-gray-50">
-                                                                                                    {isPolymerTab && (
+                                                                                                    {(isPolymerTab || isCategoryTab) && (
                                                                                                         <td className="px-4 py-2 text-xs text-gray-900">{item.supplierName || '-'}</td>
                                                                                                     )}
-                                                                                                    <td className="px-4 py-2 text-xs text-gray-900">{item.productName || item.skuCode || '-'}</td>
+                                                                                                    {!isProducer && (
+                                                                                                        <td className="px-4 py-2 text-xs text-gray-900">{item.productName || item.skuCode || '-'}</td>
+                                                                                                    )}
                                                                                                     <td className="px-4 py-2 text-xs text-gray-500">{item.componentName || item.componentDescription || '-'}</td>
                                                                                                     <td className="px-4 py-2 text-xs text-right text-gray-600">{Number(item.recycledQty || 0).toFixed(2)}</td>
                                                                                                     <td className="px-4 py-2 text-xs text-right text-gray-600">{Number(item.recycledQrtAmount || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</td>

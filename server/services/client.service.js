@@ -1,6 +1,7 @@
 import ClientModel from '../models/client.model.js';
 import PWPModel from '../models/pwp.model.js';
 import ProductComplianceModel from '../models/productCompliance.model.js';
+import NotificationModel from '../models/notification.model.js';
 import path from 'path';
 import { uploadToCloudinary } from '../utils/cloudinary.js';
 import fs from 'fs';
@@ -180,7 +181,7 @@ class ClientService {
      * @param {string} userId
      * @param {object} emitter
      */
-    static async saveSupplierCompliance(clientId, type, itemId, rows, rowIndex, row, userId, emitter) {
+    static async saveSupplierCompliance(clientId, type, itemId, rows, rowIndex, row, userId, emitter, plantName) {
         const clientExists = await this.findClientOrPwp(clientId);
         
         const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
@@ -198,13 +199,15 @@ class ClientService {
             supplierStatus: r.supplierStatus || '',
             foodGrade: (r.foodGrade ?? r.foodgrade ?? '') || '',
             eprCertificateNumber: r.eprCertificateNumber || '',
-            fssaiLicNo: r.fssaiLicNo || ''
+            fssaiLicNo: r.fssaiLicNo || '',
+            fssaiValidUpto: r.fssaiValidUpto || ''
         });
 
         let doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
         if (!doc) {
             doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [], componentDetails: [], supplierCompliance: [] });
         }
+        if (typeof plantName !== 'undefined') doc.plantName = plantName || '';
         if (!Array.isArray(doc.changeHistory)) doc.changeHistory = [];
 
         const toText = (v) => {
@@ -262,7 +265,7 @@ class ClientService {
             const afterRows = parsed.map(sanitize);
             const maxLen = Math.max(beforeRows.length, afterRows.length);
             for (let i = 0; i < maxLen; i += 1) {
-                pushDiffs('Supplier Compliance', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo']);
+                pushDiffs('Supplier Compliance', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo', 'fssaiValidUpto']);
             }
             doc.supplierCompliance = afterRows;
             doc.markModified('supplierCompliance');
@@ -296,7 +299,7 @@ class ClientService {
      * @param {string} userId
      * @param {object} emitter
      */
-    static async saveProductCompliance(clientId, type, itemId, rows, rowIndex, row, userId, emitter) {
+    static async saveProductCompliance(clientId, type, itemId, rows, rowIndex, row, userId, emitter, plantName) {
         const clientExists = await this.findClientOrPwp(clientId);
         
         const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
@@ -339,6 +342,7 @@ class ClientService {
         if (!doc) {
             doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [] });
         }
+        if (typeof plantName !== 'undefined') doc.plantName = plantName || '';
         if (!Array.isArray(doc.changeHistory)) doc.changeHistory = [];
         
         const toText = (v) => {
@@ -430,6 +434,47 @@ class ClientService {
             const allFields = ['generate', 'systemCode', 'packagingType', 'industryCategory', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage', 'thickness', 'auditorRemarks', 'clientRemarks', 'componentComplianceStatus', 'managerRemarks'];
             pushDiffs('Product Compliance', idx + 1, beforeRow, afterRow, allFields);
             doc = refreshedDoc || doc;
+
+            const normalize = (v) => (v === null || v === undefined) ? '' : String(v);
+            const changed = [];
+            if (normalize(beforeRow?.auditorRemarks) !== normalize(afterRow?.auditorRemarks)) changed.push('auditorRemarks');
+            if (normalize(beforeRow?.clientRemarks) !== normalize(afterRow?.clientRemarks)) changed.push('clientRemarks');
+            if (normalize(beforeRow?.managerRemarks) !== normalize(afterRow?.managerRemarks)) changed.push('managerRemarks');
+
+            if (changed.length > 0) {
+                const toId = (v) => (v && typeof v === 'object' && v._id) ? String(v._id) : (v ? String(v) : '');
+                const actorId = toId(userId);
+                const creatorId = toId(clientExists?.createdBy);
+                const managerId = toId(clientExists?.assignedManager) || toId(clientExists?.assignedTo);
+
+                const recipientId = (actorId && creatorId && actorId === creatorId) ? managerId : creatorId;
+                if (recipientId && actorId && recipientId !== actorId) {
+                    const clientName = (clientExists?.clientName || clientExists?.name || clientExists?.tradeName || '').toString();
+                    const sku = (afterRow?.skuCode || '').toString();
+                    const component = (afterRow?.componentCode || '').toString();
+                    const parts = changed
+                        .map((f) => (f === 'auditorRemarks' ? 'Auditor remarks' : f === 'managerRemarks' ? 'Manager remarks' : 'Client remarks'));
+
+                    await NotificationModel.create({
+                        recipient: recipientId,
+                        sender: actorId,
+                        type: 'REMARKS_UPDATED',
+                        title: `${parts.join(' & ')} updated`,
+                        message: [clientName, sku || component].filter(Boolean).join(' • '),
+                        clientId,
+                        linkPath: `/dashboard/client/${clientId}/edit`,
+                        meta: {
+                            clientId,
+                            type,
+                            itemId,
+                            rowIndex: idx,
+                            skuCode: sku,
+                            componentCode: component,
+                            changedFields: changed
+                        }
+                    });
+                }
+            }
         } else {
             let parsed = rows;
             if (typeof parsed === 'string') {
@@ -528,7 +573,7 @@ class ClientService {
      * @param {string} userId
      * @param {object} emitter
      */
-    static async saveProductComponentDetails(clientId, type, itemId, rows, rowIndex, row, userId, emitter) {
+    static async saveProductComponentDetails(clientId, type, itemId, rows, rowIndex, row, userId, emitter, plantName) {
         const clientExists = await this.findClientOrPwp(clientId);
         
         const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
@@ -556,6 +601,7 @@ class ClientService {
         if (!doc) {
             doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [], componentDetails: [] });
         }
+        if (typeof plantName !== 'undefined') doc.plantName = plantName || '';
         if (!Array.isArray(doc.changeHistory)) doc.changeHistory = [];
         const toText = (v) => {
             if (v === null || v === undefined) return '';
@@ -640,7 +686,7 @@ class ClientService {
      * @param {object} row
      * @param {string} userId
      */
-    static async saveRecycledQuantityUsed(clientId, type, itemId, rows, rowIndex, row, userId) {
+    static async saveRecycledQuantityUsed(clientId, type, itemId, rows, rowIndex, row, userId, plantName) {
         const clientExists = await this.findClientOrPwp(clientId);
         
         const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
@@ -665,6 +711,7 @@ class ClientService {
         if (!doc) {
             doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [], componentDetails: [], supplierCompliance: [], recycledQuantityUsed: [] });
         }
+        if (typeof plantName !== 'undefined') doc.plantName = plantName || '';
         if (!Array.isArray(doc.changeHistory)) doc.changeHistory = [];
         const toText = (v) => {
             if (v === null || v === undefined) return '';
@@ -739,7 +786,7 @@ class ClientService {
      * @param {object} row
      * @param {string} userId
      */
-    static async saveMonthlyProcurement(clientId, type, itemId, rows, rowIndex, row, userId) {
+    static async saveMonthlyProcurement(clientId, type, itemId, rows, rowIndex, row, userId, plantName) {
         const clientExists = await this.findClientOrPwp(clientId);
         
         const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
@@ -794,6 +841,7 @@ class ClientService {
         if (!doc) {
             doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [], componentDetails: [], supplierCompliance: [], recycledQuantityUsed: [], procurementDetails: [] });
         }
+        if (typeof plantName !== 'undefined') doc.plantName = plantName || '';
         if (!Array.isArray(doc.changeHistory)) doc.changeHistory = [];
         const toText = (v) => {
             if (v === null || v === undefined) return '';

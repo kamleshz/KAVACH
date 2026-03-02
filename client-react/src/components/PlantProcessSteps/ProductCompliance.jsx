@@ -997,9 +997,11 @@ const ProductCompliance = ({
                                         { label: 'Food Grade', width: 'min-w-[120px]' },
                                         { label: 'EPR Certificate Number', width: 'min-w-[150px]' },
                                         { label: 'FSSAI Lic No', width: 'min-w-[150px]' },
+                                        { label: 'FSSAI Valid Upto', width: 'min-w-[150px]' },
                                         { label: 'Actions', width: 'min-w-[100px]' }
                                     ].filter(h => {
                                         if (h.label === 'Supplier Type' && !isProducer) return false;
+                                        if (h.label === 'FSSAI Valid Upto' && isProducer) return false;
                                         return !isManager || (h.label !== 'Actions' && h.label !== 'System Code');
                                     }).map((header) => (
                                         <th key={header.label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${isManager ? "bg-green-50" : "bg-gray-50"} ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 z-20' : 'z-10'}`}>
@@ -1154,6 +1156,26 @@ const ProductCompliance = ({
                                             />
                                             )}
                                         </td>
+                                        {!isProducer && (
+                                        <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                            {isManager ? (
+                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.fssaiValidUpto || '-'}</div>
+                                            ) : (
+                                            <input 
+                                                type="date"
+                                                className={`w-full text-xs rounded focus:ring-1 block px-2 py-1.5 transition-all hover:border-primary-400 ${
+                                                    disableFssai
+                                                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                                        : 'bg-white border-gray-300 text-gray-700 focus:ring-primary-500 focus:border-primary-500'
+                                                }`}
+                                                placeholder="Valid Upto" 
+                                                value={row.fssaiValidUpto} 
+                                                onChange={(e)=>handleSupplierChange(idx,'fssaiValidUpto',e.target.value)} 
+                                                disabled={isManager || disableFssai}
+                                            />
+                                            )}
+                                        </td>
+                                        )}
                                         {!isManager && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle sticky right-0 bg-white border-l border-gray-100 group-hover:bg-gray-50 min-w-[140px]">
                                             <div className="flex items-center justify-center gap-2">

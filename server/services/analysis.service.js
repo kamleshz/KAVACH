@@ -800,6 +800,8 @@ class AnalysisService {
         const auditDateObj = clientDoc.auditEndDate || clientDoc.updatedAt;
         const auditDate = auditDateObj ? new Date(auditDateObj).toLocaleDateString() : new Date().toLocaleDateString();
 
+        const isProducer = clientDoc.entityType === 'Producer';
+
         // 2. Fetch Analysis Data (Pre/Post & Targets)
         const analysisDoc = await PlasticAnalysisModel.findOne({ client: clientId, type, itemId });
         console.log(`[Report Generation] Analysis Doc found: ${!!analysisDoc}`);
@@ -919,102 +921,158 @@ class AnalysisService {
             const cat = row.industryCategory || 'General';
             if (!industryMap[cat]) industryMap[cat] = {}; // Changed to Object for SKU grouping
             
-            const skuCode = row.skuCode || 'Unknown SKU';
-            
-            // Get Marking & Labeling Data
-            const markingData = skuComplianceMap[skuCode] || {};
+            if (isProducer) {
+                // Producer Logic: Group by Component Code
+                const compCode = (row.componentCode || '').trim() || 'Unknown Component';
+                
+                // If not exists, create entry
+                if (!industryMap[cat][compCode]) {
+                     // Resolve Component Image
+                    const componentImgSrc = resolveImage(row.componentImage);
+                    
+                    // Look up details
+                    const compDetail = componentDetails.find(c => (c.componentCode || '').trim() === compCode) || {};
+                    const suppComp = supplierCompliance.find(s => (s.componentCode || '').trim() === compCode) || {};
+                    
+                    // Aggregate Procurement Data (optional, but good to have)
+                    const procRecords = procurementDetails.filter(p => (p.componentCode || '').trim() === compCode);
+                    const totalMonthlyPurchaseMt = procRecords.reduce((sum, p) => sum + (p.monthlyPurchaseMt || 0), 0);
+                    const totalRecycledQty = procRecords.reduce((sum, p) => sum + (p.recycledQty || 0), 0);
 
-            if (!industryMap[cat][skuCode]) {
-                industryMap[cat][skuCode] = {
-                    skuCode: skuCode,
-                    skuDescription: row.skuDescription || '-',
-                    skuUom: row.skuUom || '-',
-                    productImage: resolveImage(row.productImage),
-                    // Added Product Compliance Status to the SKU object
-                    // Prioritize the derived productComplianceStatus from the main table row
-                    status: row.productComplianceStatus || markingData.complianceStatus || 'Pending',
-                    markingDetails: {
-                        brandOwner: markingData.brandOwner || '-',
-                        eprCertBrandOwner: markingData.eprCertBrandOwner || '-',
-                        eprCertProducer: markingData.eprCertProducer || '-',
-                        thickness: markingData.thicknessMentioned || '-',
-                        polymers: markingData.polymerUsed?.join(', ') || '-',
-                        recycledPercent: markingData.recycledPercent || '-',
-                        compostableRegNo: markingData.compostableRegNo || '-',
-                        status: markingData.complianceStatus || 'Pending',
-                        images: (markingData.markingImage || []).map(img => resolveImage(img)).filter(Boolean)
-                    },
-                    components: []
-                };
+                    industryMap[cat][compCode] = {
+                        isComponent: true, // Flag to identify this is a component object, not SKU
+                        componentCode: compCode,
+                        componentDescription: row.componentDescription || '-',
+                        componentImage: componentImgSrc,
+                        supplierName: row.supplierName || suppComp.supplierName || '-',
+                        supplierStatus: suppComp.supplierStatus || '-',
+                        eprCertificateNumber: suppComp.eprCertificateNumber || '-',
+                        polymerType: row.polymerType || compDetail.polymerType || '-',
+                        componentPolymer: row.componentPolymer || compDetail.componentPolymer || '-',
+                        category: compDetail.category || row.category || '-', 
+                        thickness: compDetail.thickness || '-',
+                        monthlyPurchaseMt: totalMonthlyPurchaseMt.toFixed(4),
+                        recycledQty: totalRecycledQty.toFixed(4),
+                        status: row.componentComplianceStatus || row.complianceStatus || 'Pending',
+                        auditorRemarks: row.auditorRemarks || '-',
+                        // Dummy 'components' array to satisfy summary calculation structure if needed, 
+                        // but better to adjust summary calculation.
+                        // However, the summary calculation uses `sku.components` to sum up monthlyPurchase.
+                        // So I'll put a self-reference or empty array?
+                        // Let's adjust summary calculation to handle isProducer.
+                        components: [] 
+                    };
+                }
+            } else {
+                // Brand Owner Logic: Group by SKU
+                const skuCode = row.skuCode || 'Unknown SKU';
+                
+                // Get Marking & Labeling Data
+                const markingData = skuComplianceMap[skuCode] || {};
+    
+                if (!industryMap[cat][skuCode]) {
+                    industryMap[cat][skuCode] = {
+                        skuCode: skuCode,
+                        skuDescription: row.skuDescription || '-',
+                        skuUom: row.skuUom || '-',
+                        productImage: resolveImage(row.productImage),
+                        // Added Product Compliance Status to the SKU object
+                        // Prioritize the derived productComplianceStatus from the main table row
+                        status: row.productComplianceStatus || markingData.complianceStatus || 'Pending',
+                        markingDetails: {
+                            brandOwner: markingData.brandOwner || '-',
+                            eprCertBrandOwner: markingData.eprCertBrandOwner || '-',
+                            eprCertProducer: markingData.eprCertProducer || '-',
+                            thickness: markingData.thicknessMentioned || '-',
+                            polymers: markingData.polymerUsed?.join(', ') || '-',
+                            recycledPercent: markingData.recycledPercent || '-',
+                            compostableRegNo: markingData.compostableRegNo || '-',
+                            status: markingData.complianceStatus || 'Pending',
+                            images: (markingData.markingImage || []).map(img => resolveImage(img)).filter(Boolean)
+                        },
+                        components: []
+                    };
+                }
+    
+                // Look up details
+                const compCode = (row.componentCode || '').trim();
+                const compDetail = componentDetails.find(c => (c.componentCode || '').trim() === compCode) || {};
+                const suppComp = supplierCompliance.find(s => (s.componentCode || '').trim() === compCode) || {};
+                
+                // Aggregate Procurement Data
+                const procRecords = procurementDetails.filter(p => (p.componentCode || '').trim() === compCode);
+                const totalMonthlyPurchaseMt = procRecords.reduce((sum, p) => sum + (p.monthlyPurchaseMt || 0), 0);
+                const totalRecycledQty = procRecords.reduce((sum, p) => sum + (p.recycledQty || 0), 0);
+    
+                // Resolve Component Image
+                const componentImgSrc = resolveImage(row.componentImage);
+    
+                industryMap[cat][skuCode].components.push({
+                    componentCode: compCode || '-',
+                    componentImage: componentImgSrc,
+                    componentDescription: row.componentDescription || '-',
+                    supplierName: row.supplierName || suppComp.supplierName || '-',
+                    supplierStatus: suppComp.supplierStatus || '-',
+                    eprCertificateNumber: suppComp.eprCertificateNumber || '-',
+                    polymerType: row.polymerType || compDetail.polymerType || '-',
+                    componentPolymer: row.componentPolymer || compDetail.componentPolymer || '-',
+                    category: compDetail.category || row.category || '-', 
+                    categoryIIType: compDetail.categoryIIType || '-',
+                    containerCapacity: compDetail.containerCapacity || '-',
+                    layerType: compDetail.layerType || '-',
+                    thickness: compDetail.thickness || '-',
+                    monthlyPurchaseMt: totalMonthlyPurchaseMt.toFixed(4),
+                    recycledQty: totalRecycledQty.toFixed(4),
+                    status: row.componentComplianceStatus || row.complianceStatus || 'Pending',
+                    auditorRemarks: row.auditorRemarks || '-'
+                });
             }
-
-            // Look up details
-            const compCode = (row.componentCode || '').trim();
-            const compDetail = componentDetails.find(c => (c.componentCode || '').trim() === compCode) || {};
-            const suppComp = supplierCompliance.find(s => (s.componentCode || '').trim() === compCode) || {};
-            
-            // Aggregate Procurement Data
-            const procRecords = procurementDetails.filter(p => (p.componentCode || '').trim() === compCode);
-            const totalMonthlyPurchaseMt = procRecords.reduce((sum, p) => sum + (p.monthlyPurchaseMt || 0), 0);
-            const totalRecycledQty = procRecords.reduce((sum, p) => sum + (p.recycledQty || 0), 0);
-
-            // Resolve Component Image
-            const componentImgSrc = resolveImage(row.componentImage);
-
-            industryMap[cat][skuCode].components.push({
-                componentCode: compCode || '-',
-                componentImage: componentImgSrc,
-                componentDescription: row.componentDescription || '-',
-                supplierName: row.supplierName || suppComp.supplierName || '-',
-                supplierStatus: suppComp.supplierStatus || '-',
-                eprCertificateNumber: suppComp.eprCertificateNumber || '-',
-                polymerType: row.polymerType || compDetail.polymerType || '-',
-                componentPolymer: row.componentPolymer || compDetail.componentPolymer || '-',
-                // The user specifically wants "Category I", "Category II", etc.
-                // This data is usually in 'industryCategory' (but that was the grouping key "Food & Beverage")
-                // OR 'category' (which might be "Cat-I", "Cat I", "Category I").
-                // OR 'packagingType' might contain it?
-                // Looking at the schema:
-                // row.industryCategory -> "Food & Beverage"
-                // row.category -> likely "Cat-I" or "Category I" if present in compDetail.
-                // compDetail.category -> "Cat-I"
-                // Let's check where "Category I/II/III" is stored.
-                // In productCompliance.model.js, componentRowSchema has 'category'.
-                // The previous fix used `row.packagingType || row.category || compDetail.category`.
-                // If the user says it is showing "Wrong", it means it's showing "Food & Beverage" (industryCategory) or something else.
-                // I will prioritize compDetail.category which usually holds the Roman Numeral category.
-                category: compDetail.category || row.category || '-', 
-                categoryIIType: compDetail.categoryIIType || '-',
-                containerCapacity: compDetail.containerCapacity || '-',
-                layerType: compDetail.layerType || '-',
-                thickness: compDetail.thickness || '-',
-                monthlyPurchaseMt: totalMonthlyPurchaseMt.toFixed(4),
-                recycledQty: totalRecycledQty.toFixed(4),
-                status: row.componentComplianceStatus || row.complianceStatus || 'Pending',
-                auditorRemarks: row.auditorRemarks || '-'
-            });
         });
 
         const industryCategories = Object.keys(industryMap).map(cat => {
             const skus = Object.values(industryMap[cat]);
             
-            // Category Summary Stats
-            const totalSkus = skus.length;
-            const totalMonthlyPurchase = skus.reduce((sum, sku) => 
-                sum + sku.components.reduce((cSum, c) => cSum + parseFloat(c.monthlyPurchaseMt || 0), 0)
-            , 0);
-            
-            // Component Level Analysis
-            const allComponents = skus.flatMap(s => s.components);
-            const compCompliantCount = allComponents.filter(c => c.status === 'Compliant').length;
-            const compNonCompliantCount = allComponents.filter(c => c.status === 'Non-Compliant').length;
-            const compPendingCount = allComponents.filter(c => c.status !== 'Compliant' && c.status !== 'Non-Compliant').length;
+            let totalSkus, totalMonthlyPurchase, skuCompliantCount, skuNonCompliantCount, skuPendingCount;
+            let compCompliantCount, compNonCompliantCount, compPendingCount, complianceScore;
 
-            // SKU Level Analysis (New Requirement)
-            const skuCompliantCount = skus.filter(s => s.status === 'Compliant').length;
-            const skuNonCompliantCount = skus.filter(s => s.status === 'Non-Compliant').length;
-            // Any status other than Compliant/Non-Compliant is treated as Pending/Other
-            const skuPendingCount = totalSkus - (skuCompliantCount + skuNonCompliantCount);
+            if (isProducer) {
+                // Producer Summary Logic (skus array actually contains components)
+                totalSkus = skus.length; // Actually total components
+                
+                // Sum monthly purchase from the component objects directly
+                totalMonthlyPurchase = skus.reduce((sum, comp) => sum + parseFloat(comp.monthlyPurchaseMt || 0), 0);
+                
+                // Status counts based on component status
+                skuCompliantCount = skus.filter(c => c.status === 'Compliant').length;
+                skuNonCompliantCount = skus.filter(c => c.status === 'Non-Compliant').length;
+                skuPendingCount = totalSkus - (skuCompliantCount + skuNonCompliantCount);
+
+                // For Producer, Component Stats = SKU Stats (since we mapped components as SKUs)
+                compCompliantCount = skuCompliantCount;
+                compNonCompliantCount = skuNonCompliantCount;
+                compPendingCount = skuPendingCount;
+                complianceScore = totalSkus > 0 ? ((skuCompliantCount / totalSkus) * 100).toFixed(1) : 0;
+
+            } else {
+                // Brand Owner Summary Logic
+                // Category Summary Stats
+                totalSkus = skus.length;
+                totalMonthlyPurchase = skus.reduce((sum, sku) => 
+                    sum + sku.components.reduce((cSum, c) => cSum + parseFloat(c.monthlyPurchaseMt || 0), 0)
+                , 0);
+                
+                // Component Level Analysis
+                const allComponents = skus.flatMap(s => s.components);
+                compCompliantCount = allComponents.filter(c => c.status === 'Compliant').length;
+                compNonCompliantCount = allComponents.filter(c => c.status === 'Non-Compliant').length;
+                compPendingCount = allComponents.filter(c => c.status !== 'Compliant' && c.status !== 'Non-Compliant').length;
+    
+                // SKU Level Analysis
+                skuCompliantCount = skus.filter(s => s.status === 'Compliant').length;
+                skuNonCompliantCount = skus.filter(s => s.status === 'Non-Compliant').length;
+                skuPendingCount = totalSkus - (skuCompliantCount + skuNonCompliantCount);
+                complianceScore = allComponents.length > 0 ? ((compCompliantCount / allComponents.length) * 100).toFixed(1) : 0;
+            }
 
             return {
                 name: cat,
@@ -1026,7 +1084,7 @@ class AnalysisService {
                     compliantCount: compCompliantCount,
                     nonCompliantCount: compNonCompliantCount,
                     pendingCount: compPendingCount,
-                    complianceScore: allComponents.length > 0 ? ((compCompliantCount / allComponents.length) * 100).toFixed(1) : 0,
+                    complianceScore: complianceScore,
                     // SKU Stats
                     skuCompliantCount,
                     skuNonCompliantCount,
@@ -1512,6 +1570,7 @@ class AnalysisService {
         };
 
         const templateData = {
+            isProducer,
             generatedDate: new Date().toLocaleString(),
             engagementContent,
             basicInfo,
