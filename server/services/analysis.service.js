@@ -704,7 +704,10 @@ class AnalysisService {
         // 2. Target Insights
         if (targetTables.length > 0) {
             const latestTable = targetTables[targetTables.length - 1];
-            const targetYear = latestTable.title.match(/Target Calculation for (\d{4}-\d{2}|\d{4})/)?.[1] || "Next Year";
+            // Safe access to title and match
+            const title = latestTable.title || "";
+            const match = title.match(/Target Calculation for (\d{4}-\d{2}|\d{4})/);
+            const targetYear = match ? match[1] : "Next Year";
             
             // Calculate total target for that year
             let totalTarget = 0;
@@ -803,7 +806,7 @@ class AnalysisService {
         const auditDateObj = clientDoc.auditEndDate || clientDoc.updatedAt;
         const auditDate = auditDateObj ? new Date(auditDateObj).toLocaleDateString() : new Date().toLocaleDateString();
 
-        const isProducer = clientDoc.entityType === 'Producer';
+        const isProducer = (clientDoc.entityType || '').trim().toLowerCase() === 'producer';
 
         // 2. Fetch Analysis Data (Pre/Post & Targets)
         const analysisDoc = await PlasticAnalysisModel.findOne({ client: clientId, type, itemId });
@@ -877,8 +880,9 @@ class AnalysisService {
             }));
 
         // 3. Fetch SKU Details (Grouped by Industry Category)
+        console.log(`[Report Generation] Fetching Product Compliance for Client: ${clientId}, Type: ${type}, ItemId: ${itemId}, isProducer: ${isProducer}`);
         const productComplianceDoc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
-        console.log(`[Report Generation] Product Compliance Doc found: ${!!productComplianceDoc}`);
+        console.log(`[Report Generation] Product Compliance Doc found: ${!!productComplianceDoc}, Rows: ${productComplianceDoc?.rows?.length || 0}`);
         
         const allRows = productComplianceDoc?.rows || [];
         const componentDetails = productComplianceDoc?.componentDetails || [];
@@ -1333,7 +1337,7 @@ class AnalysisService {
         purchaseSummaryTable.push(purchaseTotalRow);
 
         // Build EPR Target Tables for Report
-        const isProducerEntity = (clientDoc.entityType || '').toString() === 'Producer';
+        const isProducerEntity = (clientDoc.entityType || '').toString().trim().toLowerCase() === 'producer';
         let targetTables = targetTablesPrePost;
         if (isProducerEntity) {
             const normalizeSalesCategory = (val) => {
@@ -1396,12 +1400,18 @@ class AnalysisService {
         }
 
         // 5. Generate Auditor Insights
-        const auditorInsights = this.generateAuditorInsights(
-            { data: salesSummaryTable, years: displaySalesYears }, 
-            { data: purchaseSummaryTable, years: displayPurchaseYears }, 
-            formattedPrePost, 
-            targetTables
-        );
+        let auditorInsights = { validation: "", targets: "", sales: "", purchase: "" };
+        try {
+            auditorInsights = this.generateAuditorInsights(
+                { data: salesSummaryTable, years: displaySalesYears }, 
+                { data: purchaseSummaryTable, years: displayPurchaseYears }, 
+                formattedPrePost, 
+                targetTables
+            );
+        } catch (err) {
+            console.error("[Report Generation] Error generating auditor insights:", err);
+            // Non-blocking error, continue with empty insights
+        }
 
         // 6. Prepare Template Data
         // --- 1. Engagement Letter ---
