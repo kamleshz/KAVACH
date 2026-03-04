@@ -845,14 +845,15 @@ const SummaryReport = ({
                         <p className="text-gray-500 text-sm mt-1">Review overall compliance and procurement summary</p>
                     </div>
                     <div className="flex gap-3">
-                        <button
-                            onClick={handleDownloadReport}
-                            disabled={isDownloading}
-                            className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg font-semibold shadow-sm transition-all flex items-center gap-2 disabled:opacity-70"
-                        >
-                            {isDownloading ? <LoadingOutlined spin /> : <DownloadOutlined />}
-                            Download Report
-                        </button>
+{/* Download Report Button Hidden as per request */}
+{/* <button
+    onClick={handleDownloadReport}
+    disabled={isDownloading}
+    className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg font-semibold shadow-sm transition-all flex items-center gap-2 disabled:opacity-70"
+>
+    {isDownloading ? <LoadingOutlined spin /> : <DownloadOutlined />}
+    Download Report
+</button> */}
                         <button
                             onClick={handleNext}
                             disabled={isSaving}
