@@ -1,19 +1,31 @@
 import jwt from 'jsonwebtoken';
 
 export const generateAccessToken = (userId) => {
-    return jwt.sign(
-        { id: userId },
-        process.env.SECRET_KEY_ACCESS_TOKEN,
-        { expiresIn: '6h' }
-    );
+    const secret =
+        process.env.SECRET_KEY_ACCESS_TOKEN ||
+        (process.env.NODE_ENV !== 'production' ? 'dev-access-secret' : undefined);
+    if (!secret) {
+        throw new Error('Missing SECRET_KEY_ACCESS_TOKEN');
+    }
+    if (!process.env.SECRET_KEY_ACCESS_TOKEN && process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.warn('[Auth] Using development fallback for ACCESS token secret');
+    }
+    return jwt.sign({ id: userId }, secret, { expiresIn: '6h' });
 };
 
 export const generateRefreshToken = (userId) => {
-    return jwt.sign(
-        { id: userId },
-        process.env.SECRET_KEY_REFRESH_TOKEN,
-        { expiresIn: '7d' }
-    );
+    const secret =
+        process.env.SECRET_KEY_REFRESH_TOKEN ||
+        (process.env.NODE_ENV !== 'production' ? 'dev-refresh-secret' : undefined);
+    if (!secret) {
+        throw new Error('Missing SECRET_KEY_REFRESH_TOKEN');
+    }
+    if (!process.env.SECRET_KEY_REFRESH_TOKEN && process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.warn('[Auth] Using development fallback for REFRESH token secret');
+    }
+    return jwt.sign({ id: userId }, secret, { expiresIn: '7d' });
 };
 
 export const verifyAccessToken = (token) => {

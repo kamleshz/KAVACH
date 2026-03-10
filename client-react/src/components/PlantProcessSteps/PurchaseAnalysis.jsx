@@ -34,6 +34,16 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
         }
     }, [rawRows]);
 
+    const romanFromNumberish = (cat) => {
+        const s = (cat || '').toString().toUpperCase();
+        // Map numeric variants to Roman
+        if (/\b(IV|4)\b/.test(s) || /CAT[\s\-]*4/.test(s) || /CATEGORY[\s\-]*4/.test(s)) return 'Cat-IV';
+        if (/\b(III|3)\b/.test(s) || /CAT[\s\-]*3/.test(s) || /CATEGORY[\s\-]*3/.test(s)) return 'Cat-III';
+        if (/\b(II|2)\b/.test(s) || /CAT[\s\-]*2/.test(s) || /CATEGORY[\s\-]*2/.test(s)) return 'Cat-II';
+        if (/\b(I|1)\b/.test(s) || /CAT[\s\-]*1/.test(s) || /CATEGORY[\s\-]*1/.test(s) || (s.includes('I') && s.includes('CONTAINER'))) return 'Cat-I';
+        return null;
+    };
+
     const calculateMainSummary = (rows) => {
         // 1. Extract Unique Financial Years
         const years = [...new Set(rows.map(r => r.financialYear || 'Unknown'))].sort();
@@ -56,31 +66,53 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
         });
 
         // 3. Populate Data
+        const hasValue = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+        const parseQty = (v) => {
+            if (v === undefined || v === null) return 0;
+            if (typeof v === 'number') return v;
+            const s = v.toString().replace(/,/g, '').trim();
+            const n = parseFloat(s);
+            return isNaN(n) ? 0 : n;
+        };
+
         rows.forEach(row => {
-            const cat = (row.plasticCategory || '').toString().toUpperCase(); // Normalize input
+            const catRaw = row.plasticCategory || '';
+            const cat = catRaw.toString().toUpperCase(); // Normalize input
             const fy = row.financialYear || 'Unknown';
             const regType = (row.registrationType || '').toLowerCase();
-            const qty = parseFloat(row.totalPlasticQty) || 0;
+            const qty = parseQty(row.totalPlasticQty);
+            const hasRegCol = hasValue(row.registeredQty);
+            const hasUnregCol = hasValue(row.unregisteredQty);
+            const regColQty = parseQty(row.registeredQty);
+            const unregColQty = parseQty(row.unregisteredQty);
 
             let matchedCat = null;
             if (cat) {
-                 // Priority matching for Roman Numerals (IV > III > II > I)
-                 if (cat.includes("IV") || cat.includes("CAT-IV") || cat.includes("CAT IV") || cat.includes("CATEGORY IV")) matchedCat = "Cat-IV";
-                 else if (cat.includes("III") || cat.includes("CAT-III") || cat.includes("CAT III") || cat.includes("CATEGORY III")) matchedCat = "Cat-III";
-                 else if (cat.includes("II") || cat.includes("CAT-II") || cat.includes("CAT II") || cat.includes("CATEGORY II")) matchedCat = "Cat-II";
-                 
-                 // Check for Cat I variations, including "Cat I (Containers...)"
-                 else if (cat.includes("CAT-I") || cat.includes("CAT I") || cat.includes("CATEGORY I") || (cat.includes("I") && cat.includes("CONTAINER"))) matchedCat = "Cat-I";
-                 
-                 // Fallback: Check if it just contains "I" but ensure it's not part of II, III, IV
-                 else if (/\bI\b/.test(cat) || /CAT.*I/.test(cat)) matchedCat = "Cat-I";
-                 
-                 // Fallback to direct match if defined in aggregation
-                 else if (aggregation[row.plasticCategory]) matchedCat = row.plasticCategory;
+                 // First handle numeric variants
+                 matchedCat = romanFromNumberish(cat);
+                 if (!matchedCat) {
+                    // Priority matching for Roman Numerals (IV > III > II > I)
+                    if (cat.includes("CAT-IV") || cat.includes("CAT IV") || cat.includes("CATEGORY IV") || /\bIV\b/.test(cat)) matchedCat = "Cat-IV";
+                    else if (cat.includes("CAT-III") || cat.includes("CAT III") || cat.includes("CATEGORY III") || /\bIII\b/.test(cat)) matchedCat = "Cat-III";
+                    else if (cat.includes("CAT-II") || cat.includes("CAT II") || cat.includes("CATEGORY II") || /\bII\b/.test(cat)) matchedCat = "Cat-II";
+                    // Check for Cat I variations, including "Cat I (Containers...)"
+                    else if (cat.includes("CAT-I") || cat.includes("CAT I") || cat.includes("CATEGORY I") || (cat.includes("I") && cat.includes("CONTAINER")) || /\bI\b/.test(cat)) matchedCat = "Cat-I";
+                    // Fallback to direct match if defined in aggregation
+                    else if (aggregation[row.plasticCategory]) matchedCat = row.plasticCategory;
+                 }
             }
 
             if (matchedCat && aggregation[matchedCat]) {
-                if (regType.includes('unregistered')) {
+                if (hasRegCol || hasUnregCol) {
+                    if (hasRegCol) {
+                        aggregation[matchedCat].registered[fy] = (aggregation[matchedCat].registered[fy] || 0) + regColQty;
+                        aggregation[matchedCat].registered.total += regColQty;
+                    }
+                    if (hasUnregCol) {
+                        aggregation[matchedCat].unregistered[fy] = (aggregation[matchedCat].unregistered[fy] || 0) + unregColQty;
+                        aggregation[matchedCat].unregistered.total += unregColQty;
+                    }
+                } else if (regType.includes('unregistered')) {
                     aggregation[matchedCat].unregistered[fy] = (aggregation[matchedCat].unregistered[fy] || 0) + qty;
                     aggregation[matchedCat].unregistered.total += qty;
                 } else if (regType.includes('registered')) {
@@ -128,11 +160,23 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
 
     const calculateFySummary = (rows) => {
         const fyMap = {};
+        const hasValue = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+        const parseQty = (v) => {
+            if (v === undefined || v === null) return 0;
+            if (typeof v === 'number') return v;
+            const s = v.toString().replace(/,/g, '').trim();
+            const n = parseFloat(s);
+            return isNaN(n) ? 0 : n;
+        };
 
         rows.forEach(row => {
             const fy = row.financialYear || 'Unknown';
             const regType = (row.registrationType || '').toLowerCase();
-            const qty = parseFloat(row.totalPlasticQty) || 0;
+            const qty = parseQty(row.totalPlasticQty);
+            const hasRegCol = hasValue(row.registeredQty);
+            const hasUnregCol = hasValue(row.unregisteredQty);
+            const regColQty = parseQty(row.registeredQty);
+            const unregColQty = parseQty(row.unregisteredQty);
 
             if (!fyMap[fy]) {
                 fyMap[fy] = {
@@ -142,7 +186,10 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
                 };
             }
 
-            if (regType.includes('unregistered')) {
+            if (hasRegCol || hasUnregCol) {
+                if (hasRegCol) fyMap[fy].registeredQty += regColQty;
+                if (hasUnregCol) fyMap[fy].unregisteredQty += unregColQty;
+            } else if (regType.includes('unregistered')) {
                 fyMap[fy].unregisteredQty += qty;
             } else if (regType.includes('registered')) {
                 fyMap[fy].registeredQty += qty;
@@ -260,18 +307,24 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
                     return;
                 }
 
-                // Normalize headers
-                const headers = data[0].map(h => (h || '').toString().trim().toLowerCase());
-                const headerMap = {
-                    'registration type': 'registrationType', // Registered vs Unregistered
-                    'category of plastic': 'plasticCategory', // Cat-I, Cat-II, etc.
-                    'total plastic qty (tons)': 'totalPlasticQty',
-                    // Keep other fields if needed for raw data storage
-                    'entity type': 'entityType',
-                    'name of the entity': 'entityName',
-                    'plastic material type': 'plasticMaterialType',
-                    'financial year': 'financialYear',
-                    'gst': 'gst'
+                // Normalize headers with fuzzy mapping
+                const sanitize = (s) => (s || '').toString().trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                const headersRaw = data[0];
+                const headers = headersRaw.map(h => (h || '').toString().trim());
+                const mapHeader = (h) => {
+                    const sh = sanitize(h);
+                    if (sh.includes('registration') && (sh.includes('type') || sh.includes('status'))) return 'registrationType';
+                    if (sh.includes('category') && (sh.includes('plastic') || sh.includes('cat'))) return 'plasticCategory';
+                    if (sh.includes('financialyear') || (sh.includes('financial') && sh.includes('year')) || sh === 'fy') return 'financialYear';
+                    if (sh.includes('unregistered') && (sh.includes('qty') || sh.includes('quantity')) && (sh.includes('ton') || sh.includes('mt') || sh.includes('tpa') || sh.includes('tp'))) return 'unregisteredQty';
+                    if (sh.includes('registered') && !sh.includes('unregistered') && (sh.includes('qty') || sh.includes('quantity')) && (sh.includes('ton') || sh.includes('mt') || sh.includes('tpa') || sh.includes('tp'))) return 'registeredQty';
+                    if (sh.includes('total') && (sh.includes('plastic') || sh.includes('qty') || sh.includes('quantity')) && (sh.includes('ton') || sh.includes('mt'))) return 'totalPlasticQty';
+                    if ((sh.includes('total') || sh.includes('quantity') || sh.includes('qty')) && (sh.includes('ton') || sh.includes('mt') || sh.includes('tpa') || sh.includes('tp')) && !sh.includes('registered') && !sh.includes('unregistered')) return 'totalPlasticQty';
+                    if (sh === 'entitytype' || sh.includes('entitytype')) return 'entityType';
+                    if (sh.includes('nameofentity') || sh === 'entityname' || (sh.includes('entity') && sh.includes('name'))) return 'entityName';
+                    if (sh.includes('plasticmaterialtype') || sh.includes('materialtype')) return 'plasticMaterialType';
+                    if (sh === 'gst' || sh.includes('gst')) return 'gst';
+                    return null;
                 };
 
                 const processedRows = [];
@@ -286,8 +339,10 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
                     let hasData = false;
                     
                     headers.forEach((h, idx) => {
-                        if (headerMap[h]) {
-                            newRow[headerMap[h]] = (rowData[idx] || '').toString();
+                        const field = mapHeader(h);
+                        if (field) {
+                            const cell = rowData[idx];
+                            newRow[field] = cell !== undefined && cell !== null ? cell : '';
                             hasData = true;
                         }
                     });
@@ -407,8 +462,27 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
             return cat === record.key;
         });
 
-        const registeredData = categoryData.filter(row => (row.registrationType || '').toLowerCase().includes('registered') && !(row.registrationType || '').toLowerCase().includes('unregistered'));
-        const unregisteredData = categoryData.filter(row => (row.registrationType || '').toLowerCase().includes('unregistered'));
+        const hasValue = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+        const parseQty = (v) => {
+            if (v === undefined || v === null) return 0;
+            if (typeof v === 'number') return v;
+            const s = v.toString().replace(/,/g, '').trim();
+            const n = parseFloat(s);
+            return isNaN(n) ? 0 : n;
+        };
+
+        const registeredData = categoryData.filter(row => {
+            const rt = (row.registrationType || '').toLowerCase();
+            if (rt.includes('registered') && !rt.includes('unregistered')) return true;
+            if (hasValue(row.registeredQty) && parseQty(row.registeredQty) > 0) return true;
+            return false;
+        });
+        const unregisteredData = categoryData.filter(row => {
+            const rt = (row.registrationType || '').toLowerCase();
+            if (rt.includes('unregistered')) return true;
+            if (hasValue(row.unregisteredQty) && parseQty(row.unregisteredQty) > 0) return true;
+            return false;
+        });
 
         const detailColumns = [
             { title: 'Registration Type', dataIndex: 'registrationType', key: 'registrationType' },
@@ -418,6 +492,8 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
             { title: 'Category of Plastic', dataIndex: 'plasticCategory', key: 'plasticCategory' },
             { title: 'Financial Year', dataIndex: 'financialYear', key: 'financialYear' },
             { title: 'Total Plastic Qty (Tons)', dataIndex: 'totalPlasticQty', key: 'totalPlasticQty' },
+            { title: 'Registered Qty (Tons)', dataIndex: 'registeredQty', key: 'registeredQty' },
+            { title: 'Unregistered Qty (Tons)', dataIndex: 'unregisteredQty', key: 'unregisteredQty' },
             { title: 'GST', dataIndex: 'gst', key: 'gst' },
         ];
 
@@ -462,13 +538,51 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
         // Filter data for this Financial Year
         const fyData = rawRows.filter(row => (row.financialYear || 'Unknown') === record.financialYear);
 
-        const registeredData = fyData.filter(row => (row.registrationType || '').toLowerCase().includes('registered') && !(row.registrationType || '').toLowerCase().includes('unregistered'));
-        const unregisteredData = fyData.filter(row => (row.registrationType || '').toLowerCase().includes('unregistered'));
+        const hasValue = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+        const parseQty = (v) => {
+            if (v === undefined || v === null) return 0;
+            if (typeof v === 'number') return v;
+            const s = v.toString().replace(/,/g, '').trim();
+            const n = parseFloat(s);
+            return isNaN(n) ? 0 : n;
+        };
+
+        const registeredData = fyData.filter(row => {
+            const rt = (row.registrationType || '').toLowerCase();
+            if (rt.includes('registered') && !rt.includes('unregistered')) return true;
+            if (hasValue(row.registeredQty) && parseQty(row.registeredQty) > 0) return true;
+            return false;
+        });
+        const unregisteredData = fyData.filter(row => {
+            const rt = (row.registrationType || '').toLowerCase();
+            if (rt.includes('unregistered')) return true;
+            if (hasValue(row.unregisteredQty) && parseQty(row.unregisteredQty) > 0) return true;
+            return false;
+        });
 
         // Columns showing only Entity Name and Qty as requested
-        const entityColumns = [
+        const registeredEntityColumns = [
             { title: 'Name of the Entity', dataIndex: 'entityName', key: 'entityName' },
-            { title: 'Total Plastic Qty (Tons)', dataIndex: 'totalPlasticQty', key: 'totalPlasticQty' },
+            {
+                title: 'Qty (Tons)',
+                key: 'qty',
+                render: (_, row) => {
+                    const v = hasValue(row.registeredQty) ? row.registeredQty : row.totalPlasticQty;
+                    return parseQty(v).toFixed(2);
+                }
+            },
+            { title: 'Category', dataIndex: 'plasticCategory', key: 'plasticCategory' },
+        ];
+        const unregisteredEntityColumns = [
+            { title: 'Name of the Entity', dataIndex: 'entityName', key: 'entityName' },
+            {
+                title: 'Qty (Tons)',
+                key: 'qty',
+                render: (_, row) => {
+                    const v = hasValue(row.unregisteredQty) ? row.unregisteredQty : row.totalPlasticQty;
+                    return parseQty(v).toFixed(2);
+                }
+            },
             { title: 'Category', dataIndex: 'plasticCategory', key: 'plasticCategory' },
         ];
 
@@ -479,7 +593,7 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
                         <h4 className="text-sm font-semibold text-blue-600 mb-2 border-b border-blue-100 pb-1">Registered Clients ({registeredData.length})</h4>
                         {registeredData.length > 0 ? (
                             <Table
-                                columns={entityColumns}
+                                columns={registeredEntityColumns}
                                 dataSource={registeredData}
                                 pagination={false}
                                 size="small"
@@ -496,7 +610,7 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
                         <h4 className="text-sm font-semibold text-orange-600 mb-2 border-b border-orange-100 pb-1">Unregistered Clients ({unregisteredData.length})</h4>
                         {unregisteredData.length > 0 ? (
                             <Table
-                                columns={entityColumns}
+                                columns={unregisteredEntityColumns}
                                 dataSource={unregisteredData}
                                 pagination={false}
                                 size="small"

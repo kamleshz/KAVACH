@@ -10,8 +10,20 @@ const salesRowSchema = new mongoose.Schema({
   category: { type: String, default: "" },
   quantity: { type: Number, default: 0 },
   skuCode: { type: String, default: "" },
-  hsnCode: { type: String, default: "" }
-}, { _id: false });
+  hsnCode: { type: String, default: "" },
+  registrationType: { type: String, default: "" },
+  plasticCategory: { type: String, default: "" },
+  financialYear: { type: String, default: "" },
+  totalPlasticQty: { type: mongoose.Schema.Types.Mixed, default: 0 },
+  registeredQty: { type: mongoose.Schema.Types.Mixed, default: "" },
+  unregisteredQty: { type: mongoose.Schema.Types.Mixed, default: "" },
+  entityType: { type: String, default: "" },
+  entityName: { type: String, default: "" },
+  gst: { type: String, default: "" },
+  recycledPlasticPercent: { type: mongoose.Schema.Types.Mixed, default: "" },
+  recycledPlasticQty: { type: mongoose.Schema.Types.Mixed, default: "" },
+  preConsumerQty: { type: mongoose.Schema.Types.Mixed, default: "" }
+}, { _id: false, strict: false });
 
 const purchaseRowSchema = new mongoose.Schema({
   dateOfInvoice: { type: String, default: "" },
@@ -22,8 +34,17 @@ const purchaseRowSchema = new mongoose.Schema({
   plasticMaterialType: { type: String, default: "" },
   category: { type: String, default: "" },
   quantity: { type: Number, default: 0 },
-  skuCode: { type: String, default: "" }
-}, { _id: false });
+  skuCode: { type: String, default: "" },
+  registrationType: { type: String, default: "" },
+  plasticCategory: { type: String, default: "" },
+  financialYear: { type: String, default: "" },
+  totalPlasticQty: { type: mongoose.Schema.Types.Mixed, default: 0 },
+  registeredQty: { type: mongoose.Schema.Types.Mixed, default: "" },
+  unregisteredQty: { type: mongoose.Schema.Types.Mixed, default: "" },
+  entityType: { type: String, default: "" },
+  entityName: { type: String, default: "" },
+  gst: { type: String, default: "" }
+}, { _id: false, strict: false });
 
 const plasticAnalysisSchema = new mongoose.Schema({
   client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },

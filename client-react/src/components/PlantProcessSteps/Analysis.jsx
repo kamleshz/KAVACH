@@ -195,16 +195,21 @@ const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId, entityTy
                                 </div>
                                 <Table 
                                     dataSource={table.data} 
-                                    columns={table.columns.map((col, colIdx) => ({ 
-                                        title: <span className="text-xs font-bold text-gray-600 uppercase">{col}</span>,
-                                        dataIndex: col, 
-                                        key: col,
-                                        align: colIdx === 0 ? "left" : "right",
-                                        render: (val) => {
-                                            if (colIdx === 0) return <span className="font-medium text-gray-700">{val}</span>;
-                                            return <span className="text-gray-600">{val}</span>;
-                                        }
-                                    }))} 
+                                    columns={table.columns.map((col, colIdx) => {
+                                        const title = typeof col === 'object' ? col.title : col;
+                                        const key = typeof col === 'object' ? col.key : col;
+                                        return { 
+                                            title: <span className="text-xs font-bold text-gray-600 uppercase">{title}</span>,
+                                            key: key,
+                                            align: colIdx === 0 ? "left" : "center",
+                                            render: (_, record) => {
+                                                // Access value directly from record using key to handle special characters/dots
+                                                const val = record[key];
+                                                if (colIdx === 0) return <span className="font-medium text-gray-700">{val}</span>;
+                                                return <span className="text-gray-600">{val}</span>;
+                                            }
+                                        };
+                                    })} 
                                     pagination={false} 
                                     rowKey="Category of Plastic"
                                     bordered

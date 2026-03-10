@@ -2391,20 +2391,20 @@ const ProductCompliance = ({
                                     </tr>
                                 ) : (
                                     categorySummary.map((row, index) => {
-                                        const percentFraction = Number(row.totalUsedPercent) || 0;
-                                        const percent = percentFraction * 100;
-                                        const target =
-                                            row.category === 'Category II'
-                                                ? 10
-                                                : row.category === 'Category I'
-                                                    ? 30
+                                        const category = (row.category || '').trim();
+                                        const displayedFraction = (Number(row.totalUsedPercent) || 0) * 100;
+                                        const targetFraction =
+                                            category === 'Category II'
+                                                ? 0.1
+                                                : category === 'Category I'
+                                                    ? 0.3
                                                     : null;
-                                        const isCompliant = target === null ? null : percent >= target;
+                                        const isCompliant = targetFraction === null ? null : displayedFraction >= targetFraction;
                                         return (
                                             <tr key={index} className="hover:bg-gray-50">
-                                                <td className="px-3 py-2 text-center font-bold text-gray-700">{row.category}</td>
+                                                <td className="px-3 py-2 text-center font-bold text-gray-700">{category}</td>
                                                 <td className={`px-3 py-2 text-center font-bold ${isCompliant === null ? 'text-gray-600' : isCompliant ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {percent.toFixed(3)}
+                                                    {displayedFraction.toFixed(3)}
                                                 </td>
                                                 <td className="px-3 py-2 text-center text-gray-700">{Number(row.totalUsedQtyMt).toFixed(3)}</td>
                                             </tr>

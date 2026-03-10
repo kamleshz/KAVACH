@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const Pagination = ({ 
   currentPage, 
@@ -118,7 +119,7 @@ const Pagination = ({
             disabled={currentPage === 1}
             className="w-8 h-8 flex items-center justify-center rounded-md text-gray-500 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-            <i className="fas fa-chevron-left text-xs"></i>
+            <FaChevronLeft className="text-xs" />
         </button>
         
         <div className="flex gap-1">
@@ -130,7 +131,7 @@ const Pagination = ({
             disabled={currentPage === totalPages}
             className="w-8 h-8 flex items-center justify-center rounded-md text-gray-500 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-            <i className="fas fa-chevron-right text-xs"></i>
+            <FaChevronRight className="text-xs" />
         </button>
       </div>
 
