@@ -3,7 +3,7 @@ import { message } from 'antd';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 
-const useSkuCompliance = (clientId, isProducer = false, externalProductRows = []) => {
+const useSkuCompliance = (clientId, isProducer = false, externalProductRows = [], externalComponentRows = []) => {
     const [skuComplianceData, setSkuComplianceData] = useState([
         { 
             key: Date.now(), 
@@ -92,8 +92,9 @@ const useSkuCompliance = (clientId, isProducer = false, externalProductRows = []
                 return;
             }
 
-            let finalImageUrls = record.markingImage.map(img => img.url).filter(Boolean);
-            const newFiles = record.markingImage.filter(img => img.originFileObj);
+            const markingImageList = Array.isArray(record.markingImage) ? record.markingImage : [];
+            let finalImageUrls = markingImageList.map(img => img.url).filter(Boolean);
+            const newFiles = markingImageList.filter(img => img.originFileObj);
 
             if (newFiles.length > 0) {
                 const formData = new FormData();
@@ -162,6 +163,7 @@ const useSkuCompliance = (clientId, isProducer = false, externalProductRows = []
 
             // Fetch Product Compliance Data to sync/merge
             let productRows = [];
+            let componentRows = [];
             let fetchSuccess = false;
 
             if (externalProductRows && externalProductRows.length > 0) {
@@ -175,6 +177,20 @@ const useSkuCompliance = (clientId, isProducer = false, externalProductRows = []
                 if (prodResponse.data?.success && Array.isArray(prodResponse.data.data)) {
                     productRows = prodResponse.data.data;
                     fetchSuccess = true;
+                }
+            }
+
+            // Prefer externally provided componentRows when available
+            if (externalComponentRows && externalComponentRows.length > 0) {
+                componentRows = externalComponentRows;
+            } else {
+                try {
+                    const compRes = await api.get(API_ENDPOINTS.CLIENT.PRODUCT_COMPONENT_DETAILS(clientId));
+                    if (compRes.data?.success && Array.isArray(compRes.data.data)) {
+                        componentRows = compRes.data.data;
+                    }
+                } catch (e) {
+                    console.warn('Failed to fetch component details; polymer codes may be incomplete');
                 }
             }
 
@@ -217,7 +233,38 @@ const useSkuCompliance = (clientId, isProducer = false, externalProductRows = []
 
                  const existing = skuMap.get(code);
 
-                 const mergedItem = {
+                // Derive polymers from component details when saved value is not present
+                const derivePolymers = () => {
+                    try {
+                        const related = productRows.filter(p => {
+                            if (isProducer) {
+                                return (p.componentCode || '').trim() === code;
+                            }
+                            return (p.skuCode || '').trim() === code;
+                        });
+                        const compCodes = new Set(
+                            related
+                                .map(p => (p.componentCode || '').trim())
+                                .filter(Boolean)
+                        );
+                        const polys = [];
+                        compCodes.forEach(cc => {
+                            const comp = componentRows.find(c => (c.componentCode || '').trim() === cc);
+                            if (comp) {
+                                const name = comp.componentPolymer || comp.polymerType || '';
+                                const pcode = comp.polymerCode || comp.materialCode || '';
+                                const label = [name, pcode ? `(${pcode})` : ''].filter(Boolean).join(' ');
+                                if (label) polys.push(label.trim());
+                            }
+                        });
+                        // Return unique non-empty entries
+                        return Array.from(new Set(polys.filter(Boolean)));
+                    } catch {
+                        return [];
+                    }
+                };
+
+                const mergedItem = {
                      key: existing ? (existing._id || existing.key) : `prod-${index}`,
                      ...existing, // Keep existing SKU compliance edits
                      // Overwrite basic info from Product Compliance (source of truth)
@@ -231,7 +278,9 @@ const useSkuCompliance = (clientId, isProducer = false, externalProductRows = []
                      eprCertBrandOwner: existing?.eprCertBrandOwner || '',
                      eprCertProducer: existing?.eprCertProducer || '',
                      thicknessMentioned: existing?.thicknessMentioned || '',
-                     polymerUsed: Array.isArray(existing?.polymerUsed) ? existing.polymerUsed : [],
+                    polymerUsed: Array.isArray(existing?.polymerUsed) && existing.polymerUsed.length > 0
+                        ? existing.polymerUsed
+                        : derivePolymers(),
                      polymerMentioned: existing?.polymerMentioned || '',
                      recycledPercent: existing?.recycledPercent || '',
                      complianceStatus: existing?.complianceStatus || '',

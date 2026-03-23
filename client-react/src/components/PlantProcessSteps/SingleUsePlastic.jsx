@@ -410,6 +410,8 @@ const SingleUsePlastic = ({
                                 )}
                                 
                                 <Upload
+                                    accept="image/*"
+                                    capture="environment"
                                     beforeUpload={(file) => {
                                         const reader = new FileReader();
                                         reader.onload = (e) => {
@@ -427,6 +429,8 @@ const SingleUsePlastic = ({
                         </div>
                     ) : (
                         <Upload
+                            accept="image/*"
+                            capture="environment"
                             beforeUpload={(file) => {
                                 const reader = new FileReader();
                                 reader.onload = (e) => {
@@ -802,6 +806,8 @@ const SingleUsePlastic = ({
                                                             </span>
                                                         )}
                                                         <Upload
+                                                            accept="image/*"
+                                                            capture="environment"
                                                             beforeUpload={(file) => {
                                                                 const reader = new FileReader();
                                                                 reader.onload = (e) => {
@@ -819,6 +825,8 @@ const SingleUsePlastic = ({
                                                 </div>
                                             ) : (
                                                 <Upload
+                                                    accept="image/*"
+                                                    capture="environment"
                                                     beforeUpload={(file) => {
                                                         const reader = new FileReader();
                                                         reader.onload = (e) => {
@@ -1034,6 +1042,8 @@ const SingleUsePlastic = ({
                                                     </span>
                                                 )}
                                                 <Upload
+                                                    accept="image/*"
+                                                    capture="environment"
                                                     beforeUpload={(file) => {
                                                         const reader = new FileReader();
                                                         reader.onload = (e) => {
@@ -1051,6 +1061,8 @@ const SingleUsePlastic = ({
                                         </div>
                                     ) : (
                                         <Upload
+                                            accept="image/*"
+                                            capture="environment"
                                             beforeUpload={(file) => {
                                                 const reader = new FileReader();
                                                 reader.onload = (e) => {

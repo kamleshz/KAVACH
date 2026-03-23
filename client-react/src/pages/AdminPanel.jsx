@@ -1,6 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { toast } from 'react-toastify';
+import {
+  FaBan,
+  FaCheck,
+  FaCheckCircle,
+  FaChevronDown,
+  FaClock,
+  FaExclamationTriangle,
+  FaIdCard,
+  FaMapMarkedAlt,
+  FaPencilAlt,
+  FaPhoneAlt,
+  FaPlus,
+  FaSearch,
+  FaTasks,
+  FaTimes,
+  FaUser,
+  FaUserPlus,
+  FaUsersCog,
+  FaWifi,
+} from 'react-icons/fa';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 import { setUser } from '../store/authSlice';
@@ -11,6 +31,12 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
 
   const [isEditingRole, setIsEditingRole] = useState(false);
   const [selectedRole, setSelectedRole] = useState(user.role?._id || user.role);
+
+  useEffect(() => {
+    if (user) {
+      setSelectedRole(user.role?._id || user.role);
+    }
+  }, [user]);
 
   const handleSaveRole = () => {
     onUpdateRole(user._id, selectedRole);
@@ -31,7 +57,7 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
                     onClick={onClose} 
                     className="absolute top-3 right-3 text-white/60 hover:text-white transition-colors bg-black/10 hover:bg-black/20 rounded-full w-8 h-8 flex items-center justify-center"
                 >
-                    <i className="fas fa-times"></i>
+                    <FaTimes />
                 </button>
                 
                 <div className="relative mx-auto h-24 w-24 rounded-full p-1 bg-white/20 backdrop-blur-sm">
@@ -44,13 +70,13 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
                             />
                         ) : (
                             <div className="h-full w-full flex items-center justify-center bg-gray-50 text-gray-300">
-                                <i className="fas fa-user text-4xl"></i>
+                                <FaUser className="text-4xl" />
                             </div>
                         )}
                     </div>
                     {user.last_login_photo && (
                         <div className="absolute bottom-1 right-1 bg-green-500 border-2 border-white rounded-full w-6 h-6 flex items-center justify-center shadow-sm" title="Photo Verified">
-                             <i className="fas fa-check text-white text-[10px]"></i>
+                             <FaCheck className="text-white text-[10px]" />
                         </div>
                     )}
                 </div>
@@ -79,10 +105,10 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
                                         ))}
                                     </select>
                                     <button onClick={handleSaveRole} className="text-green-600 hover:text-green-800 p-1">
-                                        <i className="fas fa-check"></i>
+                                        <FaCheck />
                                     </button>
                                     <button onClick={() => setIsEditingRole(false)} className="text-red-600 hover:text-red-800 p-1">
-                                        <i className="fas fa-times"></i>
+                                        <FaTimes />
                                     </button>
                                 </div>
                             ) : (
@@ -90,7 +116,7 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
                                     <span className="font-semibold text-gray-700 text-sm">
                                         {typeof user.role === 'string' ? user.role : user.role?.name || 'USER'}
                                     </span>
-                                    <i className="fas fa-pencil-alt text-gray-300 text-xs group-hover:text-indigo-500 transition-colors"></i>
+                                    <FaPencilAlt className="text-gray-300 text-xs group-hover:text-indigo-500 transition-colors" />
                                 </div>
                             )}
                          </div>
@@ -111,7 +137,7 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
                 <div className="space-y-4">
                      <div className="flex items-center gap-3 group">
                          <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                             <i className="fas fa-phone-alt text-sm"></i>
+                             <FaPhoneAlt className="text-sm" />
                          </div>
                          <div className="flex-1">
                              <p className="text-xs text-gray-500">Mobile Number</p>
@@ -121,7 +147,7 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
 
                      <div className="flex items-center gap-3 group">
                          <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500 group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors">
-                             <i className="fas fa-check-circle text-sm"></i>
+                             <FaCheckCircle className="text-sm" />
                          </div>
                          <div className="flex-1">
                              <p className="text-xs text-gray-500">Email Verification</p>
@@ -148,7 +174,7 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
                             {user.last_login_ip && (
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-gray-500 flex items-center gap-2">
-                                        <i className="fas fa-wifi text-gray-300 w-4 text-center"></i> Last IP
+                                        <FaWifi className="text-gray-300 w-4 h-4" /> Last IP
                                     </span>
                                     <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 border border-gray-200">
                                         {user.last_login_ip}
@@ -160,7 +186,7 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
                                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-100 flex items-center justify-between mt-2">
                                     <div className="flex items-center gap-3">
                                         <div className="bg-white p-2 rounded-lg shadow-sm text-red-500 shrink-0">
-                                            <i className="fas fa-map-marked-alt"></i>
+                                            <FaMapMarkedAlt />
                                         </div>
                                         <div className="min-w-0">
                                             <p className="text-xs font-semibold text-blue-900 truncate">Login Location</p>
@@ -230,7 +256,7 @@ const CreateUserModal = ({ isOpen, onClose, onCreate, allRoles }) => {
             <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                     <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
-                        <i className="fas fa-user-plus text-indigo-600"></i>
+                        <FaUserPlus className="text-indigo-600" />
                     </div>
                     <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                         <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
@@ -625,7 +651,7 @@ const AdminPanel = () => {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                      <i className="fas fa-clock text-sm" />
+                      <FaClock className="text-sm" />
                     </div>
                     <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Pending Audits
@@ -644,7 +670,7 @@ const AdminPanel = () => {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
-                      <i className="fas fa-tasks text-sm" />
+                      <FaTasks className="text-sm" />
                     </div>
                     <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                       In Progress
@@ -663,7 +689,7 @@ const AdminPanel = () => {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                      <i className="fas fa-check-circle text-sm" />
+                      <FaCheckCircle className="text-sm" />
                     </div>
                     <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Completed
@@ -682,7 +708,7 @@ const AdminPanel = () => {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
-                      <i className="fas fa-exclamation-triangle text-sm" />
+                      <FaExclamationTriangle className="text-sm" />
                     </div>
                     <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                       On Hold
@@ -705,7 +731,7 @@ const AdminPanel = () => {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                      <i className="fas fa-users-cog text-sm" />
+                      <FaUsersCog className="text-sm" />
                     </div>
                     <h3 className="text-lg font-semibold text-gray-800">User Management</h3>
                   </div>
@@ -724,12 +750,12 @@ const AdminPanel = () => {
                         ))}
                      </select>
                      <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-400">
-                        <i className="fas fa-chevron-down text-xs"></i>
+                        <FaChevronDown className="text-xs" />
                      </div>
                   </div>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                      <i className="fas fa-search text-xs"></i>
+                      <FaSearch className="text-xs" />
                     </span>
                     <input
                       type="text"
@@ -743,13 +769,13 @@ const AdminPanel = () => {
                     onClick={() => setIsCreateUserModalOpen(true)}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all"
                   >
-                    <i className="fas fa-plus mr-2"></i> Add User
+                    <FaPlus className="mr-2" /> Add User
                   </button>
                 </div>
               </div>
             </div>
             
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto min-h-[400px]">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
@@ -837,7 +863,7 @@ const AdminPanel = () => {
                             </div>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-2 relative">
                              {canActivate && (
                                 <button
                                   type="button"
@@ -856,34 +882,49 @@ const AdminPanel = () => {
                                         e.stopPropagation();
                                         setOpenMenuUserId(openMenuUserId === u._id ? null : u._id);
                                     }}
-                                    className={`text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-all ${openMenuUserId === u._id ? 'bg-gray-100 text-gray-600' : ''}`}
+                                    className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 transition-all border border-gray-200 shadow-sm gap-2 ${
+                                        openMenuUserId === u._id 
+                                        ? 'bg-indigo-50 text-indigo-600 border-indigo-200' 
+                                        : 'bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 hover:border-gray-300'
+                                    }`}
+                                    title="More options"
                                  >
-                                    <i className="fas fa-ellipsis-v"></i>
+                                    <span className="text-xs font-medium">Actions</span>
+                                     <FaChevronDown className="text-[10px]" />
                                  </button>
                                  
                                  {openMenuUserId === u._id && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl z-50 border border-gray-100 py-1 origin-top-right">
+                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl z-50 border border-gray-100 py-1 origin-top-right transform scale-100 opacity-100 transition-all">
                                         <button 
-                                            onClick={() => {
+                                            onClick={(e) => {
+                                                e.stopPropagation();
                                                 handleViewUser(u);
                                                 setOpenMenuUserId(null);
                                             }}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
                                         >
-                                            <i className="fas fa-id-card text-gray-400 w-4"></i> View Details
+                                            <FaIdCard className="text-gray-400 w-4 h-4" />
+                                            <span>View Details</span>
                                         </button>
                                         
                                         <div className="border-t border-gray-100 my-1"></div>
                                         
                                         <button 
-                                            onClick={() => handleStatusUpdate(u._id, u.status === 'Active' ? 'Inactive' : 'Active')}
-                                            className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 ${u.status === 'Active' ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleStatusUpdate(u._id, u.status === 'Active' ? 'Inactive' : 'Active');
+                                            }}
+                                            className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 transition-colors ${u.status === 'Active' ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
                                         >
-                                            <i className={`fas ${u.status === 'Active' ? 'fa-ban' : 'fa-check-circle'} w-4`}></i>
-                                            {u.status === 'Active' ? 'Deactivate User' : 'Activate User'}
+                                            {u.status === 'Active' ? (
+                                              <FaBan className="w-4 h-4" />
+                                            ) : (
+                                              <FaCheckCircle className="w-4 h-4" />
+                                            )}
+                                            <span>{u.status === 'Active' ? 'Deactivate User' : 'Activate User'}</span>
                                         </button>
                                     </div>
-                                )}
+                                 )}
                              </div>
                           </div>
                         </td>
@@ -895,7 +936,7 @@ const AdminPanel = () => {
                       <td colSpan="5" className="px-6 py-12 text-center text-gray-500 bg-white">
                         <div className="flex flex-col items-center justify-center">
                             <div className="h-12 w-12 rounded-full bg-gray-50 flex items-center justify-center mb-3">
-                                <i className="fas fa-search text-gray-300"></i>
+                                <FaSearch className="text-gray-300" />
                             </div>
                             <p className="text-sm font-medium">No users found</p>
                             <p className="text-xs text-gray-400 mt-1">Try adjusting your search or filters</p>

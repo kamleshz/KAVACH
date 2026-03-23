@@ -74,6 +74,22 @@ const EditClient = () => {
   const [editingCtoProductIndex, setEditingCtoProductIndex] = useState(null);
   const [currentCtoProductRow, setCurrentCtoProductRow] = useState({ plantName: '', productName: '', quantity: '', uom: '' });
 
+  // CTO Production Capacity Validation State
+  const [ctoProductionCapacityValidationRows, setCtoProductionCapacityValidationRows] = useState([]);
+  const [isAddingCtoProductionCapacityValidation, setIsAddingCtoProductionCapacityValidation] = useState(false);
+  const [editingCtoProductionCapacityValidationIndex, setEditingCtoProductionCapacityValidationIndex] = useState(null);
+  const [currentCtoProductionCapacityValidationRow, setCurrentCtoProductionCapacityValidationRow] = useState({
+      productName: '',
+      machineName: '',
+      productionOutputPerHr: '',
+      uom: '',
+      powerPerHrKwh: '',
+      workingDays: '',
+      workingHoursPerDay: '',
+      consentCapacity: '',
+      consentUom: ''
+  });
+
   // MSME State
   const [msmeRows, setMsmeRows] = useState([]);
   const [isAddingMsme, setIsAddingMsme] = useState(false);
@@ -224,6 +240,7 @@ const EditClient = () => {
         })));
         setCteProductionRows(client.productionFacility?.cteProduction || []);
         setCtoProductRows(client.productionFacility?.ctoProducts || []);
+        setCtoProductionCapacityValidationRows(client.productionFacility?.ctoProductionCapacityValidation || []);
         setMsmeRows(client.msmeDetails || []);
       }
     } catch (error) {
@@ -434,6 +451,34 @@ const EditClient = () => {
     const rows = [...ctoProductRows];
     rows.splice(index, 1);
     setCtoProductRows(rows);
+  };
+
+  const handleCtoProductionCapacityValidationInput = (e) => {
+    setCurrentCtoProductionCapacityValidationRow({ ...currentCtoProductionCapacityValidationRow, [e.target.name]: e.target.value });
+  };
+  const saveCtoProductionCapacityValidationRow = () => {
+    const rows = [...ctoProductionCapacityValidationRows];
+    if (editingCtoProductionCapacityValidationIndex !== null) {
+      rows[editingCtoProductionCapacityValidationIndex] = currentCtoProductionCapacityValidationRow;
+    } else {
+      rows.push(currentCtoProductionCapacityValidationRow);
+    }
+    setCtoProductionCapacityValidationRows(rows);
+    setCurrentCtoProductionCapacityValidationRow({
+      productName: '', machineName: '', productionOutputPerHr: '', uom: '', powerPerHrKwh: '', workingDays: '', workingHoursPerDay: '', consentCapacity: '', consentUom: ''
+    });
+    setEditingCtoProductionCapacityValidationIndex(null);
+    setIsAddingCtoProductionCapacityValidation(false);
+  };
+  const editCtoProductionCapacityValidationRow = (index) => {
+    setEditingCtoProductionCapacityValidationIndex(index);
+    setCurrentCtoProductionCapacityValidationRow(ctoProductionCapacityValidationRows[index]);
+    setIsAddingCtoProductionCapacityValidation(true);
+  };
+  const deleteCtoProductionCapacityValidationRow = (index) => {
+    const rows = [...ctoProductionCapacityValidationRows];
+    rows.splice(index, 1);
+    setCtoProductionCapacityValidationRows(rows);
   };
 
   const handleMsmeInput = (e) => {
@@ -694,6 +739,42 @@ const EditClient = () => {
           ctoDetailsList: updatedCtoRows,
           cteProduction: cteProductionRows.map(r => ({ plantName: r.plantName || '', productName: r.productName, maxCapacityPerYear: r.maxCapacityPerYear ? Number(r.maxCapacityPerYear) : 0 })),
           ctoProducts: ctoProductRows.map(r => ({ plantName: r.plantName || '', productName: r.productName, quantity: r.quantity ? Number(r.quantity) : 0 })),
+          ctoProductionCapacityValidation: ctoProductionCapacityValidationRows.map(r => {
+              const productionOutputPerHr = r.productionOutputPerHr ? Number(r.productionOutputPerHr) : 0;
+              const powerPerHrKwh = r.powerPerHrKwh ? Number(r.powerPerHrKwh) : 0;
+              const workingDays = r.workingDays ? Number(r.workingDays) : 0;
+              const workingHoursPerDay = r.workingHoursPerDay ? Number(r.workingHoursPerDay) : 0;
+              const consentCapacity = r.consentCapacity ? Number(r.consentCapacity) : 0;
+              const totalMonthlyCapacity = (productionOutputPerHr * workingDays * workingHoursPerDay);
+              const totalElectricityConsumptionPerMonthKwh = (powerPerHrKwh * workingDays * workingHoursPerDay);
+              const uom = (r.uom || '').toString();
+              const consentUom = (r.consentUom || '').toString();
+              const totalMonthlyCapacityMt = uom.toUpperCase() === 'KG' ? totalMonthlyCapacity / 1000 : 0;
+              
+              let utilizationPercent = 0;
+              if (consentCapacity > 0) {
+                  const capacityForCalc = (uom.toUpperCase() === 'KG' && consentUom.toUpperCase() === 'MT') 
+                      ? totalMonthlyCapacity / 1000 
+                      : totalMonthlyCapacity;
+                  utilizationPercent = (capacityForCalc / consentCapacity) * 100;
+              }
+
+              return {
+                  productName: (r.productName || '').toString(),
+                  machineName: (r.machineName || '').toString(),
+                  productionOutputPerHr,
+                  uom,
+                  powerPerHrKwh,
+                  workingDays,
+                  workingHoursPerDay,
+                  consentCapacity,
+                  consentUom,
+                  totalMonthlyCapacity,
+                  totalMonthlyCapacityMt,
+                  totalElectricityConsumptionPerMonthKwh,
+                  utilizationPercent
+              };
+          }),
           plantLocationNumber: client.productionFacility?.plantLocationNumber || '',
           waterRegulations: client.productionFacility?.waterRegulations?.map(r => ({ ...r, permittedQuantity: r.permittedQuantity ? Number(r.permittedQuantity) : 0 })) || [],
           airRegulations: client.productionFacility?.airRegulations?.map(r => ({ ...r, permittedLimit: r.permittedLimit ? Number(r.permittedLimit) : 0 })) || [],
@@ -1825,6 +1906,109 @@ const EditClient = () => {
                       ))}
                       {ctoProductRows.length === 0 && !isAddingCtoProduct && (
                         <tr><td colSpan="5" className="p-6 text-center text-gray-400">No CTO/CCA product details</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white shadow-md hover:shadow-lg transition-shadow duration-300 mt-4">
+              <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl">
+                <span className="font-semibold text-gray-700 flex items-center gap-2">
+                  <i className="fas fa-chart-line text-primary-600"></i>
+                  Production Capacity Validation
+                </span>
+              </div>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <button
+                    type="button"
+                    onClick={() => { setIsAddingCtoProductionCapacityValidation(true); setEditingCtoProductionCapacityValidationIndex(null); }}
+                    disabled={isAddingCtoProductionCapacityValidation || editingCtoProductionCapacityValidationIndex !== null}
+                    className="bg-primary-600 text-white px-3 py-1 rounded hover:bg-primary-700 text-sm"
+                  >
+                    + Add Row
+                  </button>
+                </div>
+                <div className="overflow-x-auto border rounded-xl max-w-[calc(100vw-22rem)]">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-50 text-gray-700">
+                      <tr>
+                        <th className="p-3 border-b text-sm font-semibold">Product Name</th>
+                        <th className="p-3 border-b text-sm font-semibold">Machine Name</th>
+                        <th className="p-3 border-b text-sm font-semibold">Prod Output/Hr</th>
+                        <th className="p-3 border-b text-sm font-semibold">UOM</th>
+                        <th className="p-3 border-b text-sm font-semibold">Power/Hr (KWH)</th>
+                        <th className="p-3 border-b text-sm font-semibold">Working Days</th>
+                        <th className="p-3 border-b text-sm font-semibold">Hours/Day</th>
+                        <th className="p-3 border-b text-sm font-semibold">Consent Capacity</th>
+                        <th className="p-3 border-b text-sm font-semibold">Consent UOM</th>
+                        <th className="p-3 border-b text-sm font-semibold">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(isAddingCtoProductionCapacityValidation || editingCtoProductionCapacityValidationIndex !== null) && (
+                        <tr className="bg-primary-50">
+                          <td className="p-3 border-b">
+                             <select name="productName" value={currentCtoProductionCapacityValidationRow.productName} onChange={handleCtoProductionCapacityValidationInput} className="w-full p-2 border rounded text-sm">
+                               <option value="">Select</option>
+                               {Array.from(new Set(ctoProductRows.map(r => r.productName).filter(Boolean))).map((p, i) => (
+                                 <option key={i} value={p}>{p}</option>
+                               ))}
+                             </select>
+                          </td>
+                          <td className="p-3 border-b"><input type="text" name="machineName" value={currentCtoProductionCapacityValidationRow.machineName} onChange={handleCtoProductionCapacityValidationInput} className="w-full p-2 border rounded text-sm" placeholder="Machine" /></td>
+                          <td className="p-3 border-b"><input type="number" name="productionOutputPerHr" value={currentCtoProductionCapacityValidationRow.productionOutputPerHr} onChange={handleCtoProductionCapacityValidationInput} className="w-full p-2 border rounded text-sm" /></td>
+                          <td className="p-3 border-b">
+                            <select name="uom" value={currentCtoProductionCapacityValidationRow.uom} onChange={handleCtoProductionCapacityValidationInput} className="w-full p-2 border rounded text-sm">
+                                <option value="">Select</option>
+                                <option value="KG">KG</option>
+                                <option value="MT">MT</option>
+                                <option value="NOS">NOS</option>
+                                <option value="Pices">Pices</option>
+                            </select>
+                          </td>
+                          <td className="p-3 border-b"><input type="number" name="powerPerHrKwh" value={currentCtoProductionCapacityValidationRow.powerPerHrKwh} onChange={handleCtoProductionCapacityValidationInput} className="w-full p-2 border rounded text-sm" /></td>
+                          <td className="p-3 border-b"><input type="number" name="workingDays" value={currentCtoProductionCapacityValidationRow.workingDays} onChange={handleCtoProductionCapacityValidationInput} className="w-full p-2 border rounded text-sm" /></td>
+                          <td className="p-3 border-b"><input type="number" name="workingHoursPerDay" value={currentCtoProductionCapacityValidationRow.workingHoursPerDay} onChange={handleCtoProductionCapacityValidationInput} className="w-full p-2 border rounded text-sm" /></td>
+                          <td className="p-3 border-b"><input type="number" name="consentCapacity" value={currentCtoProductionCapacityValidationRow.consentCapacity} onChange={handleCtoProductionCapacityValidationInput} className="w-full p-2 border rounded text-sm" /></td>
+                          <td className="p-3 border-b">
+                             <select name="consentUom" value={currentCtoProductionCapacityValidationRow.consentUom} onChange={handleCtoProductionCapacityValidationInput} className="w-full p-2 border rounded text-sm">
+                                <option value="">Select</option>
+                                <option value="KG">KG</option>
+                                <option value="MT">MT</option>
+                            </select>
+                          </td>
+                          <td className="p-3 border-b">
+                            <div className="flex gap-2">
+                              <button type="button" onClick={saveCtoProductionCapacityValidationRow} className="bg-primary-600 text-white px-3 py-1 rounded text-sm hover:bg-primary-700">Save</button>
+                              <button type="button" onClick={() => { setIsAddingCtoProductionCapacityValidation(false); setEditingCtoProductionCapacityValidationIndex(null); }} className="bg-gray-400 text-white px-3 py-1 rounded text-sm hover:bg-gray-500">Cancel</button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {ctoProductionCapacityValidationRows.map((r, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50 border-b">
+                          <td className="p-3">{r.productName}</td>
+                          <td className="p-3">{r.machineName}</td>
+                          <td className="p-3">{r.productionOutputPerHr}</td>
+                          <td className="p-3">{r.uom}</td>
+                          <td className="p-3">{r.powerPerHrKwh}</td>
+                          <td className="p-3">{r.workingDays}</td>
+                          <td className="p-3">{r.workingHoursPerDay}</td>
+                          <td className="p-3">{r.consentCapacity}</td>
+                          <td className="p-3">{r.consentUom || (r.uom === 'KG' ? 'MT' : r.uom)}</td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-3">
+                              <button type="button" onClick={() => editCtoProductionCapacityValidationRow(idx)} className="text-primary-600 hover:text-primary-800 text-sm"><i className="fas fa-edit"></i> Edit</button>
+                              <button type="button" onClick={() => deleteCtoProductionCapacityValidationRow(idx)} className="text-red-600 hover:text-red-800 text-sm"><i className="fas fa-trash"></i> Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {ctoProductionCapacityValidationRows.length === 0 && !isAddingCtoProductionCapacityValidation && (
+                        <tr><td colSpan="10" className="p-6 text-center text-gray-400">No details</td></tr>
                       )}
                     </tbody>
                   </table>

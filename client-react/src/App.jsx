@@ -38,6 +38,16 @@ const LoadingFallback = () => (
   </div>
 );
 
+const DashboardIndexRedirect = () => {
+  const { user } = useAuth();
+  const roleName = typeof user?.role === 'string' ? user.role : user?.role?.name;
+
+  if (roleName === 'ADMIN') return <Navigate to="admin/kpi" replace />;
+  if (roleName === 'SUPER ADMIN') return <Navigate to="client-connect" replace />;
+
+  return <DashboardHome />;
+};
+
 function App() {
   const { checkAuth } = useAuth();
 
@@ -63,7 +73,7 @@ function App() {
               </PrivateRoute>
             }
           >
-          <Route index element={<DashboardHome />} />
+          <Route index element={<DashboardIndexRedirect />} />
           <Route path="clients" element={<Clients />} />
           <Route path="client-connect" element={<ClientConnect />} />
           <Route path="client-connect/:id" element={<ClientConnectDetail />} />

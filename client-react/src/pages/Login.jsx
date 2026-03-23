@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import useAuth from '../hooks/useAuth';
@@ -19,9 +19,7 @@ import {
   FaKey, 
   FaSpinner, 
   FaSignInAlt, 
-  FaArrowLeft, 
-  FaCheck, 
-  FaBan 
+  FaArrowLeft
 } from 'react-icons/fa';
 
 const Login = () => {
@@ -30,18 +28,30 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [requireOtp, setRequireOtp] = useState(false);
-  const [capturedImage, setCapturedImage] = useState(null);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [location, setLocation] = useState(null);
+  const [geoLocation, setGeoLocation] = useState(null);
   const [locationStatus, setLocationStatus] = useState('idle'); // idle, locating, captured, error, denied
   const [resendTimer, setResendTimer] = useState(0);
 
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
   const errorTimeoutRef = useRef(null);
   
   const { verifyLoginOtp, setUser } = useAuth();
   const navigate = useNavigate();
+  const routerLocation = useLocation();
+
+  const getRoleName = (user) => (typeof user?.role === 'string' ? user.role : user?.role?.name);
+
+  const getPostLoginPath = (user) => {
+    const roleName = getRoleName(user);
+    if (roleName === 'ADMIN') return '/dashboard/admin/kpi';
+    if (roleName === 'SUPER ADMIN') return '/dashboard/client-connect';
+    return '/dashboard';
+  };
+
+  const fromPath = useMemo(() => {
+    const from = routerLocation.state?.from;
+    if (!from?.pathname) return null;
+    return `${from.pathname || ''}${from.search || ''}${from.hash || ''}`;
+  }, [routerLocation.state]);
 
   // Clear error on unmount
   useEffect(() => {
@@ -105,7 +115,7 @@ const Login = () => {
       setLocationStatus('locating');
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setLocation({
+          setGeoLocation({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
           });
@@ -149,14 +159,9 @@ const Login = () => {
     }
   };
 
-  const startCameraAndCapture = async () => {
-    // SKIP CAMERA LOGIC as per user request
-    setIsCapturing(false);
-    setCapturedImage(null); 
+  const startOtpStep = () => {
     setRequireOtp(true);
     setLoading(false);
-    
-    // Still try to get location if possible, but don't block
     getLocation();
   };
 
@@ -178,24 +183,18 @@ const Login = () => {
         console.log("Submitting OTP Verification:", { 
             email: formData.email, 
             otpLen: formData.otp?.length,
-            photoLen: capturedImage?.length || 0,
-            hasLocation: !!location
+            hasLocation: !!geoLocation
         });
-
-        if (!capturedImage) {
-            // throw new Error("Photo capture failed. Please try logging in again.");
-            console.log("Proceeding without photo capture");
-        }
 
         const result = await verifyLoginOtp({ 
           email: formData.email, 
           otp: formData.otp,
-          photo: capturedImage || "", // Send empty string if no photo
-          location: location
+          photo: "",
+          location: geoLocation || undefined
         }).unwrap();
         
-        if (result) {
-          navigate('/dashboard');
+        if (result?.user) {
+          navigate(fromPath || getPostLoginPath(result.user), { replace: true });
         }
       } else {
         const response = await api.post(API_ENDPOINTS.AUTH.LOGIN, {
@@ -204,13 +203,12 @@ const Login = () => {
         });
 
         if (response.data.success && response.data.data?.requireOtp) {
-          // Instead of showing OTP immediately, start camera capture
-          await startCameraAndCapture();
+          startOtpStep();
         } else if (response.data.success && response.data.data?.accessToken) {
             // Direct login success (fallback if OTP disabled)
             localStorage.setItem('accessToken', response.data.data.accessToken);
             setUser(response.data.data.user);
-            navigate(from, { replace: true });
+            navigate(fromPath || getPostLoginPath(response.data.data.user), { replace: true });
         } else {
              // Handle unexpected successful response without OTP or Token
              setError('Unexpected response from server');
@@ -219,8 +217,10 @@ const Login = () => {
       }
     } catch (err) {
       const message =
-        err.response?.data?.message ||
-        err.message ||
+        (typeof err === 'string' ? err : undefined) ||
+        err?.response?.data?.message ||
+        (typeof err?.response?.data === 'string' ? err.response.data : undefined) ||
+        err?.message ||
         'Login failed';
       setError(message);
       // Removed the 8 second autoClose to allow users time to read the error
@@ -453,7 +453,7 @@ const Login = () => {
                         {loading ? (
                             <>
                                 <FaSpinner className="animate-spin" />
-                                {isCapturing ? 'Verifying Security...' : 'Processing...'}
+                                Processing...
                             </>
                         ) : (
                             <>
@@ -499,38 +499,6 @@ const Login = () => {
                     <p className="text-[10px] text-[#706B77]">
                       © 2025 EPR Kavach Audit. All rights reserved.
                     </p>
-                </div>
-                
-                {/* Camera Elements */}
-                <div className={isCapturing ? "absolute inset-0 z-50 bg-black flex items-center justify-center rounded-2xl overflow-hidden" : "fixed top-0 left-0 w-1 h-1 opacity-0 pointer-events-none overflow-hidden"}>
-                    {isCapturing && (
-                      <div className="absolute top-2 right-2 flex gap-2 z-10">
-                        <div className="bg-red-500 animate-pulse w-3 h-3 rounded-full"></div>
-                        {locationStatus === 'locating' && (
-                             <div className="text-white text-xs bg-black/50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <FaSpinner className="animate-spin" /> Locating...
-                             </div>
-                        )}
-                        {locationStatus === 'captured' && (
-                             <div className="text-green-400 text-xs bg-black/50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <FaCheck /> Loc. Captured
-                             </div>
-                        )}
-                        {locationStatus === 'denied' && (
-                             <div className="text-red-400 text-xs bg-black/50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <FaBan /> Loc. Denied
-                             </div>
-                        )}
-                      </div>
-                    )}
-                    <video 
-                        ref={videoRef} 
-                        playsInline 
-                        muted 
-                        autoPlay 
-                        className={isCapturing ? "w-full h-full object-cover transform scale-x-[-1]" : ""}
-                    />
-                    <canvas ref={canvasRef} className="hidden"></canvas>
                 </div>
             </div>
         </div>

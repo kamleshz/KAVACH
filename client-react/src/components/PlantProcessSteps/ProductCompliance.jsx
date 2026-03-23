@@ -347,16 +347,21 @@ const ProductCompliance = ({
                                 {[
                                     { label: '#', width: 'w-12 text-center' },
                                     { label: 'Packaging Type', width: 'min-w-[150px]' },
+                                    ...(isProducer ? [
+                                        { label: 'Client Name', width: 'min-w-[180px]' },
+                                        { label: 'State', width: 'min-w-[140px]' }
+                                    ] : []),
                                     { label: 'Industry Category', width: 'min-w-[150px]' },
                                     { label: 'SKU code', width: 'min-w-[120px]' },
                                     { label: 'SKU Description', width: 'min-w-[200px]' },
                                     { label: 'SKU UOM', width: 'min-w-[120px]' },
                                     { label: 'Product Image', width: 'min-w-[100px]' },
-                                    { label: 'Generate', width: 'min-w-[100px]' },
+                                    { label: 'Generate Component Code', width: 'min-w-[100px]' },
                                     { label: 'Component code', width: 'min-w-[120px]' },
                                     { label: 'System Code', width: 'min-w-[120px]' },
                                     { label: 'Component Description', width: 'min-w-[200px]' },
                                     { label: 'Supplier Name', width: 'min-w-[150px]' },
+                                    ...(isProducer ? [{ label: 'Supplier State', width: 'min-w-[140px]' }] : []),
                                     { label: 'Supplier Type', width: 'min-w-[150px]' },
                                     { label: 'Supplier Category', width: 'min-w-[150px]' },
                                     { label: 'Generate Supplier Code', width: 'min-w-[150px]' },
@@ -386,6 +391,8 @@ const ProductCompliance = ({
                                 const globalIndex = indexOfFirstRow + idx;
                                 const prevRow = lastSavedRows[globalIndex] || {};
                                 const packagingTypeChanged = isProductFieldChanged(globalIndex, 'packagingType', row.packagingType);
+                                    const clientNameChanged = isProductFieldChanged(globalIndex, 'clientName', row.clientName);
+                                    const clientStateChanged = isProductFieldChanged(globalIndex, 'clientState', row.clientState);
                                 const industryCategoryChanged = isProductFieldChanged(globalIndex, 'industryCategory', row.industryCategory);
                                 const skuCodeChanged = isProductFieldChanged(globalIndex, 'skuCode', row.skuCode);
                                 const skuDescriptionChanged = isProductFieldChanged(globalIndex, 'skuDescription', row.skuDescription);
@@ -395,6 +402,7 @@ const ProductCompliance = ({
                                 const componentCodeChanged = isProductFieldChanged(globalIndex, 'componentCode', row.componentCode);
                                 const componentDescriptionChanged = isProductFieldChanged(globalIndex, 'componentDescription', row.componentDescription);
                                 const supplierNameChanged = isProductFieldChanged(globalIndex, 'supplierName', row.supplierName);
+                                    const supplierStateChanged = isProductFieldChanged(globalIndex, 'supplierState', row.supplierState);
                                 const supplierTypeChanged = isProductFieldChanged(globalIndex, 'supplierType', row.supplierType);
                                 const supplierCategoryChanged = isProductFieldChanged(globalIndex, 'supplierCategory', row.supplierCategory);
                                 const generateSupplierCodeChanged = isProductFieldChanged(globalIndex, 'generateSupplierCode', row.generateSupplierCode);
@@ -402,6 +410,7 @@ const ProductCompliance = ({
                                 const componentImageChanged = isProductFieldChanged(globalIndex, 'componentImage', row.componentImage);
                                 const rowChanged =
                                     packagingTypeChanged ||
+                                        (isProducer && (clientNameChanged || clientStateChanged)) ||
                                     industryCategoryChanged ||
                                     skuCodeChanged ||
                                     skuDescriptionChanged ||
@@ -410,6 +419,7 @@ const ProductCompliance = ({
                                     componentCodeChanged ||
                                     componentDescriptionChanged ||
                                     supplierNameChanged ||
+                                        (isProducer && supplierStateChanged) ||
                                     supplierTypeChanged ||
                                     supplierCategoryChanged ||
                                     generateSupplierCodeChanged ||
@@ -441,6 +451,50 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    {isProducer && (
+                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                        <div className="flex flex-col">
+                                            {isManager ? (
+                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.clientName || '-'}</div>
+                                            ) : (
+                                            <input
+                                                className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${clientNameChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
+                                                placeholder="Client Name"
+                                                value={row.clientName || ''}
+                                                onChange={(e)=>handleRowChange(globalIndex,'clientName',e.target.value)}
+                                            />
+                                            )}
+                                            {clientNameChanged && (
+                                                <div className="mt-1 text-[9px] leading-tight">
+                                                    <div className="text-gray-500">Prev: {formatProductFieldValue(prevRow.clientName, 'clientName')}</div>
+                                                    <div className="text-primary-700 font-bold">Now: {formatProductFieldValue(row.clientName, 'clientName')}</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    )}
+                                    {isProducer && (
+                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                        <div className="flex flex-col">
+                                            {isManager ? (
+                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.clientState || '-'}</div>
+                                            ) : (
+                                            <input
+                                                className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${clientStateChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
+                                                placeholder="State"
+                                                value={row.clientState || ''}
+                                                onChange={(e)=>handleRowChange(globalIndex,'clientState',e.target.value)}
+                                            />
+                                            )}
+                                            {clientStateChanged && (
+                                                <div className="mt-1 text-[9px] leading-tight">
+                                                    <div className="text-gray-500">Prev: {formatProductFieldValue(prevRow.clientState, 'clientState')}</div>
+                                                    <div className="text-primary-700 font-bold">Now: {formatProductFieldValue(row.clientState, 'clientState')}</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    )}
                                     {!isProducer && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
@@ -713,6 +767,28 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    {isProducer && (
+                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                        <div className="flex flex-col">
+                                            {isManager ? (
+                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.supplierState || '-'}</div>
+                                            ) : (
+                                            <input
+                                                className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${supplierStateChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
+                                                placeholder="Supplier State"
+                                                value={row.supplierState || ''}
+                                                onChange={(e)=>handleRowChange(globalIndex,'supplierState',e.target.value)}
+                                            />
+                                            )}
+                                            {supplierStateChanged && (
+                                                <div className="mt-1 text-[9px] leading-tight">
+                                                    <div className="text-gray-500">Prev: {formatProductFieldValue(prevRow.supplierState, 'supplierState')}</div>
+                                                    <div className="text-primary-700 font-bold">Now: {formatProductFieldValue(row.supplierState, 'supplierState')}</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    )}
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -730,7 +806,8 @@ const ProductCompliance = ({
                                                         <option value="Importer of raw material">Importer of raw material</option>
                                                         <option value="Importer">Importer</option>
                                                         <option value="Producer">Producer</option>
-                                                        <option value="PWP">PWP</option>
+                                                        <option value="Brand Owner">Brand Owner</option>
+                                                        <option value="Seller">Seller</option>
                                                     </>
                                                 ) : (
                                                     <>
@@ -761,9 +838,19 @@ const ProductCompliance = ({
                                                 onChange={(e) => handleRowChange(globalIndex, 'supplierCategory', e.target.value)}
                                             >
                                                 <option value="">Select</option>
-                                                <option value="Producer">Producer</option>
-                                                <option value="Importer">Importer</option>
-                                                <option value="Brand Owner">Brand Owner</option>
+                                                {isProducer ? (
+                                                    <>
+                                                        <option value="PIBO">PIBO</option>
+                                                        <option value="SIMP">SIMP</option>
+                                                        <option value="PWP">PWP</option>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <option value="Producer">Producer</option>
+                                                        <option value="Importer">Importer</option>
+                                                        <option value="Brand Owner">Brand Owner</option>
+                                                    </>
+                                                )}
                                             </select>
                                             )}
                                             {supplierCategoryChanged && (

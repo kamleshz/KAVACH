@@ -24,57 +24,14 @@ import { WASTE_TYPES } from '../constants/wasteTypes';
 const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
-  const [openKeys, setOpenKeys] = useState(['clients']);
+  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const [openKeys, setOpenKeys] = useState([]);
 
   const onOpenChange = (keys) => {
     setOpenKeys(keys);
   };
 
-  const items = [
-    {
-      key: '/dashboard',
-      icon: <AppstoreOutlined />,
-      label: 'Dashboard',
-      onClick: () => navigate('/dashboard'),
-    },
-    {
-      key: 'clients',
-      icon: <TeamOutlined />,
-      label: 'Clients',
-      children: [
-        { 
-          key: `/dashboard/clients?wasteType=${WASTE_TYPES.PLASTIC}`, 
-          icon: <BlockOutlined />, 
-          label: WASTE_TYPES.PLASTIC,
-          onClick: () => navigate(`/dashboard/clients?wasteType=${WASTE_TYPES.PLASTIC}`),
-        },
-        { 
-          key: `/dashboard/clients?wasteType=${WASTE_TYPES.E_WASTE}`, 
-          icon: <DesktopOutlined />, 
-          label: WASTE_TYPES.E_WASTE,
-          onClick: () => navigate(`/dashboard/clients?wasteType=${WASTE_TYPES.E_WASTE}`),
-        },
-        { 
-          key: `/dashboard/clients?wasteType=${WASTE_TYPES.BATTERY}`, 
-          icon: <ThunderboltOutlined />, 
-          label: WASTE_TYPES.BATTERY,
-          onClick: () => navigate(`/dashboard/clients?wasteType=${WASTE_TYPES.BATTERY}`),
-        },
-        { 
-          key: `/dashboard/clients?wasteType=${WASTE_TYPES.ELV}`, 
-          icon: <CarOutlined />, 
-          label: WASTE_TYPES.ELV,
-          onClick: () => navigate(`/dashboard/clients?wasteType=${WASTE_TYPES.ELV}`),
-        },
-        { 
-          key: `/dashboard/clients?wasteType=${WASTE_TYPES.USED_OIL}`, 
-          icon: <ExperimentOutlined />, 
-          label: WASTE_TYPES.USED_OIL,
-          onClick: () => navigate(`/dashboard/clients?wasteType=${WASTE_TYPES.USED_OIL}`),
-        },
-      ],
-    },
+  const baseItems = [
     {
       key: '/dashboard/client-connect',
       icon: <LinkOutlined />,
@@ -83,7 +40,56 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
     },
   ];
 
-  if (isAdmin) {
+  const items = isSuperAdmin
+    ? baseItems
+    : [
+        {
+          key: '/dashboard',
+          icon: <AppstoreOutlined />,
+          label: 'Dashboard',
+          onClick: () => navigate('/dashboard'),
+        },
+        {
+          key: 'clients',
+          icon: <TeamOutlined />,
+          label: 'KAVACH Audit',
+          children: [
+            {
+              key: `/dashboard/clients?wasteType=${WASTE_TYPES.PLASTIC}`,
+              icon: <BlockOutlined />,
+              label: WASTE_TYPES.PLASTIC,
+              onClick: () => navigate(`/dashboard/clients?wasteType=${WASTE_TYPES.PLASTIC}`),
+            },
+            {
+              key: `/dashboard/clients?wasteType=${WASTE_TYPES.E_WASTE}`,
+              icon: <DesktopOutlined />,
+              label: WASTE_TYPES.E_WASTE,
+              onClick: () => navigate(`/dashboard/clients?wasteType=${WASTE_TYPES.E_WASTE}`),
+            },
+            {
+              key: `/dashboard/clients?wasteType=${WASTE_TYPES.BATTERY}`,
+              icon: <ThunderboltOutlined />,
+              label: WASTE_TYPES.BATTERY,
+              onClick: () => navigate(`/dashboard/clients?wasteType=${WASTE_TYPES.BATTERY}`),
+            },
+            {
+              key: `/dashboard/clients?wasteType=${WASTE_TYPES.ELV}`,
+              icon: <CarOutlined />,
+              label: WASTE_TYPES.ELV,
+              onClick: () => navigate(`/dashboard/clients?wasteType=${WASTE_TYPES.ELV}`),
+            },
+            {
+              key: `/dashboard/clients?wasteType=${WASTE_TYPES.USED_OIL}`,
+              icon: <ExperimentOutlined />,
+              label: WASTE_TYPES.USED_OIL,
+              onClick: () => navigate(`/dashboard/clients?wasteType=${WASTE_TYPES.USED_OIL}`),
+            },
+          ],
+        },
+        ...baseItems,
+      ];
+
+  if (isAdmin && !isSuperAdmin) {
     items.push({
       key: 'admin',
       icon: <CrownOutlined />,
@@ -116,6 +122,18 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
       ],
     });
   }
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      setOpenKeys([]);
+      return;
+    }
+
+    if (location.pathname.startsWith('/dashboard/clients')) {
+      setOpenKeys(['clients']);
+      return;
+    }
+  }, [isSuperAdmin, location.pathname]);
 
   return (
     <div className="flex h-full w-full flex-col bg-gradient-to-b from-orange-500 via-orange-600 to-orange-700">

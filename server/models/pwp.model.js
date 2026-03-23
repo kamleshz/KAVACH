@@ -355,6 +355,22 @@ const pwpSchema = new mongoose.Schema({
             productName: { type: String, required: true },
             quantity: { type: Number, required: true },
             uom: { type: String, default: "" }
+        }],
+        ctoProductionCapacityValidation: [{
+            plantName: { type: String, default: "" },
+            productName: { type: String, default: "" },
+            machineName: { type: String, default: "" },
+            productionOutputPerHr: { type: Number, default: 0 },
+            uom: { type: String, default: "" },
+            powerPerHrKwh: { type: Number, default: 0 },
+            workingDays: { type: Number, default: 0 },
+            workingHoursPerDay: { type: Number, default: 0 },
+            totalMonthlyCapacity: { type: Number, default: 0 },
+            totalMonthlyCapacityMt: { type: Number, default: 0 },
+            totalElectricityConsumptionPerMonthKwh: { type: Number, default: 0 },
+            consentCapacity: { type: Number, default: 0 },
+            consentUom: { type: String, default: "" },
+            utilizationPercent: { type: Number, default: 0 }
         }]
     },
     documents: [documentSchema],

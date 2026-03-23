@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Input, Select } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, EditOutlined, SaveOutlined } from '@ant-design/icons';
 import { FaCheckCircle, FaSave, FaEdit, FaUndo, FaTrashAlt } from 'react-icons/fa';
 import { useClientContext } from '../../context/ClientContext';
 import DocumentViewerModal from '../DocumentViewerModal';
+import PropTypes from 'prop-types';
+import { calculateCapacityMetrics, formatNumber } from '../../utils/numberUtils';
 
 const CteCtoCca = ({
     cteDetailRows,
@@ -27,6 +29,12 @@ const CteCtoCca = ({
     toggleEditCtoProductRow,
     resetCtoProductRow,
     deleteCtoProductRow,
+    ctoProductionCapacityValidationRows,
+    addCtoProductionCapacityValidationRow,
+    handleCtoProductionCapacityValidationChange,
+    toggleEditCtoProductionCapacityValidationRow,
+    resetCtoProductionCapacityValidationRow,
+    deleteCtoProductionCapacityValidationRow,
     API_URL,
     isViewMode,
     loading,
@@ -63,6 +71,21 @@ const CteCtoCca = ({
         setViewerOpen(true);
     };
 
+    const capacityProductOptions = Array.from(
+        new Set(
+            (Array.isArray(ctoProductRows) ? ctoProductRows : [])
+                .map((r) => (r?.productName || '').toString().trim())
+                .filter(Boolean)
+        )
+    );
+
+    const showFacilities =
+        (formData.plantLocationNumber > 0) ||
+        ((cteDetailRows || []).length > 0) ||
+        ((ctoDetailRows || []).length > 0) ||
+        ((ctoProductRows || []).length > 0) ||
+        ((ctoProductionCapacityValidationRows || []).length > 0);
+
     return (
         <div className="space-y-6 animate-fadeIn">
             <h3 className="text-xl font-bold text-gray-800 border-b pb-2">CTE & CTO/CCA Details</h3>
@@ -78,7 +101,7 @@ const CteCtoCca = ({
                 />
             </div>
 
-            {formData.plantLocationNumber > 0 && (
+            {showFacilities && (
                 <div className="space-y-8">
                     {/* CTE Details Table */}
                     <div>
@@ -100,7 +123,7 @@ const CteCtoCca = ({
                                             { label: 'Document', width: 'min-w-[200px]' },
                                             { label: 'Actions', width: 'min-w-[100px] text-center' }
                                         ].map((header) => (
-                                            <th key={header.label} className={`px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap bg-gray-50 sticky top-0 z-10 border-b border-gray-200 ${header.width}`}>
+                                            <th key={header.label} className={`px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap bg-gray-50 sticky top-0 z-10 border-b border-gray-200 ${header.width}`}>
                                                 {header.label}
                                             </th>
                                         ))}
@@ -109,49 +132,49 @@ const CteCtoCca = ({
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {cteDetailRows.map((row, index) => (
                                         <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="text" value={row.plantName} onChange={(e) => handleCteDetailChange(index, 'plantName', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-700">{row.plantName}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="text" value={row.consentNo} onChange={(e) => handleCteDetailChange(index, 'consentNo', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-700">{row.consentNo}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="text" value={row.category} onChange={(e) => handleCteDetailChange(index, 'category', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-700">{row.category}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="date" value={row.issuedDate} onChange={(e) => handleCteDetailChange(index, 'issuedDate', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-700">{row.issuedDate}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="date" value={row.validUpto} onChange={(e) => handleCteDetailChange(index, 'validUpto', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-700">{row.validUpto}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="text" value={row.plantLocation} onChange={(e) => handleCteDetailChange(index, 'plantLocation', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-700">{row.plantLocation}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="text" value={row.plantAddress} onChange={(e) => handleCteDetailChange(index, 'plantAddress', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" />
                                                 ) : (
@@ -160,7 +183,7 @@ const CteCtoCca = ({
                                             </td>
                                             
                                             {/* Factory Head Group */}
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <input type="text" placeholder="Name" value={row.factoryHeadName} onChange={(e) => handleCteDetailChange(index, 'factoryHeadName', e.target.value)} className="col-span-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" />
@@ -179,7 +202,7 @@ const CteCtoCca = ({
                                             </td>
 
                                             {/* Contact Person Group */}
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <input type="text" placeholder="Name" value={row.contactPersonName} onChange={(e) => handleCteDetailChange(index, 'contactPersonName', e.target.value)} className="col-span-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" />
@@ -198,7 +221,7 @@ const CteCtoCca = ({
                                             </td>
 
                                             {/* Document Upload */}
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 <div className="flex flex-col gap-2">
                                                     {row.isEditing && (
                                                         <input 
@@ -243,7 +266,7 @@ const CteCtoCca = ({
                                             </td>
 
                                             {/* Actions */}
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-4 py-3 align-top text-center">
                                                 <div className="flex flex-col gap-2">
                                                     <div className="flex items-center justify-center space-x-2">
                                                         {/* Save/Edit Button */}
@@ -446,7 +469,7 @@ const CteCtoCca = ({
                                             { label: 'Document', width: 'min-w-[200px]' },
                                             { label: 'Actions', width: 'min-w-[140px] text-center' }
                                         ].map((header) => (
-                                            <th key={header.label} className={`px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap bg-gray-50 sticky top-0 z-10 border-b border-gray-200 ${header.width}`}>
+                                            <th key={header.label} className={`px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap bg-gray-50 sticky top-0 z-10 border-b border-gray-200 ${header.width}`}>
                                                 {header.label}
                                             </th>
                                         ))}
@@ -455,7 +478,7 @@ const CteCtoCca = ({
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {ctoDetailRows.map((row, index) => (
                                         <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <select
                                                         value={row.ctoCaaType || ''}
@@ -471,14 +494,14 @@ const CteCtoCca = ({
                                                     <span className="block px-2 py-1 text-sm text-gray-600">{row.ctoCaaType || '-'}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="text" value={row.plantName} onChange={(e) => handleCtoDetailChange(index, 'plantName', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" placeholder="Plant Name" />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-700 font-medium">{row.plantName || '-'}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <select
                                                         value={row.industryType || ''}
@@ -496,7 +519,7 @@ const CteCtoCca = ({
                                                     <span className="block px-2 py-1 text-sm text-gray-600">{row.industryType || '-'}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input
                                                         type="text"
@@ -509,35 +532,35 @@ const CteCtoCca = ({
                                                     <span className="block px-2 py-1 text-sm text-gray-600">{row.category || '-'}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="text" value={row.consentOrderNo} onChange={(e) => handleCtoDetailChange(index, 'consentOrderNo', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" placeholder="Consent No" />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-600">{row.consentOrderNo || '-'}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="date" value={row.dateOfIssue} onChange={(e) => handleCtoDetailChange(index, 'dateOfIssue', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-600">{row.dateOfIssue || '-'}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="date" value={row.validUpto} onChange={(e) => handleCtoDetailChange(index, 'validUpto', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-600">{row.validUpto || '-'}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="text" value={row.plantLocation} onChange={(e) => handleCtoDetailChange(index, 'plantLocation', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" placeholder="Location" />
                                                 ) : (
                                                     <span className="block px-2 py-1 text-sm text-gray-600">{row.plantLocation || '-'}</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <input type="text" value={row.plantAddress} onChange={(e) => handleCtoDetailChange(index, 'plantAddress', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" placeholder="Address" />
                                                 ) : (
@@ -546,7 +569,7 @@ const CteCtoCca = ({
                                             </td>
                                             
                                             {/* Factory Head Group */}
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <input type="text" placeholder="Name" value={row.factoryHeadName} onChange={(e) => handleCtoDetailChange(index, 'factoryHeadName', e.target.value)} className="col-span-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
@@ -565,7 +588,7 @@ const CteCtoCca = ({
                                             </td>
 
                                             {/* Contact Person Group */}
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 {row.isEditing ? (
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <input type="text" placeholder="Name" value={row.contactPersonName} onChange={(e) => handleCtoDetailChange(index, 'contactPersonName', e.target.value)} className="col-span-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
@@ -584,7 +607,7 @@ const CteCtoCca = ({
                                             </td>
 
                                             {/* Document Upload */}
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 <div className="flex flex-col gap-2">
                                                     {row.isEditing && (
                                                         <div className="relative">
@@ -631,7 +654,7 @@ const CteCtoCca = ({
                                             </td>
 
                                             {/* Actions */}
-                                            <td className="px-4 py-3 text-center">
+                                            <td className="px-4 py-3 align-top text-center">
                                                 <div className="flex flex-col gap-2">
                                                     <div className="flex items-center justify-center space-x-2">
                                                         {/* Save/Edit Button */}
@@ -806,6 +829,280 @@ const CteCtoCca = ({
                                         <tr>
                                             <td colSpan="5" className="px-3 py-4 text-center text-gray-400 italic">
                                                 No product details added
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div className="mt-6">
+                        <div className="flex items-center justify-between border-b pb-1 mb-4">
+                            <h4 className="font-bold text-lg text-gray-700">Production Capacity Validation</h4>
+                            <button
+                                type="button"
+                                onClick={addCtoProductionCapacityValidationRow}
+                                className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors shadow-sm"
+                            >
+                                <PlusOutlined className="mr-1.5" />
+                                Add Row
+                            </button>
+                        </div>
+
+                        <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
+                            <table className="min-w-full text-xs divide-y divide-gray-200 border-separate border-spacing-0">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[220px]">
+                                            Product Name
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[180px]">
+                                            Machine name
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[220px]">
+                                            Production output in one HR
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[140px]">
+                                            UOM
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[200px]">
+                                            Power per hr KWH
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[200px]">
+                                            Machine working days
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[240px]">
+                                            Machine Total working hours per day
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[240px]">
+                                            total monthly capacity of machine (KG)
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[220px]">
+                                            Total monthly capacity in (MT)
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[260px]">
+                                            Total electricity consumption per month KWH
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[200px]">
+                                            Consent capacity
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[140px]">
+                                            UOM
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 min-w-[160px]">
+                                            Utilization %
+                                        </th>
+                                        <th className="px-4 py-3 align-top text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-b border-gray-200 w-28">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {(ctoProductionCapacityValidationRows || []).map((row, index) => {
+                                        const {
+                                            totalMonthlyCapacity,
+                                            totalMonthlyCapacityMt,
+                                            totalElectricityConsumptionPerMonthKwh: totalElectricityPerMonthKwh,
+                                            utilizationPercent,
+                                            consentCapacity
+                                        } = calculateCapacityMetrics(row, { emptyAsNull: true });
+
+                                        return (
+                                            <tr key={row.key || index} className="hover:bg-gray-50 transition-colors duration-150">
+                                                <td className="px-4 py-3 align-top">
+                                                    {row.isEditing ? (
+                                                        <select
+                                                            value={row.productName || ''}
+                                                            onChange={(e) =>
+                                                                handleCtoProductionCapacityValidationChange(index, 'productName', e.target.value)
+                                                            }
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow bg-white"
+                                                        >
+                                                            <option value="">Select</option>
+                                                            {capacityProductOptions.map((p) => (
+                                                                <option key={p} value={p}>
+                                                                    {p}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
+                                                        <span className="block px-2 py-1 text-sm text-gray-700">{row.productName || '-'}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    {row.isEditing ? (
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Machine name"
+                                                            value={row.machineName || ''}
+                                                            onChange={(e) => handleCtoProductionCapacityValidationChange(index, 'machineName', e.target.value)}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                                                        />
+                                                    ) : (
+                                                        <span className="block px-2 py-1 text-sm text-gray-700">{row.machineName}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    {row.isEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            step="any"
+                                                            placeholder="Production output"
+                                                            value={row.productionOutputPerHr ?? ''}
+                                                            onChange={(e) => handleCtoProductionCapacityValidationChange(index, 'productionOutputPerHr', e.target.value)}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                                                        />
+                                                    ) : (
+                                                        <span className="block px-2 py-1 text-sm text-gray-700">{formatNumber(row.productionOutputPerHr)}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    {row.isEditing ? (
+                                                        <select
+                                                            value={row.uom || ''}
+                                                            onChange={(e) => handleCtoProductionCapacityValidationChange(index, 'uom', e.target.value)}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow bg-white"
+                                                        >
+                                                            <option value="">Select</option>
+                                                            <option value="KG">KG</option>
+                                                            <option value="MT">MT</option>
+                                                            <option value="NOS">NOS</option>
+                                                            <option value="Pices">Pices</option>
+                                                        </select>
+                                                    ) : (
+                                                        <span className="block px-2 py-1 text-sm text-gray-700">{row.uom || '-'}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    {row.isEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            step="any"
+                                                            placeholder="Power per hr (KWH)"
+                                                            value={row.powerPerHrKwh ?? ''}
+                                                            onChange={(e) => handleCtoProductionCapacityValidationChange(index, 'powerPerHrKwh', e.target.value)}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                                                        />
+                                                    ) : (
+                                                        <span className="block px-2 py-1 text-sm text-gray-700">{formatNumber(row.powerPerHrKwh)}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    {row.isEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            step="any"
+                                                            placeholder="Working days"
+                                                            value={row.workingDays ?? ''}
+                                                            onChange={(e) => handleCtoProductionCapacityValidationChange(index, 'workingDays', e.target.value)}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                                                        />
+                                                    ) : (
+                                                        <span className="block px-2 py-1 text-sm text-gray-700">{formatNumber(row.workingDays)}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    {row.isEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            step="any"
+                                                            placeholder="Hours / day"
+                                                            value={row.workingHoursPerDay ?? ''}
+                                                            onChange={(e) => handleCtoProductionCapacityValidationChange(index, 'workingHoursPerDay', e.target.value)}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                                                        />
+                                                    ) : (
+                                                        <span className="block px-2 py-1 text-sm text-gray-700">{formatNumber(row.workingHoursPerDay)}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    <span className="block px-2 py-1 text-sm text-gray-700">
+                                                        {formatNumber(totalMonthlyCapacity)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    <span className="block px-2 py-1 text-sm text-gray-700">
+                                                        {totalMonthlyCapacityMt === null ? 'NA' : formatNumber(totalMonthlyCapacityMt)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    <span className="block px-2 py-1 text-sm text-gray-700">
+                                                        {formatNumber(totalElectricityPerMonthKwh)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    {row.isEditing ? (
+                                                        <input
+                                                            type="number"
+                                                            step="any"
+                                                            placeholder="Consent capacity"
+                                                            value={row.consentCapacity ?? ''}
+                                                            onChange={(e) => handleCtoProductionCapacityValidationChange(index, 'consentCapacity', e.target.value)}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
+                                                        />
+                                                    ) : (
+                                                        <span className="block px-2 py-1 text-sm text-gray-700">{formatNumber(consentCapacity)}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    {row.isEditing ? (
+                                                        <span className="block px-2 py-1 text-sm text-gray-700">
+                                                            {row.uom === 'KG' ? 'MT' : (row.uom || '-')}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="block px-2 py-1 text-sm text-gray-700">
+                                                            {(row.uom === 'KG' ? 'MT' : (row.consentUom || row.uom || '-'))}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    <span
+                                                        className={`block px-2 py-1 text-sm ${
+                                                            utilizationPercent !== null && utilizationPercent >= 100
+                                                                ? 'text-red-600 font-semibold'
+                                                                : 'text-gray-700'
+                                                        }`}
+                                                    >
+                                                        {formatNumber(utilizationPercent)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 align-top text-center">
+                                                    <div className="flex items-center justify-center space-x-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleEditCtoProductionCapacityValidationRow(index)}
+                                                            className="h-8 w-8 rounded-lg bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition-all duration-200 shadow-sm"
+                                                            title={row.isEditing ? "Save" : "Edit"}
+                                                        >
+                                                            {row.isEditing ? <FaSave /> : <FaEdit />}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => resetCtoProductionCapacityValidationRow(index)}
+                                                            className="h-8 w-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-200 hover:text-gray-800 transition-all duration-200 shadow-sm"
+                                                            title="Reset"
+                                                        >
+                                                            <FaUndo />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => deleteCtoProductionCapacityValidationRow(index)}
+                                                            className="h-8 w-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all duration-200 shadow-sm"
+                                                            title="Delete"
+                                                        >
+                                                            <FaTrashAlt />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+
+                                    {(ctoProductionCapacityValidationRows || []).length === 0 && (
+                                        <tr>
+                                            <td colSpan="14" className="px-3 py-4 text-center text-gray-400 italic">
+                                                No production capacity validation rows added
                                             </td>
                                         </tr>
                                     )}
@@ -1312,6 +1609,56 @@ const CteCtoCca = ({
             />
         </div>
     );
+};
+
+CteCtoCca.propTypes = {
+    cteDetailRows: PropTypes.array,
+    handleCteDetailChange: PropTypes.func,
+    toggleEditCteDetailRow: PropTypes.func,
+    resetCteDetailRow: PropTypes.func,
+    deleteLocationRow: PropTypes.func,
+    cteProductionRows: PropTypes.array,
+    handleCteProductionChange: PropTypes.func,
+    toggleEditCteProductionRow: PropTypes.func,
+    addCteProductionRow: PropTypes.func,
+    resetCteProductionRow: PropTypes.func,
+    deleteCteProductionRow: PropTypes.func,
+    ctoDetailRows: PropTypes.array,
+    handleCtoDetailChange: PropTypes.func,
+    toggleEditCtoDetailRow: PropTypes.func,
+    resetCtoDetailRow: PropTypes.func,
+    ctoProductRows: PropTypes.array,
+    addCtoProductRow: PropTypes.func,
+    handleCtoProductChange: PropTypes.func,
+    toggleEditCtoProductRow: PropTypes.func,
+    resetCtoProductRow: PropTypes.func,
+    deleteCtoProductRow: PropTypes.func,
+    ctoProductionCapacityValidationRows: PropTypes.array,
+    addCtoProductionCapacityValidationRow: PropTypes.func,
+    handleCtoProductionCapacityValidationChange: PropTypes.func,
+    toggleEditCtoProductionCapacityValidationRow: PropTypes.func,
+    resetCtoProductionCapacityValidationRow: PropTypes.func,
+    deleteCtoProductionCapacityValidationRow: PropTypes.func,
+    API_URL: PropTypes.string,
+    isViewMode: PropTypes.bool,
+    loading: PropTypes.bool,
+    handleSaveCgwaDetails: PropTypes.func,
+    regulationsCoveredUnderCto: PropTypes.array,
+    setRegulationsCoveredUnderCto: PropTypes.func,
+    normalizeCtoRegulationValue: PropTypes.func,
+    handleSaveCtoRegulations: PropTypes.func,
+    waterRegulationsRows: PropTypes.array,
+    addWaterRegulationRow: PropTypes.func,
+    updateWaterRegulationRow: PropTypes.func,
+    deleteWaterRegulationRow: PropTypes.func,
+    airRegulationsRows: PropTypes.array,
+    addAirRegulationRow: PropTypes.func,
+    updateAirRegulationRow: PropTypes.func,
+    deleteAirRegulationRow: PropTypes.func,
+    hazardousWasteRegulationsRows: PropTypes.array,
+    addHazardousWasteRegulationRow: PropTypes.func,
+    updateHazardousWasteRegulationRow: PropTypes.func,
+    deleteHazardousWasteRegulationRow: PropTypes.func
 };
 
 export default CteCtoCca;

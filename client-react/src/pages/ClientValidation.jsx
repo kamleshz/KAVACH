@@ -1530,6 +1530,76 @@ Date: ___________________`;
                                                             <span className="text-gray-400 text-sm italic">Not selected</span>
                                                         )}
                                                     </div>
+                                                    {!embedded && Array.isArray(pf.ctoProductionCapacityValidation) && pf.ctoProductionCapacityValidation.length > 0 && (
+                                                        <div className="mt-5">
+                                                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="h-8 w-1 bg-indigo-500 rounded-full"></div>
+                                                                    <h4 className="font-bold text-gray-800">Production Capacity Validation</h4>
+                                                                </div>
+                                                                <VerifyButton id="cto_production_capacity" label="OK" />
+                                                            </div>
+                                                            <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                                                <table className="w-full text-left border-collapse">
+                                                                    <thead className="bg-gray-50 text-gray-700 text-xs uppercase tracking-wider">
+                                                                        <tr>
+                                                                            <th className="p-3 font-semibold border-b">Product Name</th>
+                                                                            <th className="p-3 font-semibold border-b">Machine name</th>
+                                                                            <th className="p-3 font-semibold border-b">Production output in one HR</th>
+                                                                            <th className="p-3 font-semibold border-b">UOM</th>
+                                                                            <th className="p-3 font-semibold border-b">Power per hr KWH</th>
+                                                                            <th className="p-3 font-semibold border-b">Machine working days</th>
+                                                                            <th className="p-3 font-semibold border-b">Machine Total working hours per day</th>
+                                                                            <th className="p-3 font-semibold border-b">Total monthly capacity (KG)</th>
+                                                                            <th className="p-3 font-semibold border-b">Total monthly capacity (MT)</th>
+                                                                            <th className="p-3 font-semibold border-b">Total electricity per month KWH</th>
+                                                                            <th className="p-3 font-semibold border-b">Consent capacity</th>
+                                                                            <th className="p-3 font-semibold border-b">UOM</th>
+                                                                            <th className="p-3 font-semibold border-b">Utilization %</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="text-sm divide-y divide-gray-100">
+                                                                        {pf.ctoProductionCapacityValidation.map((r, idx) => {
+                                                                            const fmt = (v) => {
+                                                                                if (v === null || v === undefined) return '';
+                                                                                const n = Number(v);
+                                                                                if (!Number.isFinite(n)) return '';
+                                                                                return (Math.round(n * 100) / 100).toString();
+                                                                            };
+                                                                            const uom = (r.uom || '').toString().trim().toUpperCase();
+                                                                            const consentUom = (r.consentUom || uom || '').toString().trim().toUpperCase();
+                                                                            const totalMonthlyCapacity = Number(r.totalMonthlyCapacity) || 0;
+                                                                            const totalMonthlyCapacityMt = Number(r.totalMonthlyCapacityMt) || (uom === 'KG' ? totalMonthlyCapacity / 1000 : 0);
+                                                                            const consentCapacity = Number(r.consentCapacity) || 0;
+                                                                            const util = Number.isFinite(Number(r.utilizationPercent))
+                                                                                ? Number(r.utilizationPercent)
+                                                                                : (consentCapacity > 0
+                                                                                    ? (((uom === 'KG' && consentUom === 'MT') ? (totalMonthlyCapacity / 1000) : totalMonthlyCapacity) / consentCapacity) * 100
+                                                                                    : 0);
+                                                                            const isHigh = util >= 100;
+                                                                            return (
+                                                                                <tr key={idx} className="hover:bg-gray-50">
+                                                                                    <td className="p-3 text-gray-700">{r.productName || '-'}</td>
+                                                                                    <td className="p-3 text-gray-700">{r.machineName || '-'}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(r.productionOutputPerHr)}</td>
+                                                                                    <td className="p-3 text-gray-700">{uom || '-'}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(r.powerPerHrKwh)}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(r.workingDays)}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(r.workingHoursPerDay)}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(totalMonthlyCapacity)}</td>
+                                                                                    <td className="p-3 text-gray-700">{uom === 'KG' ? fmt(totalMonthlyCapacityMt) : 'NA'}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(r.totalElectricityConsumptionPerMonthKwh)}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(consentCapacity)}</td>
+                                                                                    <td className="p-3 text-gray-700">{uom === 'KG' ? 'MT' : (consentUom || '-')}</td>
+                                                                                    <td className={`p-3 ${isHigh ? 'text-red-600 font-semibold' : 'text-gray-700'}`}>{fmt(util)}</td>
+                                                                                </tr>
+                                                                            );
+                                                                        })}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    )}
 
                                                     {hasWater && (
                                                         <div className="mt-5">
@@ -1621,6 +1691,76 @@ Date: ___________________`;
                                                                         </tr>
                                                                     ))}
                                                                 </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {embedded && Array.isArray(pf.ctoProductionCapacityValidation) && pf.ctoProductionCapacityValidation.length > 0 && (
+                                                        <div className="mt-5">
+                                                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="h-8 w-1 bg-indigo-500 rounded-full"></div>
+                                                                    <h4 className="font-bold text-gray-800">Production Capacity Validation</h4>
+                                                                </div>
+                                                                <VerifyButton id="cto_production_capacity" label="OK" />
+                                                            </div>
+                                                            <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                                                <table className="w-full text-left border-collapse">
+                                                                    <thead className="bg-gray-50 text-gray-700 text-xs uppercase tracking-wider">
+                                                                        <tr>
+                                                                            <th className="p-3 font-semibold border-b">Product Name</th>
+                                                                            <th className="p-3 font-semibold border-b">Machine name</th>
+                                                                            <th className="p-3 font-semibold border-b">Production output in one HR</th>
+                                                                            <th className="p-3 font-semibold border-b">UOM</th>
+                                                                            <th className="p-3 font-semibold border-b">Power per hr KWH</th>
+                                                                            <th className="p-3 font-semibold border-b">Machine working days</th>
+                                                                            <th className="p-3 font-semibold border-b">Machine Total working hours per day</th>
+                                                                            <th className="p-3 font-semibold border-b">Total monthly capacity (KG)</th>
+                                                                            <th className="p-3 font-semibold border-b">Total monthly capacity (MT)</th>
+                                                                            <th className="p-3 font-semibold border-b">Total electricity per month KWH</th>
+                                                                            <th className="p-3 font-semibold border-b">Consent capacity</th>
+                                                                            <th className="p-3 font-semibold border-b">UOM</th>
+                                                                            <th className="p-3 font-semibold border-b">Utilization %</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="text-sm divide-y divide-gray-100">
+                                                                        {pf.ctoProductionCapacityValidation.map((r, idx) => {
+                                                                            const fmt = (v) => {
+                                                                                if (v === null || v === undefined) return '';
+                                                                                const n = Number(v);
+                                                                                if (!Number.isFinite(n)) return '';
+                                                                                return (Math.round(n * 100) / 100).toString();
+                                                                            };
+                                                                            const uom = (r.uom || '').toString().trim().toUpperCase();
+                                                                            const consentUom = (r.consentUom || uom || '').toString().trim().toUpperCase();
+                                                                            const totalMonthlyCapacity = Number(r.totalMonthlyCapacity) || 0;
+                                                                            const totalMonthlyCapacityMt = Number(r.totalMonthlyCapacityMt) || (uom === 'KG' ? totalMonthlyCapacity / 1000 : 0);
+                                                                            const consentCapacity = Number(r.consentCapacity) || 0;
+                                                                            const util = Number.isFinite(Number(r.utilizationPercent))
+                                                                                ? Number(r.utilizationPercent)
+                                                                                : (consentCapacity > 0
+                                                                                    ? (((uom === 'KG' && consentUom === 'MT') ? (totalMonthlyCapacity / 1000) : totalMonthlyCapacity) / consentCapacity) * 100
+                                                                                    : 0);
+                                                                            const isHigh = util >= 100;
+                                                                            return (
+                                                                                <tr key={idx} className="hover:bg-gray-50">
+                                                                                    <td className="p-3 text-gray-700">{r.productName || '-'}</td>
+                                                                                    <td className="p-3 text-gray-700">{r.machineName || '-'}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(r.productionOutputPerHr)}</td>
+                                                                                    <td className="p-3 text-gray-700">{uom || '-'}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(r.powerPerHrKwh)}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(r.workingDays)}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(r.workingHoursPerDay)}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(totalMonthlyCapacity)}</td>
+                                                                                    <td className="p-3 text-gray-700">{uom === 'KG' ? fmt(totalMonthlyCapacityMt) : 'NA'}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(r.totalElectricityConsumptionPerMonthKwh)}</td>
+                                                                                    <td className="p-3 text-gray-700">{fmt(consentCapacity)}</td>
+                                                                                    <td className="p-3 text-gray-700">{uom === 'KG' ? 'MT' : (consentUom || '-')}</td>
+                                                                                    <td className={`p-3 ${isHigh ? 'text-red-600 font-semibold' : 'text-gray-700'}`}>{fmt(util)}</td>
+                                                                                </tr>
+                                                                            );
+                                                                        })}
+                                                                    </tbody>
                                                                 </table>
                                                             </div>
                                                         </div>

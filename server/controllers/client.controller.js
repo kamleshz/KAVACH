@@ -60,7 +60,7 @@ export const deleteClientDocumentController = asyncHandler(async (req, res) => {
 export const getAllClientsController = asyncHandler(async (req, res) => {
     try {
         const user = await UserModel.findById(req.userId).populate('role');
-        const isUserAdmin = user?.role?.name === 'ADMIN';
+        const isUserAdmin = ['ADMIN', 'SUPER ADMIN'].includes(user?.role?.name);
         let query = isUserAdmin ? {} : {
             $or: [
                 { assignedTo: req.userId },
@@ -489,6 +489,8 @@ export const uploadProductComplianceRowController = async (req, res) => {
             generate: single.generate || 'No',
             systemCode: single.systemCode || '',
             packagingType: single.packagingType || '',
+            clientName: single.clientName || '',
+            clientState: single.clientState || '',
             skuCode: single.skuCode || '',
             skuDescription: single.skuDescription || '',
             skuUom: single.skuUom || '',
@@ -496,6 +498,7 @@ export const uploadProductComplianceRowController = async (req, res) => {
             componentCode: single.componentCode || '',
             componentDescription: single.componentDescription || '',
             supplierName: single.supplierName || '',
+            supplierState: single.supplierState || '',
             supplierType: single.supplierType || '',
             supplierCategory: single.supplierCategory || '',
             generateSupplierCode: single.generateSupplierCode || 'No',
@@ -555,7 +558,7 @@ export const uploadProductComplianceRowController = async (req, res) => {
         };
         const humanize = (field) => field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
         const at = new Date();
-        const fields = ['generate', 'systemCode', 'packagingType', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage'];
+        const fields = ['generate', 'systemCode', 'packagingType', 'clientName', 'clientState', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage'];
 
         fields.forEach((field) => {
             const prevVal = toText(beforeRow?.[field]);
@@ -960,7 +963,7 @@ export const getClientByIdController = async (req, res) => {
 
         // Check access permission
         const user = await UserModel.findById(req.userId).populate('role');
-        const isUserAdmin = user?.role?.name === 'ADMIN';
+        const isUserAdmin = ['ADMIN', 'SUPER ADMIN'].includes(user?.role?.name);
 
         const isAssignedUser = client.assignedTo?._id?.toString() === req.userId;
         const isAssignedManager = client.assignedManager?._id?.toString() === req.userId;
@@ -1042,7 +1045,7 @@ export const updateClientController = async (req, res) => {
 
         // Check permissions first
         const user = await UserModel.findById(req.userId).populate('role');
-        const isUserAdmin = user?.role?.name === 'ADMIN';
+        const isUserAdmin = ['ADMIN', 'SUPER ADMIN'].includes(user?.role?.name);
 
         let clientToCheck = await ClientModel.findById(clientId);
         let Model = ClientModel;
@@ -1198,7 +1201,7 @@ export const assignClientController = async (req, res) => {
 export const getClientStatsController = async (req, res) => {
     try {
         const user = await UserModel.findById(req.userId).populate('role');
-        const isUserAdmin = user?.role?.name === 'ADMIN';
+        const isUserAdmin = ['ADMIN', 'SUPER ADMIN'].includes(user?.role?.name);
         const baseQuery = isUserAdmin ? {} : {
             $or: [
                 { assignedTo: req.userId },

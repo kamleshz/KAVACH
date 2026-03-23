@@ -193,6 +193,8 @@ const EWasteStorage = ({ clientId }) => {
             render: (text, record) => (
                 <div className="flex items-center gap-2">
                     <Upload 
+                        accept="image/*"
+                        capture="environment"
                         beforeUpload={file => handlePhotoUpload(file, record.key)} 
                         showUploadList={false}
                     >

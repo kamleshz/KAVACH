@@ -86,15 +86,24 @@ export const verifyLoginOtpController = asyncHandler(async (req, res) => {
             userAgent
         });
 
+        const forwardedProto = req.headers['x-forwarded-proto'];
+        const isHttps =
+            req.secure ||
+            (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) === 'https';
+
         const cookieOptions = {
             httpOnly: true,
-            secure: true, // Always secure for cross-site
-            sameSite: 'none', // Allow cross-site cookies
+            secure: isHttps,
+            sameSite: isHttps ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000
         };
 
-        res.cookie('accessToken', accessToken, cookieOptions);
-        res.cookie('refreshToken', refreshToken, cookieOptions);
+        try {
+            res.cookie('accessToken', accessToken, cookieOptions);
+            res.cookie('refreshToken', refreshToken, cookieOptions);
+        } catch (cookieError) {
+            console.error("[Login Verification Cookie Error]", cookieError);
+        }
 
         return res.status(200).json({
             message: "Login successful",

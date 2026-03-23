@@ -47,7 +47,7 @@ export const admin = async (req, res, next) => {
         
         const user = await User.findById(req.userId).populate('role');
 
-        if (!user || !user.role || user.role.name !== 'ADMIN') {
+        if (!user || !user.role || (user.role.name !== 'ADMIN' && user.role.name !== 'SUPER ADMIN')) {
             console.warn("Permission denied for non-admin user", {
                 userId: req.userId,
                 path: req.originalUrl,

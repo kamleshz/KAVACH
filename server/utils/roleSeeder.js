@@ -3,7 +3,7 @@ import UserModel from '../models/user.model.js';
 
 export const seedRoles = async () => {
     try {
-        const roles = ['ADMIN', 'USER', 'MANAGER'];
+        const roles = ['SUPER ADMIN', 'ADMIN', 'USER', 'MANAGER'];
         const roleDocs = {};
 
         // 1. Ensure Roles Exist

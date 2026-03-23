@@ -205,6 +205,7 @@ const DashboardLayout = () => {
                     {(() => {
                         const r = user?.role?.name || user?.role || 'User';
                         if (r === 'ADMIN') return 'Administrator';
+                        if (r === 'SUPER ADMIN') return 'Super Administrator';
                         if (r === 'MANAGER') return 'Manager';
                         if (r === 'USER') return 'User';
                         return r;

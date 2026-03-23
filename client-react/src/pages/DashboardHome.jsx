@@ -1,10 +1,12 @@
-import WasteTypeSelection from './WasteTypeSelection';
+import KPIDashboard from './KPIDashboard';
+import useAuth from '../hooks/useAuth';
 
 const DashboardHome = () => {
+  const { user } = useAuth();
+  const roleName = typeof user?.role === 'string' ? user.role : user?.role?.name;
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-8">
-      <WasteTypeSelection />
-    </div>
+    <KPIDashboard mode={roleName === 'ADMIN' ? 'admin' : 'user'} />
   );
 };
 

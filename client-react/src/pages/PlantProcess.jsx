@@ -877,14 +877,16 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         const exportData = productRows.map((row) => {
             const data = {
                 'Packaging Type': row.packagingType,
+                ...(isProducer ? { 'Client Name': row.clientName || '', 'State': row.clientState || '' } : {}),
                 'Industry Category': row.industryCategory,
                 'SKU Code': row.skuCode,
                 'SKU Description': row.skuDescription,
                 'SKU UOM': row.skuUom,
-                'Generate': row.generate || 'No',
+                'Generate Component Code': row.generate || 'No',
                 'Component Code': row.componentCode,
                 'Component Description': row.componentDescription,
                 'Supplier Name': row.supplierName,
+                ...(isProducer ? { 'Supplier State': row.supplierState || '' } : {}),
                 'Supplier Type': row.supplierType || '',
                 'Supplier Category': row.supplierCategory || '',
                 'Generate Supplier Code': row.generateSupplierCode || 'No',
@@ -905,15 +907,18 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     const handleProductTemplateDownload = () => {
         const headers = [
             'Packaging Type',
+            isProducer ? 'Client Name' : null,
+            isProducer ? 'State' : null,
             'Industry Category',
             'SKU Code',
             'SKU Description',
             'SKU UOM',
-            'Generate',
+            'Generate Component Code',
             'Component Code',
             !isManager ? 'System Code' : null,
             'Component Description',
             'Supplier Name',
+            isProducer ? 'Supplier State' : null,
             'Supplier Type',
             'Supplier Category',
             'Generate Supplier Code',
@@ -922,32 +927,84 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
 
         const ws = XLSX.utils.aoa_to_sheet([headers]);
 
-        ws['!dataValidation'] = [
-            {
-                type: 'list',
-                allowBlank: true,
-                sqref: 'E2:E500',
-                formulae: ['"Yes,No"']
-            },
-            {
-                type: 'list',
-                allowBlank: true,
-                sqref: 'J2:J500',
-                formulae: ['"Contract Manufacture,Co-Processer,Co-Packaging,Not Applicable"']
-            },
-            {
-                type: 'list',
-                allowBlank: true,
-                sqref: 'K2:K500',
-                formulae: ['"Producer,Importer,Brand Owner"']
-            },
-            {
-                type: 'list',
-                allowBlank: true,
-                sqref: 'L2:L500',
-                formulae: ['"Yes,No"']
-            }
-        ];
+        if (isProducer) {
+            const colToLetter = (colIndex1Based) => {
+                let n = colIndex1Based;
+                let s = '';
+                while (n > 0) {
+                    const m = (n - 1) % 26;
+                    s = String.fromCharCode(65 + m) + s;
+                    n = Math.floor((n - 1) / 26);
+                }
+                return s;
+            };
+
+            const getColRef = (headerName) => {
+                const idx = headers.findIndex(h => h === headerName);
+                if (idx === -1) return null;
+                const col = colToLetter(idx + 1);
+                return `${col}2:${col}500`;
+            };
+
+            const generateRef = getColRef('Generate Component Code');
+            const supplierTypeRef = getColRef('Supplier Type');
+            const supplierCategoryRef = getColRef('Supplier Category');
+            const generateSupplierRef = getColRef('Generate Supplier Code');
+
+            ws['!dataValidation'] = [
+                generateRef ? {
+                    type: 'list',
+                    allowBlank: true,
+                    sqref: generateRef,
+                    formulae: ['"Yes,No"']
+                } : null,
+                supplierTypeRef ? {
+                    type: 'list',
+                    allowBlank: true,
+                    sqref: supplierTypeRef,
+                    formulae: ['"Manufacture,Importer of raw material,Importer,Producer,Brand Owner,Seller"']
+                } : null,
+                supplierCategoryRef ? {
+                    type: 'list',
+                    allowBlank: true,
+                    sqref: supplierCategoryRef,
+                    formulae: ['"PIBO,SIMP,PWP"']
+                } : null,
+                generateSupplierRef ? {
+                    type: 'list',
+                    allowBlank: true,
+                    sqref: generateSupplierRef,
+                    formulae: ['"Yes,No"']
+                } : null
+            ].filter(Boolean);
+        } else {
+            ws['!dataValidation'] = [
+                {
+                    type: 'list',
+                    allowBlank: true,
+                    sqref: 'E2:E500',
+                    formulae: ['"Yes,No"']
+                },
+                {
+                    type: 'list',
+                    allowBlank: true,
+                    sqref: 'J2:J500',
+                    formulae: ['"Contract Manufacture,Co-Processer,Co-Packaging,Not Applicable"']
+                },
+                {
+                    type: 'list',
+                    allowBlank: true,
+                    sqref: 'K2:K500',
+                    formulae: ['"Producer,Importer,Brand Owner"']
+                },
+                {
+                    type: 'list',
+                    allowBlank: true,
+                    sqref: 'L2:L500',
+                    formulae: ['"Yes,No"']
+                }
+            ];
+        }
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Product Compliance Template");
@@ -1069,14 +1126,17 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 let skuDescription = getValue([/sku.*desc/i]);
                 let skuUom = getValue([/sku.*uom/i, /uom/i]);
                 // Generate: matches "generate", but exclude "supplier" to avoid confusing with "Generate Supplier Code"
-                let generate = getValue([/^generate(?!.*supplier)/i, /^generate$/i]) || 'No';
+                let generate = getValue([/^generate\s*component\s*code/i, /^generate(?!.*supplier)/i, /^generate$/i]) || 'No';
                 let componentCode = getValue([/component.*code/i]);
                 let componentDescription = getValue([/component.*desc/i]);
                 let supplierName = getValue([/supplier.*name/i]);
+                let supplierState = getValue([/supplier.*state/i]);
                 let supplierType = getValue([/supplier.*type/i]);
                 let supplierCategory = getValue([/supplier.*cat/i, /category/i]);
                 let generateSupplierCode = getValue([/generate.*supplier/i]) || 'No';
                 let supplierCode = getValue([/supplier.*code/i]);
+                let clientName = getValue([/client.*name/i]);
+                let clientState = getValue([/client.*state/i, /^state$/i]);
 
                 if (generate === 'No') {
                      const match = currentAllRows.find(r => 
@@ -1121,6 +1181,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
 
                 const newRow = {
                     packagingType,
+                    clientName,
+                    clientState,
                     industryCategory,
                     skuCode,
                     skuDescription,
@@ -1131,6 +1193,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                     systemCode,
                     componentDescription,
                     supplierName,
+                    supplierState,
                     supplierType,
                     supplierCategory,
                     generateSupplierCode,
@@ -1429,6 +1492,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
           generate: 'No',
           systemCode: newSystemCode,
           packagingType: '',
+          clientName: '',
+          clientState: '',
           skuCode: '',
           skuDescription: '',
           skuUom: '',
@@ -1436,6 +1501,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
           componentCode: newCode,
           componentDescription: '',
           supplierName: '',
+          supplierState: '',
           supplierType: '',
           supplierCategory: '',
           generateSupplierCode: 'No',
@@ -1613,7 +1679,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(clientId), payload);
       }
 
-      const fields = ['generate', 'systemCode', 'packagingType', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage'];
+      const fields = ['generate', 'systemCode', 'packagingType', 'clientName', 'clientState', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage'];
       const entryBaseId = `${Date.now()}-${Math.random()}`;
       const historyEntries = [];
       fields.forEach((field) => {
@@ -3790,7 +3856,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     };
 
     const isStepReadOnly = () => {
-        if (user?.role?.name === 'ADMIN' || user?.role === 'ADMIN') return false;
+        const role = user?.role?.name || user?.role;
+        if (['ADMIN', 'SUPER ADMIN'].includes(role)) return false;
         return completedSteps.includes(activeTab);
     };
 
@@ -3803,7 +3870,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         // 1. Product Compliance
         productRows.forEach((row, idx) => {
             const initialRow = lastSavedRows[idx] || {};
-            const fields = ['packagingType', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'generateSupplierCode', 'supplierCode', 'componentImage'];
+            const fields = ['packagingType', 'clientName', 'clientState', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'generateSupplierCode', 'supplierCode', 'componentImage'];
             fields.forEach(field => {
                 const initialVal = initialRow[field];
                 const currentVal = row[field];

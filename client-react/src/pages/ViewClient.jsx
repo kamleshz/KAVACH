@@ -115,6 +115,7 @@ const ViewClient = () => {
   // Columns for Post Audit
   const postValidationColumns = getPostValidationColumns({
       postValidationPagination: postValidationPagination || { current: 1, pageSize: 10 },
+      API_URL: import.meta.env.VITE_API_URL,
       postValidationData,
       setPostValidationData,
       handleSaveRow: noOp, // Read-only
@@ -126,7 +127,13 @@ const ViewClient = () => {
       loading: false,
       readOnly: !isPostAuditUnlocked, // Ensure columns respect read-only if supported, otherwise actions are disabled via noOp
       parseRemarksToItems, // Passed utility function
-      onViewDocument: handleViewDocument
+      openRemarkModal: noOp,
+      handlePostValidationChange: noOp,
+      appendRemarkPoint: noOp,
+      handleSavePostValidation: noOp,
+      onViewDocument: handleViewDocument,
+      canEditComplianceRemarks: false,
+      canEditAuditorRemarks: false
   });
 
   // Filter logic for Post Audit

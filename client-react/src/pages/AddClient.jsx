@@ -27,6 +27,7 @@ import PostAuditCheck from '../components/AddClientSteps/PostAuditCheck';
 import { getPostValidationColumns } from '../components/AddClientSteps/utils/postAuditColumns';
 import { generateMarkingLabellingReport, generateSkuComplianceReport } from '../components/AddClientSteps/utils/reportUtils';
 import { parseRemarksToItems } from '../utils/pdfHelpers';
+import { calculateCapacityMetrics } from '../utils/numberUtils';
 import DocumentViewerModal from '../components/DocumentViewerModal';
 
 import { 
@@ -178,6 +179,7 @@ const AddClientContent = () => {
 
   const isProducer = formData?.clientType === 'Producer' || formData?.entityType === 'Producer';
   const [productRows, setProductRows] = useState([]);
+  const [componentRows, setComponentRows] = useState([]);
 
   // Scroll to top on tab/step change
   useEffect(() => {
@@ -189,9 +191,15 @@ const AddClientContent = () => {
       if (clientId && fullClientData?.productionFacility?.ctoDetailsList?.[0]?._id) {
         try {
           const params = { type: 'CTO', itemId: fullClientData.productionFacility.ctoDetailsList[0]._id };
-          const res = await api.get(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(clientId), { params });
-          if (res.data?.success) {
-            setProductRows(res.data.data || []);
+          const [prodRes, compRes] = await Promise.all([
+            api.get(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(clientId), { params }),
+            api.get(API_ENDPOINTS.CLIENT.PRODUCT_COMPONENT_DETAILS(clientId), { params })
+          ]);
+          if (prodRes.data?.success) {
+            setProductRows(prodRes.data.data || []);
+          }
+          if (compRes.data?.success) {
+            setComponentRows(compRes.data.data || []);
           }
         } catch (error) {
           console.error('Error fetching product rows:', error);
@@ -223,7 +231,7 @@ const AddClientContent = () => {
       handleSkuStatusChange,
       handleSaveSkuCompliance,
       fetchSkuComplianceData
-  } = useSkuCompliance(clientId, isProducer, productRows);
+  } = useSkuCompliance(clientId, isProducer, productRows, componentRows);
   
   // Alias for prop consistency
   // const saveSkuRow = handleSaveSkuCompliance;
@@ -262,7 +270,7 @@ const AddClientContent = () => {
       return digits.length === 10;
   };
 
-  const { user: authUser } = useAuth();
+  const { user: authUser, isAdmin, isManager } = useAuth();
 
   useEffect(() => {
       if (isAuditMode) {
@@ -422,7 +430,7 @@ const AddClientContent = () => {
                  setIsPreValidationComplete(true);
             }
 
-            if (authUser?.role?.name === 'MANAGER') {
+            if (isManager) {
                 setIsPreValidationUnlocked(true);
                 setIsPreValidationComplete(true);
                 setIsAuditComplete(true);
@@ -511,9 +519,9 @@ const AddClientContent = () => {
               eeeFilePath: client.documents?.find(d => d.documentType === 'EEE Import Authorization')?.filePath || ''
             }));
             setRegulationsCoveredUnderCto(Array.isArray(client.productionFacility?.regulationsCoveredUnderCto) ? client.productionFacility.regulationsCoveredUnderCto.map(normalizeCtoRegulationValue).filter(Boolean) : []);
-            setWaterRegulationsRows(Array.isArray(client.productionFacility?.waterRegulations) ? client.productionFacility.waterRegulations.map((r, i) => ({ key: r._id || i, description: r.description || '', permittedQuantity: r.permittedQuantity || '' })) : []);
-            setAirRegulationsRows(Array.isArray(client.productionFacility?.airRegulations) ? client.productionFacility.airRegulations.map((r, i) => ({ key: r._id || i, parameter: r.parameter || '', permittedLimit: r.permittedLimit || '' })) : []);
-            setHazardousWasteRegulationsRows(Array.isArray(client.productionFacility?.hazardousWasteRegulations) ? client.productionFacility.hazardousWasteRegulations.map((r, i) => ({ key: r._id || i, nameOfHazardousWaste: r.nameOfHazardousWaste || '', facilityModeOfDisposal: r.facilityModeOfDisposal || '', quantityMtYr: r.quantityMtYr || '' })) : []);
+            setWaterRegulationsRows(Array.isArray(client.productionFacility?.waterRegulations) ? client.productionFacility.waterRegulations.map((r, i) => ({ key: r._id || i, description: r.description || '', permittedQuantity: r.permittedQuantity || '', uom: r.uom || '' })) : []);
+            setAirRegulationsRows(Array.isArray(client.productionFacility?.airRegulations) ? client.productionFacility.airRegulations.map((r, i) => ({ key: r._id || i, parameter: r.parameter || '', permittedLimit: r.permittedLimit || '', uom: r.uom || '' })) : []);
+            setHazardousWasteRegulationsRows(Array.isArray(client.productionFacility?.hazardousWasteRegulations) ? client.productionFacility.hazardousWasteRegulations.map((r, i) => ({ key: r._id || i, nameOfHazardousWaste: r.nameOfHazardousWaste || '', facilityModeOfDisposal: r.facilityModeOfDisposal || '', quantityMtYr: r.quantityMtYr || '', uom: r.uom || '' })) : []);
 
             if (client.msmeDetails && client.msmeDetails.length > 0) {
                   setMsmeRows(client.msmeDetails.map((m, i) => ({
@@ -616,6 +624,17 @@ const AddClientContent = () => {
                          ...item,
                          isEditing: false
                      })));
+                 }
+
+                 if (client.productionFacility.ctoProductionCapacityValidation?.length > 0) {
+                     setCtoProductionCapacityValidationRows(
+                         client.productionFacility.ctoProductionCapacityValidation.map((item, i) => ({
+                             key: item._id || i,
+                             ...item,
+                             consentUom: ((item?.consentUom || item?.uom || '').toString() === 'KG' ? 'MT' : (item?.consentUom || item?.uom || '').toString()),
+                             isEditing: false
+                         }))
+                     );
                  }
             }
           }
@@ -783,6 +802,7 @@ const AddClientContent = () => {
   
   const [cteProductionRows, setCteProductionRows] = useState([]);
   const [ctoProductRows, setCtoProductRows] = useState([]);
+  const [ctoProductionCapacityValidationRows, setCtoProductionCapacityValidationRows] = useState([]);
 
   // steps definition moved to before return statement to fix hoisting issue
 
@@ -860,7 +880,7 @@ const AddClientContent = () => {
   const addWaterRegulationRow = () => {
       setWaterRegulationsRows((prev) => [
           ...(Array.isArray(prev) ? prev : []),
-          { key: Date.now() + Math.random(), description: '', permittedQuantity: '' }
+          { key: Date.now() + Math.random(), description: '', permittedQuantity: '', uom: '' }
       ]);
   };
 
@@ -882,7 +902,7 @@ const AddClientContent = () => {
   const addAirRegulationRow = () => {
       setAirRegulationsRows((prev) => [
           ...(Array.isArray(prev) ? prev : []),
-          { key: Date.now() + Math.random(), parameter: '', permittedLimit: '' }
+          { key: Date.now() + Math.random(), parameter: '', permittedLimit: '', uom: '' }
       ]);
   };
 
@@ -904,7 +924,7 @@ const AddClientContent = () => {
   const addHazardousWasteRegulationRow = () => {
       setHazardousWasteRegulationsRows((prev) => [
           ...(Array.isArray(prev) ? prev : []),
-          { key: Date.now() + Math.random(), nameOfHazardousWaste: '', facilityModeOfDisposal: '', quantityMtYr: '' }
+          { key: Date.now() + Math.random(), nameOfHazardousWaste: '', facilityModeOfDisposal: '', quantityMtYr: '', uom: '' }
       ]);
   };
 
@@ -1091,6 +1111,51 @@ const AddClientContent = () => {
       setCtoProductRows(newRows);
   };
 
+  const addCtoProductionCapacityValidationRow = () => {
+      setCtoProductionCapacityValidationRows((prev) => [
+          ...(Array.isArray(prev) ? prev : []),
+          {
+              key: Date.now(),
+              productName: '',
+              machineName: '',
+              productionOutputPerHr: '',
+              uom: '',
+              powerPerHrKwh: '',
+              workingDays: '',
+              workingHoursPerDay: '',
+              consentCapacity: '',
+              consentUom: '',
+              isEditing: true
+          }
+      ]);
+  };
+
+  const handleCtoProductionCapacityValidationChange = (index, field, value) => {
+      setCtoProductionCapacityValidationRows((prev) => {
+          const copy = Array.isArray(prev) ? [...prev] : [];
+          const curr = { ...(copy[index] || {}), [field]: value };
+          if (field === 'uom') {
+              curr.consentUom = value === 'KG' ? 'MT' : value;
+          }
+          copy[index] = curr;
+          return copy;
+      });
+  };
+
+  const toggleEditCtoProductionCapacityValidationRow = (index) => {
+      setCtoProductionCapacityValidationRows((prev) => {
+          const copy = Array.isArray(prev) ? [...prev] : [];
+          const curr = { ...(copy[index] || {}) };
+          curr.isEditing = !curr.isEditing;
+          copy[index] = curr;
+          return copy;
+      });
+  };
+
+  const deleteCtoProductionCapacityValidationRow = (index) => {
+      setCtoProductionCapacityValidationRows((prev) => (Array.isArray(prev) ? prev.filter((_, i) => i !== index) : []));
+  };
+
   // Reset Handlers
   const resetCteDetailRow = (index) => {
       const newRows = [...cteDetailRows];
@@ -1126,6 +1191,25 @@ const AddClientContent = () => {
       const newRows = [...ctoProductRows];
       newRows[index] = { ...newRows[index], plantName: '', productName: '', quantity: '' };
       setCtoProductRows(newRows);
+  };
+
+  const resetCtoProductionCapacityValidationRow = (index) => {
+      setCtoProductionCapacityValidationRows((prev) => {
+          const copy = Array.isArray(prev) ? [...prev] : [];
+          copy[index] = {
+              ...(copy[index] || {}),
+              productName: '',
+              machineName: '',
+              productionOutputPerHr: '',
+              uom: '',
+              powerPerHrKwh: '',
+              workingDays: '',
+              workingHoursPerDay: '',
+              consentCapacity: '',
+              consentUom: ''
+          };
+          return copy;
+      });
   };
 
   const handleSubmit = async (e, processPreValidation = false) => {
@@ -1264,20 +1348,23 @@ const AddClientContent = () => {
                 waterRegulations: normalizedCtoRegs.includes('Water')
                     ? (Array.isArray(waterRegulationsRows) ? waterRegulationsRows : []).map(r => ({
                         description: (r?.description || '').toString(),
-                        permittedQuantity: r?.permittedQuantity ? Number(r.permittedQuantity) : 0
+                        permittedQuantity: r?.permittedQuantity ? Number(r.permittedQuantity) : 0,
+                        uom: (r?.uom || '').toString()
                     }))
                     : [],
                 airRegulations: normalizedCtoRegs.includes('Air')
                     ? (Array.isArray(airRegulationsRows) ? airRegulationsRows : []).map(r => ({
                         parameter: (r?.parameter || '').toString(),
-                        permittedLimit: r?.permittedLimit ? Number(r.permittedLimit) : 0
+                        permittedLimit: r?.permittedLimit ? Number(r.permittedLimit) : 0,
+                        uom: (r?.uom || '').toString()
                     }))
                     : [],
                 hazardousWasteRegulations: normalizedCtoRegs.includes('Hazardous Waste')
                     ? (Array.isArray(hazardousWasteRegulationsRows) ? hazardousWasteRegulationsRows : []).map(r => ({
                         nameOfHazardousWaste: (r?.nameOfHazardousWaste || '').toString(),
                         facilityModeOfDisposal: (r?.facilityModeOfDisposal || '').toString(),
-                        quantityMtYr: r?.quantityMtYr ? Number(r.quantityMtYr) : 0
+                        quantityMtYr: r?.quantityMtYr ? Number(r.quantityMtYr) : 0,
+                        uom: (r?.uom || '').toString()
                     }))
                     : [],
                 cteDetailsList: cteDetailRows.map(r => ({
@@ -1299,7 +1386,19 @@ const AddClientContent = () => {
                 ctoProducts: ctoProductRows.map(r => ({
                     ...r,
                     quantity: r.quantity ? Number(r.quantity) : 0
-                }))
+                })),
+                ctoProductionCapacityValidation: ctoProductionCapacityValidationRows.map((r) => {
+                    const metrics = calculateCapacityMetrics(r);
+
+                    return {
+                        ...r,
+                        productName: (r.productName || '').toString(),
+                        machineName: (r.machineName || '').toString(),
+                        uom: (r.uom || '').toString(),
+                        consentUom: (r.consentUom || '').toString(),
+                        ...metrics
+                    };
+                })
             },
             lastCompletedStep: 4,
             ...(processPreValidation ? { clientStatus: 'SUBMITTED' } : (!clientId ? { clientStatus: 'DRAFT' } : {}))
@@ -1524,7 +1623,19 @@ const AddClientContent = () => {
                     cteDetailsList: updatedCteRows,
                     cteProduction: cteProductionRows,
                     ctoDetailsList: updatedCtoRows,
-                    ctoProducts: ctoProductRows
+                    ctoProducts: ctoProductRows,
+                    ctoProductionCapacityValidation: ctoProductionCapacityValidationRows.map((r) => {
+                        const metrics = calculateCapacityMetrics(r);
+
+                        return {
+                            ...r,
+                            productName: (r.productName || '').toString(),
+                            machineName: (r.machineName || '').toString(),
+                            uom: (r.uom || '').toString(),
+                            consentUom: (r.consentUom || '').toString(),
+                            ...metrics
+                        };
+                    })
                 }
             });
             messageApi.success('Client saved successfully!');
@@ -2824,8 +2935,10 @@ const AddClientContent = () => {
       handlePostValidationChange,
       appendRemarkPoint,
       handleSavePostValidation,
-      onViewDocument: handleViewDocument
-  }), [postValidationPagination, API_URL, openRemarkModal, handlePostValidationChange, appendRemarkPoint, handleSavePostValidation]);
+      onViewDocument: handleViewDocument,
+      canEditComplianceRemarks: isAdmin || isManager,
+      canEditAuditorRemarks: isAdmin || (!isAdmin && !isManager)
+  }), [postValidationPagination, API_URL, openRemarkModal, handlePostValidationChange, appendRemarkPoint, handleSavePostValidation, isAdmin, isManager]);
 
 
 
@@ -3223,14 +3336,19 @@ const AddClientContent = () => {
             render: (_, record) => {
                 const remarks = Array.isArray(record.remarks) ? record.remarks : (record.remarks ? [record.remarks] : []);
                 const val = remarks.join('\n');
+                const canEdit = isAdmin || (!isAdmin && !isManager);
                 return (
-                    <Input.TextArea
-                        className="w-full border border-gray-200 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white min-h-[50px]"
-                        value={val}
-                        onChange={(e) => handleSkuComplianceChange(record.key, 'remarks', e.target.value.split('\n'))}
-                        placeholder="Auditor remarks..."
-                        autoSize={{ minRows: 2, maxRows: 6 }}
-                    />
+                    canEdit ? (
+                        <Input.TextArea
+                            className="w-full border border-gray-200 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white min-h-[50px]"
+                            value={val}
+                            onChange={(e) => handleSkuComplianceChange(record.key, 'remarks', e.target.value.split('\n'))}
+                            placeholder="Auditor remarks..."
+                            autoSize={{ minRows: 2, maxRows: 6 }}
+                        />
+                    ) : (
+                        <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">{val || '-'}</div>
+                    )
                 );
             }
         },
@@ -3239,16 +3357,31 @@ const AddClientContent = () => {
             dataIndex: 'complianceRemarks', 
             key: 'complianceRemarks', 
             width: 250, 
-            render: (text) => {
-                 const remarks = Array.isArray(text) ? text : (text ? [text] : []);
-                 if (remarks.length === 0) return <span className="text-gray-400 text-xs">-</span>;
-                 return (
-                     <ul className="list-disc pl-4 m-0 text-xs text-gray-700">
-                         {remarks.map((r, i) => (
-                             <li key={i}>{r}</li>
-                         ))}
-                     </ul>
-                 );
+            render: (text, record) => {
+                const remarks = Array.isArray(record.complianceRemarks)
+                    ? record.complianceRemarks
+                    : (record.complianceRemarks ? [record.complianceRemarks] : (Array.isArray(text) ? text : (text ? [text] : [])));
+                const val = remarks.join('\n');
+                const canEdit = isAdmin || isManager;
+                if (canEdit) {
+                    return (
+                        <Input.TextArea
+                            className="w-full border border-gray-200 rounded text-xs p-1 focus:ring-1 focus:ring-primary-500 bg-white min-h-[50px]"
+                            value={val}
+                            onChange={(e) => handleSkuComplianceChange(record.key, 'complianceRemarks', e.target.value.split('\n'))}
+                            placeholder="Compliance remarks..."
+                            autoSize={{ minRows: 2, maxRows: 6 }}
+                        />
+                    );
+                }
+                if (remarks.length === 0) return <span className="text-gray-400 text-xs">-</span>;
+                return (
+                    <ul className="list-disc pl-4 m-0 text-xs text-gray-700">
+                        {remarks.map((r, i) => (
+                            <li key={i}>{r}</li>
+                        ))}
+                    </ul>
+                );
             }
         },
         { 
@@ -3333,7 +3466,7 @@ const AddClientContent = () => {
                 </div>
             )
         }
-    ].filter(Boolean), [skuPagination, isProducer, handleSkuComplianceChange, handleSaveSkuCompliance, API_URL]);
+    ].filter(Boolean), [skuPagination, isProducer, handleSkuComplianceChange, handleSaveSkuCompliance, API_URL, isAdmin, isManager]);
 
     const loadSkuComplianceData = async () => {
         if (!clientId || !fullClientData?.productionFacility) {
@@ -3747,6 +3880,12 @@ const AddClientContent = () => {
                             toggleEditCtoProductRow={toggleEditCtoProductRow}
                             resetCtoProductRow={resetCtoProductRow}
                             deleteCtoProductRow={deleteCtoProductRow}
+                            ctoProductionCapacityValidationRows={ctoProductionCapacityValidationRows}
+                            addCtoProductionCapacityValidationRow={addCtoProductionCapacityValidationRow}
+                            handleCtoProductionCapacityValidationChange={handleCtoProductionCapacityValidationChange}
+                            toggleEditCtoProductionCapacityValidationRow={toggleEditCtoProductionCapacityValidationRow}
+                            resetCtoProductionCapacityValidationRow={resetCtoProductionCapacityValidationRow}
+                            deleteCtoProductionCapacityValidationRow={deleteCtoProductionCapacityValidationRow}
                             API_URL={API_URL}
                             isViewMode={isViewMode}
                             loading={loading}

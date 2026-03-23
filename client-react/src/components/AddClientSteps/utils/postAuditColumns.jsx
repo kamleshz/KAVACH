@@ -10,7 +10,9 @@ export const getPostValidationColumns = ({
     handlePostValidationChange,
     appendRemarkPoint,
     handleSavePostValidation,
-    onViewDocument
+    onViewDocument,
+    canEditComplianceRemarks = true,
+    canEditAuditorRemarks = true
 }) => {
     // Helper to check if field is changed
     const isChanged = (record, field) => {
@@ -273,21 +275,23 @@ export const getPostValidationColumns = ({
             dataIndex: 'complianceRemarks',
             key: 'complianceRemarks',
             width: 200,
-            render: (text, record) => (
+            render: (_text, record) => (
                 <div className="flex flex-col gap-1">
                     <ul className="list-disc pl-4 m-0 text-xs text-gray-700 mb-1">
                         {(Array.isArray(record.complianceRemarks) ? record.complianceRemarks : []).map((r, i) => (
                             <li key={i}>{r}</li>
                         ))}
                     </ul>
-                    <Button 
-                        size="small" 
-                        type="dashed" 
-                        onClick={() => openRemarkModal(record, 'complianceRemarks')}
-                        className="text-xs w-full flex items-center justify-center gap-1"
-                    >
-                        <FaInfoCircle /> {record.complianceRemarks?.length > 0 ? 'Edit Remarks' : 'Add Remarks'}
-                    </Button>
+                    {canEditComplianceRemarks && typeof openRemarkModal === 'function' ? (
+                        <Button 
+                            size="small" 
+                            type="dashed" 
+                            onClick={() => openRemarkModal(record, 'complianceRemarks')}
+                            className="text-xs w-full flex items-center justify-center gap-1"
+                        >
+                            <FaInfoCircle /> {record.complianceRemarks?.length > 0 ? 'Edit Remarks' : 'Add Remarks'}
+                        </Button>
+                    ) : null}
                 </div>
             )
         },
@@ -297,13 +301,17 @@ export const getPostValidationColumns = ({
             key: 'auditorRemarks',
             width: 200,
             render: (text, record) => (
-                <Input.TextArea
-                    value={text || ''}
-                    onChange={(e) => handlePostValidationChange(record.key, 'auditorRemarks', e.target.value)}
-                    placeholder="Remarks..."
-                    autoSize={{ minRows: 2, maxRows: 4 }}
-                    className={getInputClass(isChanged(record, 'auditorRemarks'))}
-                />
+                canEditAuditorRemarks ? (
+                    <Input.TextArea
+                        value={text || ''}
+                        onChange={(e) => handlePostValidationChange?.(record.key, 'auditorRemarks', e.target.value)}
+                        placeholder="Remarks..."
+                        autoSize={{ minRows: 2, maxRows: 4 }}
+                        className={getInputClass(isChanged(record, 'auditorRemarks'))}
+                    />
+                ) : (
+                    <div className="text-xs text-gray-700 whitespace-pre-wrap text-center">{text || '-'}</div>
+                )
             )
         },
         {

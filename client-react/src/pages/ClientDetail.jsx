@@ -591,6 +591,18 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
     const wasteType = client.wasteType || 'Plastic Waste';
     const theme = WASTE_THEME[wasteType] || WASTE_THEME['Plastic Waste'];
     const WasteIcon = theme.icon;
+    const pf = client.productionFacility || {};
+    const regs = Array.isArray(pf.regulationsCoveredUnderCto) ? pf.regulationsCoveredUnderCto : [];
+    const capacityRows = Array.isArray(pf.ctoProductionCapacityValidation) ? pf.ctoProductionCapacityValidation : [];
+    const hasWater = regs.includes('Water');
+    const waterRegs = Array.isArray(pf.waterRegulations) ? pf.waterRegulations : [];
+    const hasAir = regs.includes('Air');
+    const airRegs = Array.isArray(pf.airRegulations) ? pf.airRegulations : [];
+    const hasHazardousWaste = regs.some((r) => {
+      const lower = (r || '').toString().trim().toLowerCase();
+      return lower === 'hazardous waste' || lower === 'hazardous wate';
+    });
+    const hazardousRegs = Array.isArray(pf.hazardousWasteRegulations) ? pf.hazardousWasteRegulations : [];
 
     const InfoItem = ({ icon: Icon, label, value, iconColor = 'text-gray-400' }) => (
       <div className="flex items-start gap-3 py-2.5">
@@ -741,6 +753,184 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
             icon={FaUserTie}
           />
         </div>
+
+        {initialViewMode === 'client-connect' && (regs.length > 0 || capacityRows.length > 0) && (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
+              <FaIndustry className="text-primary-600 text-sm" />
+              <h4 className="text-sm font-semibold text-gray-700">CTO Regulations & Capacity</h4>
+            </div>
+            <div className="p-5 space-y-5">
+              <div>
+                <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Regulations Covered under CTO</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {regs.length ? regs.map((r) => (
+                    <span
+                      key={r}
+                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    >
+                      {r}
+                    </span>
+                  )) : (
+                    <span className="text-gray-400 text-sm italic">Not selected</span>
+                  )}
+                </div>
+              </div>
+
+              {(hasWater || hasAir || hasHazardousWaste) && (
+                <div className="space-y-4">
+                  {hasWater && (
+                    <div>
+                      <div className="text-sm font-bold text-gray-700 mb-2">Water</div>
+                      <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="w-full text-left border-collapse">
+                          <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                            <tr>
+                              <th className="p-3 font-semibold border-b w-20">SR No</th>
+                              <th className="p-3 font-semibold border-b">Description (water consumption / waste)</th>
+                              <th className="p-3 font-semibold border-b w-48">Permitted quantity</th>
+                              <th className="p-3 font-semibold border-b w-24">UOM</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-sm divide-y divide-gray-100">
+                            {(waterRegs.length ? waterRegs : [{}]).map((row, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50">
+                                <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                <td className="p-3 text-gray-700">{row?.description || '-'}</td>
+                                <td className="p-3 text-gray-700">{row?.permittedQuantity || '-'}</td>
+                                <td className="p-3 text-gray-700">{row?.uom || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasAir && (
+                    <div>
+                      <div className="text-sm font-bold text-gray-700 mb-2">Air</div>
+                      <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="w-full text-left border-collapse">
+                          <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                            <tr>
+                              <th className="p-3 font-semibold border-b w-20">SR No</th>
+                              <th className="p-3 font-semibold border-b">Parameters</th>
+                              <th className="p-3 font-semibold border-b w-80">Permissible annual / daily limit</th>
+                              <th className="p-3 font-semibold border-b w-24">UOM</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-sm divide-y divide-gray-100">
+                            {(airRegs.length ? airRegs : [{}]).map((row, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50">
+                                <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                <td className="p-3 text-gray-700">{row?.parameter || '-'}</td>
+                                <td className="p-3 text-gray-700">{row?.permittedLimit || '-'}</td>
+                                <td className="p-3 text-gray-700">{row?.uom || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasHazardousWaste && (
+                    <div>
+                      <div className="text-sm font-bold text-gray-700 mb-2">Hazardous Waste</div>
+                      <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="w-full text-left border-collapse">
+                          <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                            <tr>
+                              <th className="p-3 font-semibold border-b w-20">SR No</th>
+                              <th className="p-3 font-semibold border-b">Name of Hazardous Waste</th>
+                              <th className="p-3 font-semibold border-b">Facility &amp; Mode of Disposal</th>
+                              <th className="p-3 font-semibold border-b w-40">Quantity MT/YR</th>
+                              <th className="p-3 font-semibold border-b w-24">UOM</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-sm divide-y divide-gray-100">
+                            {(hazardousRegs.length ? hazardousRegs : [{}]).map((row, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50">
+                                <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                <td className="p-3 text-gray-700">{row?.nameOfHazardousWaste || '-'}</td>
+                                <td className="p-3 text-gray-700">{row?.facilityModeOfDisposal || '-'}</td>
+                                <td className="p-3 text-gray-700">{row?.quantityMtYr || '-'}</td>
+                                <td className="p-3 text-gray-700">{row?.uom || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {capacityRows.length > 0 && (
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-50 text-gray-700 text-xs uppercase tracking-wider">
+                      <tr>
+                        <th className="p-3 font-semibold border-b">Product Name</th>
+                        <th className="p-3 font-semibold border-b">Machine name</th>
+                        <th className="p-3 font-semibold border-b">Production output in one HR</th>
+                        <th className="p-3 font-semibold border-b">UOM</th>
+                        <th className="p-3 font-semibold border-b">Power per hr KWH</th>
+                        <th className="p-3 font-semibold border-b">Machine working days</th>
+                        <th className="p-3 font-semibold border-b">Machine Total working hours per day</th>
+                        <th className="p-3 font-semibold border-b">Total monthly capacity (KG)</th>
+                        <th className="p-3 font-semibold border-b">Total monthly capacity (MT)</th>
+                        <th className="p-3 font-semibold border-b">Total electricity per month KWH</th>
+                        <th className="p-3 font-semibold border-b">Consent capacity</th>
+                        <th className="p-3 font-semibold border-b">UOM</th>
+                        <th className="p-3 font-semibold border-b">Utilization %</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm divide-y divide-gray-100">
+                      {capacityRows.map((r, idx) => {
+                        const fmt = (v) => {
+                          if (v === null || v === undefined) return '';
+                          const n = Number(v);
+                          if (!Number.isFinite(n)) return '';
+                          return (Math.round(n * 100) / 100).toString();
+                        };
+                        const uom = (r.uom || '').toString().trim().toUpperCase();
+                        const consentUom = (r.consentUom || uom || '').toString().trim().toUpperCase();
+                        const totalMonthlyCapacity = Number(r.totalMonthlyCapacity) || 0;
+                        const totalMonthlyCapacityMt = Number(r.totalMonthlyCapacityMt) || (uom === 'KG' ? totalMonthlyCapacity / 1000 : 0);
+                        const consentCapacity = Number(r.consentCapacity) || 0;
+                        const util = Number.isFinite(Number(r.utilizationPercent))
+                          ? Number(r.utilizationPercent)
+                          : (consentCapacity > 0
+                            ? (((uom === 'KG' && consentUom === 'MT') ? (totalMonthlyCapacity / 1000) : totalMonthlyCapacity) / consentCapacity) * 100
+                            : 0);
+                        const isHigh = util >= 100;
+                        return (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="p-3 text-gray-700">{r.productName || '-'}</td>
+                            <td className="p-3 text-gray-700">{r.machineName || '-'}</td>
+                            <td className="p-3 text-gray-700">{fmt(r.productionOutputPerHr)}</td>
+                            <td className="p-3 text-gray-700">{uom || '-'}</td>
+                            <td className="p-3 text-gray-700">{fmt(r.powerPerHrKwh)}</td>
+                            <td className="p-3 text-gray-700">{fmt(r.workingDays)}</td>
+                            <td className="p-3 text-gray-700">{fmt(r.workingHoursPerDay)}</td>
+                            <td className="p-3 text-gray-700">{fmt(totalMonthlyCapacity)}</td>
+                            <td className="p-3 text-gray-700">{uom === 'KG' ? fmt(totalMonthlyCapacityMt) : 'NA'}</td>
+                            <td className="p-3 text-gray-700">{fmt(r.totalElectricityConsumptionPerMonthKwh)}</td>
+                            <td className="p-3 text-gray-700">{fmt(consentCapacity)}</td>
+                            <td className="p-3 text-gray-700">{uom === 'KG' ? 'MT' : (consentUom || '-')}</td>
+                            <td className={`p-3 ${isHigh ? 'text-red-600 font-semibold' : 'text-gray-700'}`}>{fmt(util)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -1364,133 +1554,135 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                           </div>
                         </div>
 
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                            <div className="flex items-center gap-2">
-                              <div className="h-8 w-1 bg-emerald-500 rounded-full"></div>
-                              <h4 className="font-bold text-gray-800 text-sm md:text-base">
-                                Regulations Covered under CTO
-                              </h4>
+                        {initialViewMode !== 'client-connect' && (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <div className="h-8 w-1 bg-emerald-500 rounded-full"></div>
+                                <h4 className="font-bold text-gray-800 text-sm md:text-base">
+                                  Regulations Covered under CTO
+                                </h4>
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="mt-1 flex flex-wrap gap-2">
-                            {regs.length ? (
-                              regs.map(r => (
-                                <span
-                                  key={r}
-                                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                >
-                                  {r}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-gray-400 text-sm italic">Not selected</span>
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              {regs.length ? (
+                                regs.map(r => (
+                                  <span
+                                    key={r}
+                                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  >
+                                    {r}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-gray-400 text-sm italic">Not selected</span>
+                              )}
+                            </div>
+
+                            {hasWater && (
+                              <div className="mt-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="text-sm font-bold text-gray-700">Water</div>
+                                </div>
+                                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                  <table className="w-full text-left border-collapse">
+                                    <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                                      <tr>
+                                        <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                        <th className="p-3 font-semibold border-b">
+                                          Description (water consumption / waste)
+                                        </th>
+                                        <th className="p-3 font-semibold border-b w-48">Permitted quantity</th>
+                                        <th className="p-3 font-semibold border-b w-24">UOM</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="text-sm divide-y divide-gray-100">
+                                      {(waterRegs.length ? waterRegs : [{}]).map((row, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                          <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                          <td className="p-3 text-gray-700">{row.description || '-'}</td>
+                                          <td className="p-3 text-gray-700">{row.permittedQuantity || '-'}</td>
+                                          <td className="p-3 text-gray-700">{row.uom || '-'}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+
+                            {hasAir && (
+                              <div className="mt-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="text-sm font-bold text-gray-700">Air</div>
+                                </div>
+                                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                  <table className="w-full text-left border-collapse">
+                                    <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                                      <tr>
+                                        <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                        <th className="p-3 font-semibold border-b">Parameters</th>
+                                        <th className="p-3 font-semibold border-b w-80">
+                                          Permissible annual / daily limit
+                                        </th>
+                                        <th className="p-3 font-semibold border-b w-24">UOM</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="text-sm divide-y divide-gray-100">
+                                      {(airRegs.length ? airRegs : [{}]).map((row, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                          <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                          <td className="p-3 text-gray-700">{row.parameter || '-'}</td>
+                                          <td className="p-3 text-gray-700">{row.permittedLimit || '-'}</td>
+                                          <td className="p-3 text-gray-700">{row.uom || '-'}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+
+                            {hasHazardousWaste && (
+                              <div className="mt-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="text-sm font-bold text-gray-700">Hazardous Waste</div>
+                                </div>
+                                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                  <table className="w-full text-left border-collapse">
+                                    <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
+                                      <tr>
+                                        <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                        <th className="p-3 font-semibold border-b">Name of Hazardous Waste</th>
+                                        <th className="p-3 font-semibold border-b">
+                                          Facility &amp; Mode of Disposal
+                                        </th>
+                                        <th className="p-3 font-semibold border-b w-40">Quantity MT/YR</th>
+                                        <th className="p-3 font-semibold border-b w-24">UOM</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="text-sm divide-y divide-gray-100">
+                                      {(hazardousRegs.length ? hazardousRegs : [{}]).map((row, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                          <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                          <td className="p-3 text-gray-700">
+                                            {row.nameOfHazardousWaste || '-'}
+                                          </td>
+                                          <td className="p-3 text-gray-700">
+                                            {row.facilityModeOfDisposal || '-'}
+                                          </td>
+                                          <td className="p-3 text-gray-700">{row.quantityMtYr || '-'}</td>
+                                          <td className="p-3 text-gray-700">{row.uom || '-'}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
                             )}
                           </div>
-
-                          {hasWater && (
-                            <div className="mt-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="text-sm font-bold text-gray-700">Water</div>
-                              </div>
-                              <div className="overflow-x-auto rounded-lg border border-gray-200">
-                                <table className="w-full text-left border-collapse">
-                                  <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
-                                    <tr>
-                                      <th className="p-3 font-semibold border-b w-20">SR No</th>
-                                      <th className="p-3 font-semibold border-b">
-                                        Description (water consumption / waste)
-                                      </th>
-                                      <th className="p-3 font-semibold border-b w-48">Permitted quantity</th>
-                                      <th className="p-3 font-semibold border-b w-24">UOM</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="text-sm divide-y divide-gray-100">
-                                    {(waterRegs.length ? waterRegs : [{}]).map((row, idx) => (
-                                      <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
-                                        <td className="p-3 text-gray-700">{row.description || '-'}</td>
-                                        <td className="p-3 text-gray-700">{row.permittedQuantity || '-'}</td>
-                                        <td className="p-3 text-gray-700">{row.uom || '-'}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-
-                          {hasAir && (
-                            <div className="mt-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="text-sm font-bold text-gray-700">Air</div>
-                              </div>
-                              <div className="overflow-x-auto rounded-lg border border-gray-200">
-                                <table className="w-full text-left border-collapse">
-                                  <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
-                                    <tr>
-                                      <th className="p-3 font-semibold border-b w-20">SR No</th>
-                                      <th className="p-3 font-semibold border-b">Parameters</th>
-                                      <th className="p-3 font-semibold border-b w-80">
-                                        Permissible annual / daily limit
-                                      </th>
-                                      <th className="p-3 font-semibold border-b w-24">UOM</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="text-sm divide-y divide-gray-100">
-                                    {(airRegs.length ? airRegs : [{}]).map((row, idx) => (
-                                      <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
-                                        <td className="p-3 text-gray-700">{row.parameter || '-'}</td>
-                                        <td className="p-3 text-gray-700">{row.permittedLimit || '-'}</td>
-                                        <td className="p-3 text-gray-700">{row.uom || '-'}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-
-                          {hasHazardousWaste && (
-                            <div className="mt-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="text-sm font-bold text-gray-700">Hazardous Waste</div>
-                              </div>
-                              <div className="overflow-x-auto rounded-lg border border-gray-200">
-                                <table className="w-full text-left border-collapse">
-                                  <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
-                                    <tr>
-                                      <th className="p-3 font-semibold border-b w-20">SR No</th>
-                                      <th className="p-3 font-semibold border-b">Name of Hazardous Waste</th>
-                                      <th className="p-3 font-semibold border-b">
-                                        Facility &amp; Mode of Disposal
-                                      </th>
-                                      <th className="p-3 font-semibold border-b w-40">Quantity MT/YR</th>
-                                      <th className="p-3 font-semibold border-b w-24">UOM</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="text-sm divide-y divide-gray-100">
-                                    {(hazardousRegs.length ? hazardousRegs : [{}]).map((row, idx) => (
-                                      <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
-                                        <td className="p-3 text-gray-700">
-                                          {row.nameOfHazardousWaste || '-'}
-                                        </td>
-                                        <td className="p-3 text-gray-700">
-                                          {row.facilityModeOfDisposal || '-'}
-                                        </td>
-                                        <td className="p-3 text-gray-700">{row.quantityMtYr || '-'}</td>
-                                        <td className="p-3 text-gray-700">{row.uom || '-'}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
                     </div>
                   )}

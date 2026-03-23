@@ -125,11 +125,16 @@ export const unlockUserController = asyncHandler(async (req, res) => {
 export const updateUserRoleController = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const { roleId } = req.body;
-    const user = await UserModel.findByIdAndUpdate(userId, { role: roleId }, { new: true });
+    const user = await UserModel.findByIdAndUpdate(userId, { role: roleId }, { new: true }).populate('role');
     if (!user) {
         return res.status(404).json({ message: "User not found", error: true, success: false });
     }
-    return res.status(200).json({ message: "User role updated successfully", error: false, success: true });
+    return res.status(200).json({ 
+        message: "User role updated successfully", 
+        error: false, 
+        success: true,
+        data: user 
+    });
 });
 
 export const updateUserStatusController = asyncHandler(async (req, res) => {

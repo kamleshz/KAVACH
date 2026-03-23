@@ -13,7 +13,7 @@ const getBase64 = (file) =>
     reader.onerror = (error) => reject(error);
   });
 
-const MarkingLabeling = ({ clientId, API_URL, readOnly = false, isProducer = false, productRows = [] }) => {
+const MarkingLabeling = ({ clientId, API_URL, readOnly = false, isProducer = false, productRows = [], componentRows = [], isManagerRemarksReadOnly = false }) => {
     // Preview state for file uploads
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewImage, setPreviewImage] = useState('');
@@ -34,7 +34,7 @@ const MarkingLabeling = ({ clientId, API_URL, readOnly = false, isProducer = fal
         handleSkuPageSizeChange,
         handleSaveSkuCompliance: saveSkuRow,
         fetchSkuComplianceData
-    } = useSkuCompliance(clientId, isProducer, productRows);
+    } = useSkuCompliance(clientId, isProducer, productRows, componentRows);
 
     useEffect(() => {
         if (clientId) {
@@ -413,7 +413,7 @@ const MarkingLabeling = ({ clientId, API_URL, readOnly = false, isProducer = fal
                 const remarks = Array.isArray(record.remarks) ? record.remarks : (record.remarks ? [record.remarks] : []);
                 const val = remarks.join('\n');
                 return (
-                    readOnly ? (
+                    (readOnly || isManagerRemarksReadOnly) ? (
                         <div className="text-xs text-gray-600 whitespace-pre-wrap max-h-[60px] overflow-y-auto">{val || '-'}</div>
                     ) : (
                         <textarea

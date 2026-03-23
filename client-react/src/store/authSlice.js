@@ -28,7 +28,13 @@ export const verifyLoginOtp = createAsyncThunk('auth/verifyLoginOtp', async ({ e
     }
     return rejectWithValue(response.data?.message || 'OTP verification failed');
   } catch (error) {
-    return rejectWithValue(error?.response?.data?.message || 'OTP verification failed');
+    const data = error?.response?.data;
+    const message =
+      (data && typeof data === 'object' ? data.message : undefined) ||
+      (typeof data === 'string' ? data : undefined) ||
+      error?.message ||
+      'OTP verification failed';
+    return rejectWithValue(message);
   }
 });
 
@@ -44,7 +50,13 @@ export const login = createAsyncThunk('auth/login', async ({ email, password }, 
     }
     return rejectWithValue(response.data?.message || 'Login failed');
   } catch (error) {
-    return rejectWithValue(error?.response?.data?.message || 'Login failed');
+    const data = error?.response?.data;
+    const message =
+      (data && typeof data === 'object' ? data.message : undefined) ||
+      (typeof data === 'string' ? data : undefined) ||
+      error?.message ||
+      'Login failed';
+    return rejectWithValue(message);
   }
 });
 
@@ -133,4 +145,3 @@ const authSlice = createSlice({
 
 export const { clearAuthError, setUser } = authSlice.actions;
 export default authSlice.reducer;
-

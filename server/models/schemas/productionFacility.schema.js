@@ -92,6 +92,8 @@ const productionFacilitySchema = new mongoose.Schema({
             generate: { type: String, default: "No" },
             systemCode: { type: String, default: "" },
             packagingType: { type: String, default: "" },
+            clientName: { type: String, default: "" },
+            clientState: { type: String, default: "" },
             skuCode: { type: String, default: "" },
             skuDescription: { type: String, default: "" },
             skuUom: { type: String, default: "" },
@@ -99,6 +101,7 @@ const productionFacilitySchema = new mongoose.Schema({
             componentCode: { type: String, default: "" },
             componentDescription: { type: String, default: "" },
             supplierName: { type: String, default: "" },
+            supplierState: { type: String, default: "" },
             supplierType: { type: String, default: "" },
             generateSupplierCode: { type: String, default: "No" },
             supplierCode: { type: String, default: "" },
@@ -188,13 +191,22 @@ const productionFacilitySchema = new mongoose.Schema({
         },
         completedSteps: { type: [String], default: [] },
         productComplianceRows: [{
+            generate: { type: String, default: "No" },
+            systemCode: { type: String, default: "" },
             packagingType: { type: String, default: "" },
+            clientName: { type: String, default: "" },
+            clientState: { type: String, default: "" },
             skuCode: { type: String, default: "" },
             skuDescription: { type: String, default: "" },
             skuUom: { type: String, default: "" },
             productImage: { type: String, default: "" },
             componentCode: { type: String, default: "" },
             componentDescription: { type: String, default: "" },
+            supplierName: { type: String, default: "" },
+            supplierState: { type: String, default: "" },
+            supplierType: { type: String, default: "" },
+            generateSupplierCode: { type: String, default: "No" },
+            supplierCode: { type: String, default: "" },
             componentImage: { type: String, default: "" }
         }],
         productComponentDetails: [{
@@ -248,6 +260,21 @@ const productionFacilitySchema = new mongoose.Schema({
             document: { type: String, default: "" },
             remark: { type: String, default: "" }
         }
+    }],
+    ctoProductionCapacityValidation: [{
+        productName: { type: String, default: "" },
+        machineName: { type: String, default: "" },
+        productionOutputPerHr: { type: Number, default: 0 },
+        uom: { type: String, default: "" },
+        powerPerHrKwh: { type: Number, default: 0 },
+        workingDays: { type: Number, default: 0 },
+        workingHoursPerDay: { type: Number, default: 0 },
+        totalMonthlyCapacity: { type: Number, default: 0 },
+        totalMonthlyCapacityMt: { type: Number, default: 0 },
+        totalElectricityConsumptionPerMonthKwh: { type: Number, default: 0 },
+        consentCapacity: { type: Number, default: 0 },
+        consentUom: { type: String, default: "" },
+        utilizationPercent: { type: Number, default: 0 }
     }]
 });
 

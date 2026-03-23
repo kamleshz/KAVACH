@@ -313,6 +313,8 @@ class ClientService {
                 generate: r.generate || 'No',
                 systemCode: r.systemCode || '',
                 packagingType: r.packagingType || '',
+                clientName: r.clientName || '',
+                clientState: r.clientState || '',
                 industryCategory: r.industryCategory || '',
                 skuCode: r.skuCode || '',
                 skuDescription: r.skuDescription || '',
@@ -321,6 +323,7 @@ class ClientService {
                 componentCode: r.componentCode || '',
                 componentDescription: r.componentDescription || '',
                 supplierName: r.supplierName || '',
+                supplierState: r.supplierState || '',
                 supplierType: r.supplierType || '',
                 supplierCategory: r.supplierCategory || '',
                 generateSupplierCode: r.generateSupplierCode || 'No',
@@ -381,9 +384,9 @@ class ClientService {
             const hasNonEmpty = (r) => {
                 if (!r || typeof r !== 'object') return false;
                 const keysToCheck = [
-                    'systemCode','packagingType','industryCategory','skuCode','skuDescription','skuUom',
+                    'systemCode','packagingType','clientName','clientState','industryCategory','skuCode','skuDescription','skuUom',
                     'productImage','componentCode','componentDescription',
-                    'supplierName','supplierType','supplierCategory','generateSupplierCode','supplierCode',
+                    'supplierName','supplierState','supplierType','supplierCategory','generateSupplierCode','supplierCode',
                     'componentImage','thickness'
                 ];
                 return keysToCheck.some(k => {
@@ -431,7 +434,7 @@ class ClientService {
 
             const refreshedDoc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
             const afterRow = refreshedDoc?.rows?.[idx] || {};
-            const allFields = ['generate', 'systemCode', 'packagingType', 'industryCategory', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage', 'thickness', 'auditorRemarks', 'clientRemarks', 'componentComplianceStatus', 'managerRemarks'];
+            const allFields = ['generate', 'systemCode', 'packagingType', 'clientName', 'clientState', 'industryCategory', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage', 'thickness', 'auditorRemarks', 'clientRemarks', 'componentComplianceStatus', 'managerRemarks'];
             pushDiffs('Product Compliance', idx + 1, beforeRow, afterRow, allFields);
             doc = refreshedDoc || doc;
 
@@ -499,6 +502,8 @@ class ClientService {
                     generate: mergeField(incomingRow.generate, baseRow.generate),
                     systemCode: mergeField(incomingRow.systemCode, baseRow.systemCode),
                     packagingType: mergeField(incomingRow.packagingType, baseRow.packagingType),
+                    clientName: mergeField(incomingRow.clientName, baseRow.clientName),
+                    clientState: mergeField(incomingRow.clientState, baseRow.clientState),
                     industryCategory: mergeField(incomingRow.industryCategory, baseRow.industryCategory),
                     skuCode: mergeField(incomingRow.skuCode, baseRow.skuCode),
                     skuDescription: mergeField(incomingRow.skuDescription, baseRow.skuDescription),
@@ -507,6 +512,7 @@ class ClientService {
                     componentCode: mergeField(incomingRow.componentCode, baseRow.componentCode),
                     componentDescription: mergeField(incomingRow.componentDescription, baseRow.componentDescription),
                     supplierName: mergeField(incomingRow.supplierName, baseRow.supplierName),
+                    supplierState: mergeField(incomingRow.supplierState, baseRow.supplierState),
                     supplierType: mergeField(incomingRow.supplierType, baseRow.supplierType),
                     supplierCategory: mergeField(incomingRow.supplierCategory, baseRow.supplierCategory),
                     generateSupplierCode: mergeField(incomingRow.generateSupplierCode, baseRow.generateSupplierCode),
@@ -541,7 +547,7 @@ class ClientService {
 
             const maxLen = Math.max(beforeRows.length, afterRows.length);
             for (let i = 0; i < maxLen; i += 1) {
-                pushDiffs('Product Compliance', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['generate', 'systemCode', 'packagingType', 'industryCategory', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierCategory', 'componentImage']);
+                pushDiffs('Product Compliance', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['generate', 'systemCode', 'packagingType', 'clientName', 'clientState', 'industryCategory', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage']);
             }
             doc.rows = afterRows;
         }

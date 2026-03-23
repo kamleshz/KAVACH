@@ -34,8 +34,9 @@ const useAuth = () => {
     return userRole === roleName;
   };
 
-  const isAdmin = hasRole('ADMIN');
+  const isAdmin = hasRole('ADMIN') || hasRole('SUPER ADMIN');
   const isManager = hasRole('MANAGER');
+  const isSuperAdmin = hasRole('SUPER ADMIN');
 
   return {
     user,
@@ -51,7 +52,8 @@ const useAuth = () => {
     clearAuthError,
     hasRole,
     isAdmin,
-    isManager
+    isManager,
+    isSuperAdmin
   };
 };
 

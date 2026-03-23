@@ -758,6 +758,8 @@ const SummaryReport = ({
                     API_URL={import.meta.env.VITE_API_URL} 
                     isProducer={isProducer}
                     productRows={productRows}
+                    componentRows={componentRows}
+                    isManagerRemarksReadOnly={isManagerRemarksReadOnly}
                 />
             )
         },
