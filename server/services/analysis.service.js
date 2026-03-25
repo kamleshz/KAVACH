@@ -924,6 +924,15 @@ class AnalysisService {
             return null;
         };
 
+        const pickText = (...values) => {
+            for (const v of values) {
+                if (v === undefined || v === null) continue;
+                const s = v.toString().trim();
+                if (s) return s;
+            }
+            return '';
+        };
+
         allRows.forEach(row => {
             const cat = row.industryCategory || 'General';
             if (!industryMap[cat]) industryMap[cat] = {}; // Changed to Object for SKU grouping
@@ -945,6 +954,73 @@ class AnalysisService {
                     const procRecords = procurementDetails.filter(p => (p.componentCode || '').trim() === compCode);
                     const totalMonthlyPurchaseMt = procRecords.reduce((sum, p) => sum + (p.monthlyPurchaseMt || 0), 0);
                     const totalRecycledQty = procRecords.reduce((sum, p) => sum + (p.recycledQty || 0), 0);
+                    let recycledPolymerUsed = pickText(
+                        row.recycledPolymerUsed,
+                        row.recycled_polymer_used,
+                        row['Recycled Polymer Used'],
+                        compDetail.recycledPolymerUsed,
+                        compDetail.recycled_polymer_used,
+                        compDetail['Recycled Polymer Used']
+                    );
+                    if (!recycledPolymerUsed) {
+                        for (const p of procRecords) {
+                            recycledPolymerUsed = pickText(
+                                p.recycledPolymerUsed,
+                                p.recycled_polymer_used,
+                                p['Recycled Polymer Used']
+                            );
+                            if (recycledPolymerUsed) break;
+                        }
+                    }
+                    if (!recycledPolymerUsed) recycledPolymerUsed = '-';
+
+                    let polymerType = pickText(
+                        row.polymerType,
+                        row['Polymer Type'],
+                        compDetail.polymerType,
+                        compDetail['Polymer Type']
+                    );
+                    if (!polymerType) {
+                        for (const p of procRecords) {
+                            polymerType = pickText(p.polymerType, p['Polymer Type']);
+                            if (polymerType) break;
+                        }
+                    }
+                    if (!polymerType) polymerType = '-';
+
+                    let componentPolymer = pickText(
+                        row.componentPolymer,
+                        row.component_polymer,
+                        row['Component Polymer'],
+                        row.componentPolymerType,
+                        row['Component Polymer Type'],
+                        row.polymer,
+                        row['Polymer'],
+                        compDetail.componentPolymer,
+                        compDetail.component_polymer,
+                        compDetail['Component Polymer'],
+                        compDetail.componentPolymerType,
+                        compDetail['Component Polymer Type'],
+                        compDetail.polymer,
+                        compDetail['Polymer']
+                    );
+                    if (!componentPolymer) {
+                        for (const p of procRecords) {
+                            componentPolymer = pickText(
+                                p.componentPolymer,
+                                p.component_polymer,
+                                p['Component Polymer'],
+                                p.componentPolymerType,
+                                p['Component Polymer Type'],
+                                p.polymer,
+                                p['Polymer'],
+                                p.polymerType,
+                                p['Polymer Type']
+                            );
+                            if (componentPolymer) break;
+                        }
+                    }
+                    if (!componentPolymer) componentPolymer = polymerType || '-';
 
                     industryMap[cat][compCode] = {
                         isComponent: true, // Flag to identify this is a component object, not SKU
@@ -953,9 +1029,11 @@ class AnalysisService {
                         componentImage: componentImgSrc,
                         supplierName: row.supplierName || suppComp.supplierName || '-',
                         supplierStatus: suppComp.supplierStatus || '-',
+                        supplierState: row.supplierState || suppComp.supplierState || '-',
                         eprCertificateNumber: suppComp.eprCertificateNumber || '-',
-                        polymerType: row.polymerType || compDetail.polymerType || '-',
-                        componentPolymer: row.componentPolymer || compDetail.componentPolymer || '-',
+                        polymerType,
+                        componentPolymer,
+                        recycledPolymerUsed,
                         category: compDetail.category || row.category || '-', 
                         thickness: compDetail.thickness || '-',
                         monthlyPurchaseMt: totalMonthlyPurchaseMt.toFixed(4),
@@ -1010,6 +1088,73 @@ class AnalysisService {
                 const procRecords = procurementDetails.filter(p => (p.componentCode || '').trim() === compCode);
                 const totalMonthlyPurchaseMt = procRecords.reduce((sum, p) => sum + (p.monthlyPurchaseMt || 0), 0);
                 const totalRecycledQty = procRecords.reduce((sum, p) => sum + (p.recycledQty || 0), 0);
+                let recycledPolymerUsed = pickText(
+                    row.recycledPolymerUsed,
+                    row.recycled_polymer_used,
+                    row['Recycled Polymer Used'],
+                    compDetail.recycledPolymerUsed,
+                    compDetail.recycled_polymer_used,
+                    compDetail['Recycled Polymer Used']
+                );
+                if (!recycledPolymerUsed) {
+                    for (const p of procRecords) {
+                        recycledPolymerUsed = pickText(
+                            p.recycledPolymerUsed,
+                            p.recycled_polymer_used,
+                            p['Recycled Polymer Used']
+                        );
+                        if (recycledPolymerUsed) break;
+                    }
+                }
+                if (!recycledPolymerUsed) recycledPolymerUsed = '-';
+
+                let polymerType = pickText(
+                    row.polymerType,
+                    row['Polymer Type'],
+                    compDetail.polymerType,
+                    compDetail['Polymer Type']
+                );
+                if (!polymerType) {
+                    for (const p of procRecords) {
+                        polymerType = pickText(p.polymerType, p['Polymer Type']);
+                        if (polymerType) break;
+                    }
+                }
+                if (!polymerType) polymerType = '-';
+
+                let componentPolymer = pickText(
+                    row.componentPolymer,
+                    row.component_polymer,
+                    row['Component Polymer'],
+                    row.componentPolymerType,
+                    row['Component Polymer Type'],
+                    row.polymer,
+                    row['Polymer'],
+                    compDetail.componentPolymer,
+                    compDetail.component_polymer,
+                    compDetail['Component Polymer'],
+                    compDetail.componentPolymerType,
+                    compDetail['Component Polymer Type'],
+                    compDetail.polymer,
+                    compDetail['Polymer']
+                );
+                if (!componentPolymer) {
+                    for (const p of procRecords) {
+                        componentPolymer = pickText(
+                            p.componentPolymer,
+                            p.component_polymer,
+                            p['Component Polymer'],
+                            p.componentPolymerType,
+                            p['Component Polymer Type'],
+                            p.polymer,
+                            p['Polymer'],
+                            p.polymerType,
+                            p['Polymer Type']
+                        );
+                        if (componentPolymer) break;
+                    }
+                }
+                if (!componentPolymer) componentPolymer = polymerType || '-';
     
                 // Resolve Component Image
                 const componentImgSrc = resolveImage(row.componentImage);
@@ -1021,8 +1166,9 @@ class AnalysisService {
                     supplierName: row.supplierName || suppComp.supplierName || '-',
                     supplierStatus: suppComp.supplierStatus || '-',
                     eprCertificateNumber: suppComp.eprCertificateNumber || '-',
-                    polymerType: row.polymerType || compDetail.polymerType || '-',
-                    componentPolymer: row.componentPolymer || compDetail.componentPolymer || '-',
+                    polymerType,
+                    componentPolymer,
+                    recycledPolymerUsed,
                     category: compDetail.category || row.category || '-', 
                     categoryIIType: compDetail.categoryIIType || '-',
                     containerCapacity: compDetail.containerCapacity || '-',
@@ -1584,6 +1730,8 @@ class AnalysisService {
 
         const templateData = {
             isProducer,
+            isBrandOwner: !isProducer,
+            entityType: clientDoc.entityType || 'Brand Owner',
             generatedDate: new Date().toLocaleString(),
             engagementContent,
             basicInfo,

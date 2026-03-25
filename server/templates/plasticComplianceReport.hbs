@@ -401,22 +401,20 @@
     <div class="page-break">
         <div class="report-header">
             <div class="company-name">{{basicInfo.clientName}}</div>
-            <div class="report-title">Table of Contents</div>
+            <div class="report-title">{{#if isProducer}}Producer Pre-Validation Report{{else}}Brand Owner Compliance Report{{/if}}</div>
+            <div style="margin-top: 10px; display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
+                {{#if isProducer}}background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;
+                {{else}}background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa;{{/if}}">
+                {{entityType}}
+            </div>
         </div>
 
         <div class="toc-container">
-            <!-- 1. Engagement Letter -->
             <div class="toc-item">
-                <a href="#engagement" class="toc-main-link">
-                    <span>1. Engagement Letter</span>
-                </a>
+                <a href="#engagement" class="toc-main-link"><span>1. Engagement Letter</span></a>
             </div>
-
-            <!-- 2. Client Data -->
             <div class="toc-item">
-                <a href="#client-data" class="toc-main-link">
-                    <span>2. Client Data</span>
-                </a>
+                <a href="#client-data" class="toc-main-link"><span>2. Client Data</span></a>
                 <div class="toc-sub-list">
                     <a href="#client-basic-info" class="toc-sub-link">2.1 Client Basic Information</a>
                     <a href="#address-details" class="toc-sub-link">2.2 Address Details</a>
@@ -424,45 +422,38 @@
                     <a href="#company-documents" class="toc-sub-link">2.4 Company Documents</a>
                 </div>
             </div>
-
-            <!-- 3. Plant & Consent Details -->
             <div class="toc-item">
-                <a href="#plant-details" class="toc-main-link">
-                    <span>3. Plant & Consent Details</span>
-                </a>
+                <a href="#plant-details" class="toc-main-link"><span>3. Plant & Consent Details</span></a>
             </div>
-
-            <!-- 4. Industry Category -->
             <div class="toc-item">
                 <a href="#industry-category" class="toc-main-link">
-                    <span>4. Industry Category Wise Details (SKU & Component Analysis)</span>
+                    <span>4. {{#if isProducer}}Category Wise Component Analysis{{else}}Industry Category Wise Details (SKU & Component Analysis){{/if}}</span>
                 </a>
             </div>
-
-            <!-- 5. Marking and Labeling -->
+            {{#if isBrandOwner}}
             <div class="toc-item">
-                <a href="#marking-labeling" class="toc-main-link">
-                    <span>5. Marking and Labeling Report</span>
-                </a>
+                <a href="#marking-labeling" class="toc-main-link"><span>5. Marking and Labeling Report</span></a>
             </div>
-
-            <!-- 6. Summary Report -->
+            {{/if}}
             <div class="toc-item">
                 <a href="#summary-report" class="toc-main-link">
-                    <span>6. Summary Report</span>
+                    <span>{{#if isBrandOwner}}6{{else}}5{{/if}}. Summary Report</span>
                 </a>
                 <div class="toc-sub-list">
+                    {{#if isBrandOwner}}
                     <a href="#sales-summary" class="toc-sub-link">6.1 Sales Summary</a>
                     <a href="#procurement-summary" class="toc-sub-link">6.2 Procurement Summary</a>
                     <a href="#pre-post-analysis" class="toc-sub-link">6.3 Pre vs Post Consumer Waste Analysis</a>
                     <a href="#epr-targets" class="toc-sub-link">6.4 EPR Targets</a>
+                    {{else}}
+                    <a href="#procurement-summary" class="toc-sub-link">5.1 Procurement Summary</a>
+                    <a href="#epr-targets" class="toc-sub-link">5.2 EPR Targets (Producer)</a>
+                    {{/if}}
                 </div>
             </div>
-
-            <!-- 7. Auditor Insights -->
             <div class="toc-item">
                 <a href="#auditor-insights" class="toc-main-link">
-                    <span>7. Auditor Insights</span>
+                    <span>{{#if isBrandOwner}}7{{else}}6{{/if}}. Auditor Insights</span>
                 </a>
             </div>
         </div>
@@ -496,7 +487,7 @@
     <!-- PAGE 3: PRE-VALIDATION REPORT START -->
     <div class="report-header" id="client-data">
         <div class="company-name">{{basicInfo.clientName}}</div>
-        <div class="report-title">Pre-validation Report</div>
+        <div class="report-title">{{#if isProducer}}Producer Pre-Validation Report{{else}}Brand Owner Compliance Report{{/if}}</div>
         <div style="font-size: 10px; color: #6b7280; margin-top: 8px; font-weight: 500;">Generated on: {{generatedDate}}</div>
     </div>
 
@@ -938,6 +929,10 @@
                                                 <td style="padding: 4px 0;">{{this.componentPolymer}}</td>
                                             </tr>
                                             <tr style="border-bottom: 1px solid #f3f4f6;">
+                                                <td style="font-weight:bold; padding: 4px 0;">Recycled Polymer Used:</td>
+                                                <td style="padding: 4px 0;">{{this.recycledPolymerUsed}}</td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #f3f4f6;">
                                                 <td style="font-weight:bold; padding: 4px 0;">Category:</td>
                                                 <td style="padding: 4px 0;">{{this.category}}</td>
                                             </tr>
@@ -1029,8 +1024,10 @@
                                         <th style="width: 8%;">Comp Code</th>
                                         <th style="width: 15%;">Description</th>
                                         <th style="width: 10%;">Supplier</th>
+                                        <th style="width: 8%;">Supplier State</th>
                                         <th style="width: 8%;">Supplier Status</th>
                                         <th style="width: 8%;">Polymer</th>
+                                        <th style="width: 10%;">Recycled Polymer Used</th>
                                         <th style="width: 8%;">Category</th>
                                         <th style="width: 8%;">Thickness</th>
                                         <th style="width: 8%;">Compliance</th>
@@ -1042,8 +1039,10 @@
                                         <td>{{this.componentCode}}</td>
                                         <td>{{this.componentDescription}}</td>
                                         <td>{{this.supplierName}}</td>
+                                        <td>{{this.supplierState}}</td>
                                         <td>{{this.supplierStatus}}</td>
                                         <td>{{this.componentPolymer}}</td>
+                                        <td>{{this.recycledPolymerUsed}}</td>
                                         <td>{{this.category}}</td>
                                         <td>{{this.thickness}}</td>
                                         <td>
@@ -1111,7 +1110,8 @@
             {{/each}}
         {{/if}}
 
-    <!-- Marking and Labeling Report -->
+    <!-- Marking and Labeling Report (Brand Owner Only) -->
+    {{#if isBrandOwner}}
     <div class="page-break" id="marking-labeling">
         <div class="report-header" style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-bottom-color: #059669;">
             <div class="company-name" style="color: #065f46;">Marking and Labeling Report</div>
@@ -1235,15 +1235,17 @@
             {{/if}}
         </div>
     </div>
+    {{/if}}
 
-    <!-- 7. Phase 3: Summary Reports -->
+    <!-- Summary Reports -->
     <div class="page-break" id="summary-report">
         <div class="report-header">
             <div class="company-name">Summary Report</div>
-            <div class="report-title">Sales, Procurement & Consumption Analysis</div>
+            <div class="report-title">{{#if isProducer}}Procurement & EPR Target Analysis{{else}}Sales, Procurement & Consumption Analysis{{/if}}</div>
         </div>
 
-        <!-- Sales Summary -->
+        <!-- Sales Summary (Brand Owner Only) -->
+        {{#if isBrandOwner}}
         <div class="section" id="sales-summary">
             <div class="section-title">Sales Summary</div>
             {{#if salesSummary.data.length}}
@@ -1288,6 +1290,7 @@
             <div class="card" style="text-align: center;">No Sales Data Available</div>
             {{/if}}
         </div>
+        {{/if}}
 
         <!-- Purchase Summary -->
         <div class="section" id="procurement-summary">
@@ -1335,7 +1338,8 @@
             {{/if}}
         </div>
 
-        <!-- Pre/Post Consumption Summary -->
+        <!-- Pre/Post Consumption Summary (Brand Owner Only) -->
+        {{#if isBrandOwner}}
         <div class="section" id="pre-post-analysis">
             <div class="section-title">Pre vs Post Consumer Waste Analysis</div>
             {{#if prePostSummary.length}}
@@ -1367,6 +1371,7 @@
             <div class="card" style="text-align: center;">No Analysis Data Available</div>
             {{/if}}
         </div>
+        {{/if}}
 
         <!-- Target Tables -->
         {{#if targetTables.length}}
@@ -1419,12 +1424,14 @@
                     </div>
                     <div style="padding: 14px 16px; font-size: 10px; color: #334155; line-height: 1.6;">{{auditorInsights.targets}}</div>
                 </div>
+                {{#if isBrandOwner}}
                 <div style="border: 1px solid #bfdbfe; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 6px rgba(37,99,235,0.08);">
                     <div style="background: linear-gradient(135deg, #eff6ff, #dbeafe); padding: 10px 16px; border-bottom: 2px solid #93c5fd;">
                         <strong style="color: #1e40af; font-size: 11px; letter-spacing: 0.5px;">SALES</strong>
                     </div>
                     <div style="padding: 14px 16px; font-size: 10px; color: #334155; line-height: 1.6;">{{auditorInsights.sales}}</div>
                 </div>
+                {{/if}}
                 <div style="border: 1px solid #bfdbfe; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 6px rgba(37,99,235,0.08);">
                     <div style="background: linear-gradient(135deg, #eff6ff, #dbeafe); padding: 10px 16px; border-bottom: 2px solid #93c5fd;">
                         <strong style="color: #1e40af; font-size: 11px; letter-spacing: 0.5px;">PROCUREMENT</strong>

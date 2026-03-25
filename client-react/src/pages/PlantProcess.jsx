@@ -209,6 +209,59 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     if (parts.length > 0) return parts[0].substring(0, 3).toUpperCase();
     return 'UNK';
   };
+  const getStateShortName = (name) => {
+    if (!name) return 'NA';
+    const s = name.trim();
+    if (!s) return 'NA';
+    return s.substring(0, 3).toUpperCase();
+  };
+
+  const getSupplierCodePrefix = (supplierName, supplierState, companyName) => {
+    const supplierShortName = getSupplierShortName(supplierName);
+    const companyShortName = getCompanyShortName(companyName);
+    const supplierStateShort = getStateShortName(supplierState);
+    return `${supplierShortName}/${companyShortName}/${supplierStateShort}/`;
+  };
+
+  const generateNextSupplierCode = (rows, prefix, excludeIndex) => {
+    let maxNum = 0;
+    (rows || []).forEach((r, i) => {
+      if (i === excludeIndex) return;
+      const code = (r?.supplierCode || '').trim();
+      if (!code.startsWith(prefix)) return;
+      const numPart = code.substring(prefix.length);
+      if (/^\d+$/.test(numPart)) {
+        const num = parseInt(numPart, 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+      }
+    });
+    const nextNum = maxNum + 1;
+    return `${prefix}${nextNum.toString().padStart(3, '0')}`;
+  };
+
+  const ensureSupplierCodeWithState = (rows, row, excludeIndex) => {
+    if (!row || row.generateSupplierCode !== 'No') return (row?.supplierCode || '').trim();
+    const supplierName = (row.supplierName || '').trim();
+    if (!supplierName) return (row.supplierCode || '').trim();
+
+    const prefix = getSupplierCodePrefix(row.supplierName, row.supplierState, client?.clientName);
+    const currentCode = (row.supplierCode || '').trim();
+    if (currentCode && currentCode.startsWith(prefix)) return currentCode;
+
+    const supplierNameLower = supplierName.toLowerCase();
+    const stateShort = getStateShortName(row.supplierState);
+    const match = (rows || []).find((r, i) => {
+      if (i === excludeIndex) return false;
+      const nameLower = ((r?.supplierName || '').trim()).toLowerCase();
+      if (!nameLower || nameLower !== supplierNameLower) return false;
+      if (getStateShortName(r?.supplierState) !== stateShort) return false;
+      const code = (r?.supplierCode || '').trim();
+      return code && code.startsWith(prefix);
+    });
+    if (match?.supplierCode) return match.supplierCode;
+
+    return generateNextSupplierCode(rows, prefix, excludeIndex);
+  };
 
   const [productRows, setProductRows] = useState([]);
   const [lastSavedRows, setLastSavedRows] = useState([]);
@@ -256,6 +309,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
   const componentOptions = useMemo(() => {
     const map = new Map();
     productRows.forEach(r => {
+      if (!r) return;
       const code = (r.componentCode || '').trim();
       if (code) {
         if (!map.has(code)) {
@@ -269,6 +323,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
   const systemCodeOptions = useMemo(() => {
     const uniqueMap = new Map();
     productRows.forEach(r => {
+      if (!r) return;
       const code = (r.systemCode || '').trim();
       if (!code) return;
       const existing = uniqueMap.get(code) || {
@@ -277,7 +332,9 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         componentCode: '',
         componentDescription: '',
         supplierName: '',
+        supplierState: '',
         supplierType: '',
+        supplierCategory: '',
         polymerType: '',
         componentPolymer: '',
         category: ''
@@ -286,7 +343,9 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       if (!existing.componentCode && r.componentCode) existing.componentCode = r.componentCode;
       if (!existing.componentDescription && r.componentDescription) existing.componentDescription = r.componentDescription;
       if (!existing.supplierName && r.supplierName) existing.supplierName = r.supplierName;
+      if (!existing.supplierState && r.supplierState) existing.supplierState = r.supplierState;
       if (!existing.supplierType && r.supplierType) existing.supplierType = r.supplierType;
+      if (!existing.supplierCategory && r.supplierCategory) existing.supplierCategory = r.supplierCategory;
       uniqueMap.set(code, existing);
     });
     componentRows.forEach(r => {
@@ -298,7 +357,9 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         componentCode: '',
         componentDescription: '',
         supplierName: '',
+        supplierState: '',
         supplierType: '',
+        supplierCategory: '',
         polymerType: '',
         componentPolymer: '',
         category: ''
@@ -307,6 +368,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       if (!existing.componentCode && r.componentCode) existing.componentCode = r.componentCode;
       if (!existing.componentDescription && r.componentDescription) existing.componentDescription = r.componentDescription;
       if (!existing.supplierName && r.supplierName) existing.supplierName = r.supplierName;
+      if (!existing.supplierState && r.supplierState) existing.supplierState = r.supplierState;
       if (r.polymerType) existing.polymerType = r.polymerType;
       if (r.componentPolymer) existing.componentPolymer = r.componentPolymer;
       if (r.category) existing.category = r.category;
@@ -423,16 +485,20 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
           }
       }
 
-      // If Supplier Name changes and Generate Supplier Code is 'No', regenerate Supplier Code
-      if (updatedRow.generateSupplierCode === 'No' && field === 'supplierName') {
+      // If Supplier Name/State changes and Generate Supplier Code is 'No', regenerate Supplier Code
+      if (updatedRow.generateSupplierCode === 'No' && (field === 'supplierName' || field === 'supplierState')) {
           const supplierName = (updatedRow.supplierName || '').trim();
+          const supplierShortName = getSupplierShortName(updatedRow.supplierName);
+          const companyShortName = getCompanyShortName(client?.clientName);
+          const stateShort = getStateShortName(updatedRow.supplierState);
+          const prefix = `${supplierShortName}/${companyShortName}/${stateShort}/`;
           
           let existingCode = '';
           if (supplierName) {
             const match = copy.find((r, i) => 
                 i !== index && 
                 (r.supplierName || '').trim().toLowerCase() === supplierName.toLowerCase() && 
-                (r.supplierCode || '').trim()
+                (r.supplierCode || '').trim().startsWith(prefix)
             );
             if (match) {
                 existingCode = match.supplierCode;
@@ -442,10 +508,6 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
           if (existingCode) {
               updatedRow.supplierCode = existingCode;
           } else {
-              const supplierShortName = getSupplierShortName(updatedRow.supplierName);
-              const companyShortName = getCompanyShortName(client?.clientName);
-              const prefix = `${supplierShortName}/${companyShortName}/`;
-              
               let maxNum = 0;
               copy.forEach((r, i) => {
                   const code = (r.supplierCode || '').trim();
@@ -670,14 +732,16 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       } else if (value === 'No') {
         const row = copy[index];
         const supplierName = (row.supplierName || '').trim();
+        const supplierStateShort = getStateShortName(row.supplierState);
         
         // 1. Check if Supplier Name exists in other rows and has a valid Supplier Code
         let existingCode = '';
         if (supplierName) {
+            const prefix = `${getSupplierShortName(row.supplierName)}/${getCompanyShortName(client?.clientName)}/${supplierStateShort}/`;
             const match = prev.find((r, i) => 
                 i !== index && 
                 (r.supplierName || '').trim().toLowerCase() === supplierName.toLowerCase() && 
-                (r.supplierCode || '').trim()
+                (r.supplierCode || '').trim().startsWith(prefix)
             );
             if (match) {
                 existingCode = match.supplierCode;
@@ -690,7 +754,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             const supplierShortName = getSupplierShortName(row.supplierName);
             const companyShortName = getCompanyShortName(client?.clientName);
             
-            const prefix = `${supplierShortName}/${companyShortName}/`;
+            const prefix = `${supplierShortName}/${companyShortName}/${supplierStateShort}/`;
             
             let maxNum = 0;
             
@@ -752,7 +816,9 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
   const generateSupplierCodeForBulk = (currentRows, supplierName, clientName) => {
       const supplierShortName = getSupplierShortName(supplierName);
       const companyShortName = getCompanyShortName(clientName);
-      const prefix = `${supplierShortName}/${companyShortName}/`;
+      const sampleRow = (currentRows || []).find(r => (r.supplierName || '').trim().toLowerCase() === (supplierName || '').trim().toLowerCase());
+      const stateShort = getStateShortName(sampleRow?.supplierState);
+      const prefix = `${supplierShortName}/${companyShortName}/${stateShort}/`;
       
       let maxNum = 0;
       currentRows.forEach((r) => {
@@ -886,7 +952,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 'Component Code': row.componentCode,
                 'Component Description': row.componentDescription,
                 'Supplier Name': row.supplierName,
-                ...(isProducer ? { 'Supplier State': row.supplierState || '' } : {}),
+                'Supplier State': row.supplierState || '',
                 'Supplier Type': row.supplierType || '',
                 'Supplier Category': row.supplierCategory || '',
                 'Generate Supplier Code': row.generateSupplierCode || 'No',
@@ -918,7 +984,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             !isManager ? 'System Code' : null,
             'Component Description',
             'Supplier Name',
-            isProducer ? 'Supplier State' : null,
+            'Supplier State',
             'Supplier Type',
             'Supplier Category',
             'Generate Supplier Code',
@@ -988,19 +1054,19 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 {
                     type: 'list',
                     allowBlank: true,
-                    sqref: 'J2:J500',
+                    sqref: 'K2:K500',
                     formulae: ['"Contract Manufacture,Co-Processer,Co-Packaging,Not Applicable"']
                 },
                 {
                     type: 'list',
                     allowBlank: true,
-                    sqref: 'K2:K500',
+                    sqref: 'L2:L500',
                     formulae: ['"Producer,Importer,Brand Owner"']
                 },
                 {
                     type: 'list',
                     allowBlank: true,
-                    sqref: 'L2:L500',
+                    sqref: 'M2:M500',
                     formulae: ['"Yes,No"']
                 }
             ];
@@ -1020,15 +1086,19 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         const isProducer = client?.entityType === 'Producer';
 
         const exportData = supplierRows.map((row) => {
-            const data = {
+            const data = isProducer ? {
                 'Component Code': row.componentCode,
                 'Component Description': row.componentDescription,
                 'Name of Supplier': row.supplierName,
+                'Supplier Type': row.supplierType,
+                'Supplier State': row.supplierState || '',
+                'Application Type': row.applicationType
+            } : {
+                'Component Code': row.componentCode,
+                'Component Description': row.componentDescription,
+                'Name of Supplier': row.supplierName,
+                'Supplier State': row.supplierState || ''
             };
-            
-            if (isProducer) {
-                data['Supplier Type'] = row.supplierType;
-            }
 
             Object.assign(data, {
                 'Supplier Status': row.supplierStatus,
@@ -1061,25 +1131,47 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             'Component Description',
             'Name of Supplier',
             isProducer ? 'Supplier Type' : null,
+            'Supplier State',
             'Supplier Status',
+            isProducer ? 'Application Type' : null,
             'Food Grade',
             'EPR Certificate Number',
             'FSSAI Lic No'
         ].filter(Boolean);
 
         const ws = XLSX.utils.aoa_to_sheet([headers]);
+        const colLetter = (colIndex) => {
+            let n = colIndex + 1;
+            let s = '';
+            while (n > 0) {
+                const m = (n - 1) % 26;
+                s = String.fromCharCode(65 + m) + s;
+                n = Math.floor((n - 1) / 26);
+            }
+            return s;
+        };
+        const headerIndex = (label) => headers.findIndex((h) => (h || '').toString().trim().toLowerCase() === label.toLowerCase());
+        const statusCol = headerIndex('Supplier Status');
+        const foodCol = headerIndex('Food Grade');
+        const appCol = headerIndex('Application Type');
         ws['!dataValidation'] = [
             {
                 type: 'list',
                 allowBlank: true,
-                sqref: 'E2:E500',
+                sqref: statusCol >= 0 ? `${colLetter(statusCol)}2:${colLetter(statusCol)}500` : 'A1:A1',
                 formulae: ['"Registered,Unregistered"']
             },
+            ...(appCol >= 0 ? [{
+                type: 'list',
+                allowBlank: true,
+                sqref: `${colLetter(appCol)}2:${colLetter(appCol)}500`,
+                formulae: ['"Liquid,Solid"']
+            }] : []),
             {
                 type: 'list',
                 allowBlank: true,
-                sqref: 'F2:F500',
-                formulae: ['"Yes,No"']
+                sqref: foodCol >= 0 ? `${colLetter(foodCol)}2:${colLetter(foodCol)}500` : 'A1:A1',
+                formulae: ['"Food,Non Food"']
             }
         ];
 
@@ -1126,8 +1218,28 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 let skuDescription = getValue([/sku.*desc/i]);
                 let skuUom = getValue([/sku.*uom/i, /uom/i]);
                 // Generate: matches "generate", but exclude "supplier" to avoid confusing with "Generate Supplier Code"
-                let generate = getValue([/^generate\s*component\s*code/i, /^generate(?!.*supplier)/i, /^generate$/i]) || 'No';
-                let componentCode = getValue([/component.*code/i]);
+                let generate = getValue([/^generate\s*component\s*code/i, /^generate(?!.*supplier)/i, /^generate$/i]);
+                
+                // Be very strict about matching exactly "Component Code"
+                let componentCode = getValue([/^component\s*code$/i, /^componentCode$/i]);
+                if (!componentCode) {
+                     // Fallback if header is slightly dirty but definitely not generate
+                     componentCode = getValue([/^component.*code/i]);
+                }
+
+                // Specifically avoid accidental assignment of "Yes"/"No" to componentCode
+                if (componentCode && (componentCode.toLowerCase() === 'yes' || componentCode.toLowerCase() === 'no')) {
+                    const possibleGenerateValue = componentCode;
+                    componentCode = ''; // Clear it out because it read the wrong column
+                    if (!generate) generate = possibleGenerateValue;
+                }
+
+                if (!generate && isProducer) {
+                    generate = 'No'; // Producer doesn't usually generate codes
+                } else if (!generate) {
+                    generate = 'No';
+                }
+                
                 let componentDescription = getValue([/component.*desc/i]);
                 let supplierName = getValue([/supplier.*name/i]);
                 let supplierState = getValue([/supplier.*state/i]);
@@ -1138,10 +1250,11 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 let clientName = getValue([/client.*name/i]);
                 let clientState = getValue([/client.*state/i, /^state$/i]);
 
-                if (generate === 'No') {
+                if (generate === 'Yes') {
                      const match = currentAllRows.find(r => 
                         (r.skuCode || '').trim() === skuCode && 
-                        (r.componentDescription || '').trim() === componentDescription
+                        (r.componentDescription || '').trim() === componentDescription &&
+                        r.componentCode
                      );
                      
                      if (match && match.componentCode) {
@@ -1149,12 +1262,29 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                      } else {
                          componentCode = generateComponentCodeForBulk(currentAllRows, client?.clientName, item?.plantName, componentRows);
                      }
+                } else {
+                    // generate === 'No'
+                    if (!componentCode) {
+                         const match = currentAllRows.find(r => 
+                            (r.skuCode || '').trim() === skuCode && 
+                            (r.componentDescription || '').trim() === componentDescription &&
+                            r.componentCode
+                         );
+                         if (match && match.componentCode) {
+                             componentCode = match.componentCode;
+                         }
+                    }
                 }
                 
                 if (generateSupplierCode === 'No') {
+                     const stateShort = getStateShortName(supplierState);
+                     const supplierShort = getSupplierShortName(supplierName);
+                     const companyShort = getCompanyShortName(client?.clientName);
+                     const prefix = `${supplierShort}/${companyShort}/${stateShort}/`;
                      const match = currentAllRows.find(r => 
                         (r.supplierName || '').trim().toLowerCase() === supplierName.toLowerCase() && 
-                        (r.supplierCode || '').trim()
+                        getStateShortName(r.supplierState) === stateShort &&
+                        (r.supplierCode || '').trim().startsWith(prefix)
                      );
                      
                      if (match && match.supplierCode) {
@@ -1216,12 +1346,19 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     const handleBulkSave = async () => {
         setIsBulkSaving(true);
         try {
-            const validatedRows = productRows.map(row => {
+            const rowsForValidation = (Array.isArray(productRows) ? productRows : []).filter((r) => r && typeof r === 'object');
+            const validatedRows = rowsForValidation.map(row => {
                 const missing = [];
+                if (!row.systemCode) missing.push('System Code');
                 if (!row.packagingType) missing.push('Packaging Type');
-                if (!row.skuCode) missing.push('SKU Code');
-                if (!row.skuDescription) missing.push('SKU Description');
-                if (!row.skuUom) missing.push('SKU UOM');
+                if (isProducer) {
+                    if (!row.clientName) missing.push('Client Name');
+                    if (!row.clientState) missing.push('State');
+                } else {
+                    if (!row.skuCode) missing.push('SKU Code');
+                    if (!row.skuDescription) missing.push('SKU Description');
+                    if (!row.skuUom) missing.push('SKU UOM');
+                }
                 if (!row.componentDescription) missing.push('Component Description');
                 if (!row.supplierName) missing.push('Supplier Name');
                 if (!row.componentCode) missing.push('Component Code');
@@ -1232,17 +1369,28 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 return { ...row, _validationError: null };
             });
 
+            const normalizedRows = validatedRows.map((r, idx) => {
+                if (!r || r._validationError) return r;
+                const supplierCode = ensureSupplierCodeWithState(validatedRows, r, idx);
+                if (!supplierCode) return r;
+                return { ...r, supplierCode };
+            });
+
             const validRows = validatedRows.filter(r => !r._validationError);
             const invalidRows = validatedRows.filter(r => r._validationError);
             
-            if (validRows.length === 0) {
-                setProductRows(validatedRows);
-                notify('warning', 'No valid rows to save. Please check for missing fields.');
+            if (validatedRows.length === 0) {
+                notify('warning', 'No rows to save.');
                 setIsBulkSaving(false);
                 return false;
             }
 
-            const payload = validRows.map(r => {
+            if (invalidRows.length > 0) {
+                 notify('warning', `${invalidRows.length} row(s) have missing fields. Please fix them.`);
+                 setProductRows(normalizedRows);
+            }
+
+            const payload = normalizedRows.map(r => {
                  const { _validationError, ...rest } = r;
                  return {
                     ...rest,
@@ -1258,8 +1406,9 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             });
             
             if (res.data && res.data.success) {
-                notify('success', `Saved ${validRows.length} rows successfully`);
-                setProductRows([...res.data.data, ...invalidRows]);
+                notify('success', `Saved ${payload.length} rows successfully`);
+                const savedRows = (Array.isArray(res.data.data) ? res.data.data : []).filter((r) => r && typeof r === 'object');
+                setProductRows(savedRows);
                 // We should update lastSavedRows carefully.
                 // The response contains ONLY the rows we saved.
                 // We need to keep the "old" lastSavedRows for the invalid rows (if they existed previously)
@@ -1294,7 +1443,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 
                 // If I am careful, I should verify if invalid rows are preserved.
                 // But for now, I will stick to the implementation:
-                setLastSavedRows([...res.data.data]); 
+                setLastSavedRows([...savedRows]); 
                 return true;
             } else {
                 notify('error', res.data.message || 'Failed to save rows');
@@ -1329,6 +1478,14 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             }
 
             const newRows = [];
+          const normalizeFoodGrade = (value) => {
+              const raw = (value ?? '').toString().trim();
+              const lower = raw.toLowerCase();
+              if (!raw) return '';
+              if (lower === 'yes' || lower === 'food') return 'Food';
+              if (lower === 'no' || lower === 'non food' || lower === 'non-food' || lower === 'nonfood') return 'Non Food';
+              return raw;
+          };
             data.forEach((row) => {
                 const getValue = (patterns) => {
                     const rowKeys = Object.keys(row);
@@ -1343,20 +1500,31 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 let componentCode = getValue([/component.*code/i]);
                 let componentDescription = getValue([/component.*desc/i]);
                 let supplierName = getValue([/name.*supplier/i, /supplier.*name/i]);
+                let supplierState = getValue([/supplier.*state/i]);
                 let supplierType = getValue([/supplier.*type/i]);
                 const supplierStatus = getValue([/supplier.*status/i]);
-                const foodGrade = getValue([/food.*grade/i]);
+                const rawApplicationType = getValue([/application.*type/i]);
+                const applicationType = (() => {
+                    const raw = (rawApplicationType ?? '').toString().trim();
+                    const lower = raw.toLowerCase();
+                    if (lower === 'liquid') return 'Liquid';
+                    if (lower === 'solid') return 'Solid';
+                    return raw;
+                })();
+              const foodGrade = normalizeFoodGrade(getValue([/food.*grade/i]));
                 const eprCertificateNumber = getValue([/epr.*cert/i, /epr.*no/i]);
                 const fssaiLicNo = getValue([/fssai.*lic/i, /fssai.*no/i]);
+              const fssaiValidUpto = getValue([/fssai.*valid/i, /valid.*upto/i]);
 
-                // Auto-fetch details if systemCode is present
+                let selectedOption = null;
                 if (systemCode) {
-                    const selected = systemCodeOptions.find(opt => opt.code === systemCode);
-                    if (selected && selected.data) {
-                        if (!componentCode) componentCode = selected.data.componentCode || '';
-                        if (!componentDescription) componentDescription = selected.data.componentDescription || '';
-                        if (!supplierName) supplierName = selected.data.supplierName || '';
-                        if (!supplierType) supplierType = selected.data.supplierType || '';
+                    selectedOption = systemCodeOptions.find(opt => opt.code === systemCode) || null;
+                    if (selectedOption && selectedOption.data) {
+                        if (!componentCode) componentCode = selectedOption.data.componentCode || '';
+                        if (!componentDescription) componentDescription = selectedOption.data.componentDescription || '';
+                        if (!supplierName) supplierName = selectedOption.data.supplierName || '';
+                        if (!supplierState) supplierState = selectedOption.data.supplierState || '';
+                        if (!supplierType) supplierType = selectedOption.data.supplierType || '';
                     }
                 }
 
@@ -1365,8 +1533,10 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                     componentCode,
                     componentDescription,
                     supplierName,
+                    supplierState: supplierState || '',
                     supplierType,
                     supplierStatus,
+                    applicationType: isProducer ? applicationType : '',
                     foodGrade,
                     eprCertificateNumber,
                     fssaiLicNo,
@@ -1420,11 +1590,14 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                     componentCode: r.componentCode,
                     componentDescription: r.componentDescription,
                     supplierName: r.supplierName,
+                    supplierState: r.supplierState,
                     supplierType: (r.supplierType || '').toString(),
                     supplierStatus: r.supplierStatus,
+                    applicationType: r.applicationType,
                     foodGrade: r.foodGrade,
                     eprCertificateNumber: r.eprCertificateNumber,
-                    fssaiLicNo: r.fssaiLicNo
+                    fssaiLicNo: r.fssaiLicNo,
+                    fssaiValidUpto: r.fssaiValidUpto
                 }))
             };
 
@@ -1461,6 +1634,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         
         let maxNum = 0;
         prev.forEach(r => {
+            if (!r) return;
             const code = (r.componentCode || '').trim();
             if (code.startsWith(prefix)) {
                 const numPart = code.substring(prefix.length);
@@ -1471,6 +1645,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             }
         });
         componentRows.forEach(r => {
+            if (!r) return;
             const code = (r.componentCode || '').trim();
             if (code.startsWith(prefix)) {
                 const numPart = code.substring(prefix.length);
@@ -1565,6 +1740,11 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     
     // Validation
     const rowToCheck = productRows[idx];
+    if (!rowToCheck || typeof rowToCheck !== 'object') {
+        notify('error', 'Row is empty');
+        setSavingRow(null);
+        return;
+    }
     if (!rowToCheck.componentCode || !rowToCheck.componentCode.trim()) {
         notify('error', 'Component Code is mandatory');
         setSavingRow(null);
@@ -1611,7 +1791,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     }
 
     // Check Supplier Code Uniqueness
-    const supplierCodeToCheck = (rowToCheck.supplierCode || '').trim();
+    const supplierCodeNormalized = ensureSupplierCodeWithState(productRows, rowToCheck, idx);
+    const supplierCodeToCheck = supplierCodeNormalized;
     const supplierNameToCheck = (rowToCheck.supplierName || '').trim().toLowerCase();
     
     if (supplierCodeToCheck) {
@@ -1634,7 +1815,14 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
 
     try {
       const beforeRow = lastSavedRows[idx] || {};
-      const row = productRows[idx];
+      const row = { ...productRows[idx], supplierCode: supplierCodeNormalized };
+      if ((productRows[idx]?.supplierCode || '').trim() !== supplierCodeNormalized) {
+        setProductRows((prev) => {
+          const copy = [...prev];
+          copy[idx] = row;
+          return copy;
+        });
+      }
       // Ensure hasFiles is true ONLY if actual File objects are present
       const hasFiles = (row.productImage instanceof File) || (row.componentImage instanceof File);
       let savedRowForHistory = row;
@@ -2078,7 +2266,13 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 let skuDescription = getValue([/sku.*desc/i]);
                 let skuUom = getValue([/sku.*uom/i, /uom/i]);
                 let generate = getValue([/^generate(?!.*supplier)/i, /^generate$/i]) || 'No';
-                let componentCode = getValue([/component.*code/i]);
+                let componentCode = getValue([/^component\s*code/i]);
+
+                if (componentCode && (componentCode.toLowerCase() === 'yes' || componentCode.toLowerCase() === 'no')) {
+                    const possibleGenerateValue = componentCode;
+                    componentCode = ''; 
+                    if (!generate) generate = possibleGenerateValue;
+                }
                 let componentDescription = getValue([/component.*desc/i]);
                 let supplierName = getValue([/supplier.*name/i]);
                 let supplierType = getValue([/supplier.*type/i]);
@@ -2179,6 +2373,14 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     setComponentRows(prev => {
       const copy = [...prev];
       copy[index] = { ...copy[index], [field]: value };
+      if (field === 'polymerType' && (value || '').toString().toUpperCase() !== 'PET') {
+        if ((copy[index].recycledPolymerUsed || '').toString().trim().toLowerCase() === 'rpet') {
+          copy[index].recycledPolymerUsed = '';
+        }
+      }
+      if (field === 'category' && (value || '') !== 'Category I') {
+        copy[index].recycledPolymerUsed = '';
+      }
       
       // Auto-fetch logic for System Code
       if (field === 'systemCode') {
@@ -2207,6 +2409,10 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
           if (selected.data.componentPolymer) copy[index].componentPolymer = selected.data.componentPolymer;
           if (selected.data.category) copy[index].category = selected.data.category;
         }
+        if (isProducer) {
+          const match = (Array.isArray(supplierRows) ? supplierRows : []).find((r) => (r?.systemCode || '').toString().trim() === (value || '').toString().trim());
+          copy[index].foodGrade = (match?.foodGrade || '').toString();
+        }
       }
       
       return copy;
@@ -2214,7 +2420,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
   };
   const addComponentRow = () => {
     setComponentRows(prev => {
-      const newRows = [...prev, { systemCode: '', skuCode: '', componentCode: '', componentDescription: '', polymerType: '', componentPolymer: '', category: '', categoryIIType: '', containerCapacity: '', foodGrade: '', layerType: '', thickness: '', supplierName: '' }];
+      const newRows = [...prev, { systemCode: '', skuCode: '', componentCode: '', componentDescription: '', polymerType: '', recycledPolymerUsed: '', componentPolymer: '', category: '', categoryIIType: '', containerCapacity: '', foodGrade: '', layerType: '', thickness: '', supplierName: '' }];
       setComponentPage(Math.ceil(newRows.length / componentItemsPerPage));
       return newRows;
     });
@@ -2232,23 +2438,39 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       const row = componentRows[idx] || {};
       const pt = (row.polymerType || '').trim();
       const cp = (row.componentPolymer || '').trim();
-      if (pt && pt.toLowerCase() !== 'others' && cp && pt.toLowerCase() !== cp.toLowerCase()) {
+      if (!isProducer && pt && pt.toLowerCase() !== 'others' && cp && pt.toLowerCase() !== cp.toLowerCase()) {
         notify('error', 'Polymer Type and Component Polymer is not matching');
         return;
+      }
+      if ((row.recycledPolymerUsed || '').toString().trim().toLowerCase() === 'rpet' && pt.toUpperCase() !== 'PET') {
+        notify('error', "Recycled Polymer Used 'rPET' requires Polymer Type 'PET'");
+        return;
+      }
+      const resolvedRow = (() => {
+        if (!isProducer) return { ...row };
+        const match = (Array.isArray(supplierRows) ? supplierRows : []).find((r) => (r?.systemCode || '').toString().trim() === (row?.systemCode || '').toString().trim());
+        return { ...row, foodGrade: (match?.foodGrade || row?.foodGrade || '').toString() };
+      })();
+      if (isProducer) {
+        setComponentRows((prev) => {
+          const copy = [...prev];
+          copy[idx] = resolvedRow;
+          return copy;
+        });
       }
       const payload = {
         type,
         itemId,
         rowIndex: idx,
-        row: { ...row }
+        row: resolvedRow
       };
       await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPONENT_DETAILS(clientId), payload);
-      const fields = ['skuCode', 'componentCode', 'componentDescription', 'supplierName', 'polymerType', 'componentPolymer', 'polymerCode', 'category', 'containerCapacity', 'foodGrade', 'layerType', 'thickness'];
+      const fields = ['skuCode', 'componentCode', 'componentDescription', 'supplierName', 'polymerType', 'recycledPolymerUsed', 'componentPolymer', 'polymerCode', 'category', 'containerCapacity', 'foodGrade', 'layerType', 'thickness'];
       const entryBaseId = `${Date.now()}-${Math.random()}`;
       const historyEntries = [];
       fields.forEach((field) => {
         const prevVal = (beforeRow[field] ?? '').toString().trim();
-        const currVal = (row[field] ?? '').toString().trim();
+        const currVal = (resolvedRow[field] ?? '').toString().trim();
         if (prevVal !== currVal) {
           historyEntries.push({
             id: `${entryBaseId}-${field}`,
@@ -2266,7 +2488,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       setDbHistory(prev => [...prev, ...historyEntries]);
       setLastSavedComponentRows(prev => {
         const copy = [...prev];
-        copy[idx] = row;
+        copy[idx] = resolvedRow;
         return copy;
       });
       notify('success', 'Component details saved successfully');
@@ -2325,6 +2547,9 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     if (!isProducer && pt && pt.toLowerCase() !== 'others' && cp && pt.toLowerCase() !== cp.toLowerCase()) {
       missing.push('Polymer Type Mismatch');
     }
+    if ((row.recycledPolymerUsed || '').toString().trim().toLowerCase() === 'rpet' && pt.toUpperCase() !== 'PET') {
+      missing.push("rPET allowed only with Polymer Type PET");
+    }
 
     return missing.length > 0 ? `Missing/Error: ${missing.join(', ')}` : null;
   };
@@ -2349,8 +2574,40 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
           return false;
         }
 
+        if (isProducer) {
+          const hasRpetMismatch = rowsToSave.some((r) => {
+            const pt = (r.polymerType || '').toString().trim().toUpperCase();
+            const recycled = (r.recycledPolymerUsed || '').toString().trim().toLowerCase();
+            return recycled === 'rpet' && pt !== 'PET';
+          });
+          if (hasRpetMismatch) {
+            setComponentRows(validatedRows);
+            notify('error', "Recycled Polymer Used 'rPET' requires Polymer Type 'PET'");
+            setIsComponentBulkSaving(false);
+            return false;
+          }
+        }
+
+        if (!isProducer) {
+          const hasMismatch = rowsToSave.some((r) => {
+            const pt = (r.polymerType || '').toString().trim();
+            const cp = (r.componentPolymer || '').toString().trim();
+            return pt && pt.toLowerCase() !== 'others' && cp && pt.toLowerCase() !== cp.toLowerCase();
+          });
+          if (hasMismatch) {
+            setComponentRows(validatedRows);
+            notify('error', 'Polymer Type and Component Polymer must match (except Others)');
+            setIsComponentBulkSaving(false);
+            return false;
+          }
+        }
+
         const payload = rowsToSave.map((r) => {
           const { _validationError, ...rest } = r;
+          if (isProducer) {
+            const match = (Array.isArray(supplierRows) ? supplierRows : []).find((s) => (s?.systemCode || '').toString().trim() === (rest?.systemCode || '').toString().trim());
+            rest.foodGrade = (match?.foodGrade || rest?.foodGrade || '').toString();
+          }
           return rest;
         });
 
@@ -2424,6 +2681,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             'Component Description': row.componentDescription,
             'Supplier Name': row.supplierName,
             'Polymer Type': row.polymerType,
+            ...(isProducer ? { 'Recycled Polymer Used': row.recycledPolymerUsed || '' } : {}),
+            ...(isProducer ? { 'Polymer Code': row.polymerCode ?? '' } : {}),
             'Category': row.category,
             'Category II Type': row.categoryIIType,
             'Container Capacity': row.containerCapacity,
@@ -2454,6 +2713,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         'Supplier Name',
         'Polymer Type',
         'Component Polymer',
+        isProducer ? 'Recycled Polymer Used' : null,
+        isProducer ? 'Polymer Code' : null,
         'Category of EPR',
         'Category II Type',
         'Container Capacity',
@@ -2466,14 +2727,37 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     });
 
     const ws = XLSX.utils.aoa_to_sheet([headers]);
-    ws['!dataValidation'] = [
-        {
+    const colLetter = (colIndex) => {
+        let n = colIndex + 1;
+        let s = '';
+        while (n > 0) {
+            const m = (n - 1) % 26;
+            s = String.fromCharCode(65 + m) + s;
+            n = Math.floor((n - 1) / 26);
+        }
+        return s;
+    };
+    const headerIndex = (label) => headers.findIndex((h) => (h || '').toString().trim().toLowerCase() === label.toLowerCase());
+    const layerCol = headerIndex('Monolayer / Multilayer');
+    const polymerCodeCol = headerIndex('Polymer Code');
+    const validations = [];
+    if (layerCol >= 0) {
+        validations.push({
             type: 'list',
             allowBlank: true,
-            sqref: 'J2:J500',
+            sqref: `${colLetter(layerCol)}2:${colLetter(layerCol)}500`,
             formulae: ['"Monolayer,Multilayer"']
-        }
-    ];
+        });
+    }
+    if (isProducer && polymerCodeCol >= 0) {
+        validations.push({
+            type: 'list',
+            allowBlank: true,
+            sqref: `${colLetter(polymerCodeCol)}2:${colLetter(polymerCodeCol)}500`,
+            formulae: ['"1,2,3,4,5,6,7"']
+        });
+    }
+    ws['!dataValidation'] = validations;
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Component Details Template");
@@ -2497,7 +2781,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             return;
         }
 
-        const newRows = data.map((row) => {
+        const newRowsRaw = data.map((row) => {
             const getValue = (patterns) => {
                 const rowKeys = Object.keys(row);
                 for (const pattern of patterns) {
@@ -2515,6 +2799,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 supplierName: getValue([/supplier.*name/i, /^supplier$/i]),
                 polymerType: getValue([/polymer.*type/i, /^polymer$/i]),
                 componentPolymer: getValue([/component.*polymer/i]),
+                recycledPolymerUsed: isProducer ? getValue([/recycled.*polymer.*used/i]) : '',
+                polymerCode: isProducer ? getValue([/polymer.*code/i]) : '',
                 category: getValue([/category.*epr/i, /^category$/i]),
                 categoryIIType: getValue([/category.*ii.*type/i, /category.*2/i]),
                 containerCapacity: getValue([/container.*capacity/i, /^capacity$/i]),
@@ -2522,6 +2808,27 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                 thickness: getValue([/^thickness/i, /micron/i]),
                 foodGrade: '',
             };
+        });
+        const newRows = newRowsRaw.map((r) => {
+          const rr = { ...r };
+          const sc = (rr.systemCode || '').toString().trim();
+          if (sc) {
+            const selected = systemCodeOptions.find(opt => opt.code === sc);
+            if (selected && selected.data) {
+              if (!rr.skuCode) rr.skuCode = selected.data.skuCode || '';
+              if (!rr.componentCode) rr.componentCode = selected.data.componentCode || '';
+              if (!rr.componentDescription) rr.componentDescription = selected.data.componentDescription || '';
+              if (!rr.supplierName) rr.supplierName = selected.data.supplierName || '';
+              if (!rr.polymerType) rr.polymerType = selected.data.polymerType || '';
+              if (!rr.componentPolymer) rr.componentPolymer = selected.data.componentPolymer || '';
+              if (!rr.category) rr.category = selected.data.category || '';
+            }
+            if (isProducer) {
+              const match = (Array.isArray(supplierRows) ? supplierRows : []).find((s) => (s?.systemCode || '').toString().trim() === sc);
+              rr.foodGrade = (match?.foodGrade || rr.foodGrade || '').toString();
+            }
+          }
+          return rr;
         });
 
         setComponentRows((prev) => {
@@ -2926,6 +3233,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                  'recycled qty': 'recycledQty',
                  'recycled rate': 'recycledRate',
                  'recycled qrt amount': 'recycledQrtAmount',
+                 'recycled qty amount': 'recycledQrtAmount',
                  'virgin rate': 'virginRate',
                  'virgin qty': 'virginQty',
                  'virgin qty amount': 'virginQtyAmount'
@@ -2937,10 +3245,13 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                   const newRow = {
                      systemCode: '',
                      supplierName: '',
+                     supplierCategory: '',
                      skuCode: '',
                      componentCode: '',
                      componentDescription: '',
+                     foodGrade: '',
                      polymerType: '',
+                     recycledPolymerUsed: '',
                      componentPolymer: '',
                      category: '',
                      dateOfInvoice: '',
@@ -3019,6 +3330,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                       const selected = systemCodeOptions.find(opt => opt.code === newRow.systemCode);
                       if (selected && selected.data) {
                           if (!newRow.supplierName) newRow.supplierName = selected.data.supplierName || '';
+                          if (!newRow.supplierCategory) newRow.supplierCategory = selected.data.supplierCategory || '';
                           if (!newRow.componentCode) newRow.componentCode = selected.data.componentCode || '';
                           if (!newRow.skuCode) newRow.skuCode = selected.data.skuCode || '';
                           if (!newRow.componentDescription) newRow.componentDescription = selected.data.componentDescription || '';
@@ -3028,6 +3340,11 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                           if (!newRow.polymerType) newRow.polymerType = compMatch.polymerType || '';
                           if (!newRow.componentPolymer) newRow.componentPolymer = compMatch.componentPolymer || '';
                           if (!newRow.category) newRow.category = compMatch.category || '';
+                      }
+                      if (isProducer) {
+                        const supplierMatch = (Array.isArray(supplierRows) ? supplierRows : []).find((r) => (r?.systemCode || '').toString().trim() === (newRow.systemCode || '').toString().trim());
+                        if (!newRow.foodGrade) newRow.foodGrade = (supplierMatch?.foodGrade || compMatch?.foodGrade || '').toString();
+                        if (!newRow.recycledPolymerUsed) newRow.recycledPolymerUsed = (compMatch?.recycledPolymerUsed || '').toString();
                       }
                   }
                   const uom = newRow.uom;
@@ -3045,6 +3362,20 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                   newRow.recycledPercent = pct ? pct.toFixed(3) : '';
                   if (!newRow.recycledQty) {
                       newRow.recycledQty = (monthlyMt * pct).toFixed(3);
+                  }
+                  const rRate = parseFloat(newRow.recycledRate) || 0;
+                  const rQtyVal = parseFloat(newRow.recycledQty) || 0;
+                  if (!newRow.recycledQrtAmount) {
+                      newRow.recycledQrtAmount = rRate && rQtyVal ? ((rQtyVal * 1000) * rRate).toFixed(3) : '';
+                  }
+                  const monthlyMtVal = parseFloat(newRow.monthlyPurchaseMt) || 0;
+                  if (!newRow.virginQty) {
+                      newRow.virginQty = (monthlyMtVal - rQtyVal).toFixed(3);
+                  }
+                  const vRate = parseFloat(newRow.virginRate) || 0;
+                  const vQtyVal = parseFloat(newRow.virginQty) || 0;
+                  if (!newRow.virginQtyAmount) {
+                      newRow.virginQtyAmount = vRate && vQtyVal ? ((vQtyVal * 1000) * vRate).toFixed(3) : '';
                   }
                   rows.push(newRow);
               }
@@ -3268,6 +3599,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         componentCode: match?.componentCode || '',
         componentDescription: match?.componentDescription || '',
         supplierName: match?.supplierName || '',
+        supplierState: match?.supplierState || '',
         supplierType: match?.supplierType || ''
       };
       return copy;
@@ -3304,7 +3636,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
 
   const addSupplierRow = () => {
     setSupplierRows(prev => {
-      const newRows = [...prev, { componentCode: '', componentDescription: '', supplierName: '', supplierType: '', supplierStatus: '', foodGrade: '', eprCertificateNumber: '', fssaiLicNo: '' }];
+      const newRows = [...prev, { systemCode: '', componentCode: '', componentDescription: '', supplierName: '', supplierType: '', supplierStatus: '', applicationType: '', foodGrade: '', eprCertificateNumber: '', fssaiLicNo: '', fssaiValidUpto: '' }];
       setSupplierPage(Math.ceil(newRows.length / supplierItemsPerPage));
       return newRows;
     });
@@ -3329,7 +3661,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       await api.post(API_ENDPOINTS.CLIENT.PRODUCT_SUPPLIER_COMPLIANCE(clientId), payload);
 
       const row = supplierRows[idx] || {};
-      const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo', 'fssaiValidUpto'];
+      const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'applicationType', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo', 'fssaiValidUpto'];
       const entryBaseId = `${Date.now()}-${Math.random()}`;
       const historyEntries = [];
       fields.forEach((field) => {
@@ -3383,7 +3715,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         const res = await api.get(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(clientId), {
           params: { type, itemId }
         });
-        const rows = res.data?.data || [];
+        const rows = (res.data?.data || []).filter((r) => r && typeof r === 'object');
         
         // Prioritize API data if available
         if (rows.length > 0) {
@@ -3393,18 +3725,20 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         } else {
             // Fallback to item (Client Model) data if API data is empty
             if (item && Array.isArray(item.productComplianceRows) && item.productComplianceRows.length > 0) {
-                setProductRows(item.productComplianceRows);
-                setLastSavedRows(item.productComplianceRows);
-                setInitialProductRows(item.productComplianceRows);
+                const fallbackRows = (item.productComplianceRows || []).filter((r) => r && typeof r === 'object');
+                setProductRows(fallbackRows);
+                setLastSavedRows(fallbackRows);
+                setInitialProductRows(fallbackRows);
             }
         }
       } catch (err) {
         console.error("Error fetching compliance:", err);
         // On error, try fallback
         if (item && Array.isArray(item.productComplianceRows) && item.productComplianceRows.length > 0) {
-          setProductRows(item.productComplianceRows);
-          setLastSavedRows(item.productComplianceRows);
-          setInitialProductRows(item.productComplianceRows);
+          const fallbackRows = (item.productComplianceRows || []).filter((r) => r && typeof r === 'object');
+          setProductRows(fallbackRows);
+          setLastSavedRows(fallbackRows);
+          setInitialProductRows(fallbackRows);
         }
       }
     };
@@ -3463,20 +3797,39 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
           params: { type, itemId }
         });
         const rows = res.data?.data || [];
+        const normalizeFoodGrade = (value) => {
+          const raw = (value ?? '').toString().trim();
+          const lower = raw.toLowerCase();
+          if (!raw) return '';
+          if (lower === 'yes' || lower === 'food') return 'Food';
+          if (lower === 'no' || lower === 'non food' || lower === 'non-food' || lower === 'nonfood') return 'Non Food';
+          return raw;
+        };
         if (rows.length) {
-          setSupplierRows(rows);
-          setLastSavedSupplierRows(rows);
-          setInitialSupplierRows(rows);
+          const normalized = rows.map((r) => ({ ...r, foodGrade: normalizeFoodGrade(r?.foodGrade) }));
+          setSupplierRows(normalized);
+          setLastSavedSupplierRows(normalized);
+          setInitialSupplierRows(normalized);
         } else if (item && Array.isArray(item.productSupplierCompliance) && item.productSupplierCompliance.length) {
-          setSupplierRows(item.productSupplierCompliance);
-          setLastSavedSupplierRows(item.productSupplierCompliance);
-          setInitialSupplierRows(item.productSupplierCompliance);
+          const normalized = item.productSupplierCompliance.map((r) => ({ ...r, foodGrade: normalizeFoodGrade(r?.foodGrade) }));
+          setSupplierRows(normalized);
+          setLastSavedSupplierRows(normalized);
+          setInitialSupplierRows(normalized);
         }
       } catch (_) {
         if (item && Array.isArray(item.productSupplierCompliance) && item.productSupplierCompliance.length) {
-          setSupplierRows(item.productSupplierCompliance);
-          setLastSavedSupplierRows(item.productSupplierCompliance);
-          setInitialSupplierRows(item.productSupplierCompliance);
+          const normalizeFoodGrade = (value) => {
+            const raw = (value ?? '').toString().trim();
+            const lower = raw.toLowerCase();
+            if (!raw) return '';
+            if (lower === 'yes' || lower === 'food') return 'Food';
+            if (lower === 'no' || lower === 'non food' || lower === 'non-food' || lower === 'nonfood') return 'Non Food';
+            return raw;
+          };
+          const normalized = item.productSupplierCompliance.map((r) => ({ ...r, foodGrade: normalizeFoodGrade(r?.foodGrade) }));
+          setSupplierRows(normalized);
+          setLastSavedSupplierRows(normalized);
+          setInitialSupplierRows(normalized);
         }
       }
     };
@@ -3936,7 +4289,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         // 3. Supplier Compliance
         supplierRows.forEach((row, idx) => {
             const initialRow = lastSavedSupplierRows[idx] || {};
-            const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo', 'fssaiValidUpto'];
+            const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'applicationType', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo', 'fssaiValidUpto'];
             fields.forEach(field => {
                 const prevVal = (initialRow[field] ?? '').toString().trim();
                 const currVal = (row[field] ?? '').toString().trim();

@@ -163,6 +163,7 @@ const PostAuditCheck = ({
     const isManagerRemarksReadOnly = !isAdmin && !isManager;
 
     const [plasticAnalysisTab, setPlasticAnalysisTab] = useState('prePostValidation');
+    const [producerPolymerTab, setProducerPolymerTab] = useState('Polymer Type');
     
     // Toggle states for Polymer and Category Procurement
     const [polymerViewMode, setPolymerViewMode] = useState('graph');
@@ -395,6 +396,64 @@ const PostAuditCheck = ({
     const [expandedSuppliers, setExpandedSuppliers] = useState(new Set());
     const [expandedPolymers, setExpandedPolymers] = useState(new Set());
     const [expandedCategories, setExpandedCategories] = useState(new Set());
+
+    const pickText = (...values) => {
+        for (const v of values) {
+            if (v === undefined || v === null) continue;
+            const s = v.toString().trim();
+            if (s) return s;
+        }
+        return '';
+    };
+
+    const normalizedMonthlyProcurementRaw = React.useMemo(() => {
+        const rows = Array.isArray(monthlyProcurementRaw) ? monthlyProcurementRaw : [];
+        return rows.map((row) => {
+            const industryCategory = pickText(
+                row?.industryCategory,
+                row?.industry_category,
+                row?.['Industry Category'],
+                row?.['industryCategory']
+            );
+            if (!industryCategory) return row;
+            return { ...row, category: industryCategory };
+        });
+    }, [monthlyProcurementRaw]);
+
+    const procurementAttrsBySystemCode = React.useMemo(() => {
+        const map = new Map();
+        const rows = Array.isArray(monthlyProcurementRaw) ? monthlyProcurementRaw : [];
+
+        for (const r of rows) {
+            const sc = pickText(r?.systemCode, r?.system_code, r?.['System Code'], r?.['systemCode']);
+            if (!sc) continue;
+
+            const prev = map.get(sc) || {};
+            const next = { ...prev };
+
+            const foodGrade = pickText(r?.foodGrade, r?.['Food Grade'], r?.['FOOD GRADE']);
+            const recycledPolymerUsed = pickText(r?.recycledPolymerUsed, r?.['Recycled Polymer Used'], r?.['RECYCLED POLYMER USED']);
+            const polymerType = pickText(r?.polymerType, r?.['Polymer Type'], r?.['POLYMER TYPE']);
+            const componentPolymer = pickText(
+                r?.componentPolymer,
+                r?.componentPolymerType,
+                r?.['Component Polymer'],
+                r?.polymer,
+                r?.['Polymer'],
+                r?.polymerType,
+                r?.['Polymer Type']
+            );
+
+            if (!next.foodGrade && foodGrade) next.foodGrade = foodGrade;
+            if (!next.recycledPolymerUsed && recycledPolymerUsed) next.recycledPolymerUsed = recycledPolymerUsed;
+            if (!next.polymerType && polymerType) next.polymerType = polymerType;
+            if (!next.componentPolymer && componentPolymer) next.componentPolymer = componentPolymer;
+
+            map.set(sc, next);
+        }
+
+        return map;
+    }, [monthlyProcurementRaw]);
 
     const toggleSupplierExpansion = (supplierName) => {
         const newSet = new Set(expandedSuppliers);
@@ -1006,13 +1065,13 @@ const PostAuditCheck = ({
                                                         >
                                                             <div className="flex items-center gap-2">
                                                                 <FaFilter className="text-orange-500" />
-                                                                <span>Filter by category</span>
+                                                                <span>Filter by Industry Category:</span>
                                                             </div>
                                                             <FaChevronDown className={`text-orange-400 transition-transform duration-200 ${monthlyProcurementFilterOpen.category ? 'rotate-180' : ''}`} />
                                                         </button>
                                                         {monthlyProcurementFilterOpen.category && (
                                                             <div className="absolute z-20 mt-2 w-56 rounded-md border border-orange-200 bg-white shadow-lg p-2">
-                                                                <div className="text-[11px] font-semibold text-orange-700 mb-1">Category</div>
+                                                                <div className="text-[11px] font-semibold text-orange-700 mb-1">Industry Category</div>
                                                                 <label className="flex items-center gap-2 py-1 text-xs">
                                                                     <input
                                                                         type="checkbox"
@@ -1023,7 +1082,7 @@ const PostAuditCheck = ({
                                                                     />
                                                                     <span>All</span>
                                                                 </label>
-                                                                {Array.from(new Set(monthlyProcurementRaw.map((r) => r.category).filter(Boolean))).map((cat) => {
+                                                                {Array.from(new Set(normalizedMonthlyProcurementRaw.map((r) => r.category).filter(Boolean))).map((cat) => {
                                                                     const checked = (monthlyProcurementFilters.category || []).includes(cat);
                                                                     return (
                                                                         <label key={cat} className="flex items-center gap-2 py-1 text-xs">
@@ -1191,7 +1250,7 @@ const PostAuditCheck = ({
                                                     <div className="flex flex-wrap gap-2">
                                                         {(monthlyProcurementFilters.category || []).length > 0 && (
                                                             <span className="inline-flex items-center px-2 py-1 rounded-full bg-orange-50 border border-orange-200 text-[11px] text-orange-700">
-                                                                Category: {(monthlyProcurementFilters.category || []).join(', ')}
+                                                                Industry Category: {(monthlyProcurementFilters.category || []).join(', ')}
                                                             </span>
                                                         )}
                                                         {(monthlyProcurementFilters.polymer || []).length > 0 && (
@@ -1398,12 +1457,12 @@ const PostAuditCheck = ({
 
                                                 {(() => {
                                                     const polymerSummaryResult = buildPolymerProcurementSummary(
-                                                        monthlyProcurementRaw,
+                                                        normalizedMonthlyProcurementRaw,
                                                         monthlyProcurementFilters,
                                                         monthlyProcurementViewMode
                                                     );
                                                     const categorySummaryResult = buildCategoryProcurementSummary(
-                                                        monthlyProcurementRaw,
+                                                        normalizedMonthlyProcurementRaw,
                                                         monthlyProcurementFilters,
                                                         monthlyProcurementViewMode
                                                     );
@@ -1719,7 +1778,7 @@ const PostAuditCheck = ({
                                     <div>
                                         <p className="text-gray-800 font-semibold mb-2">UREP Performance Summary</p>
                                         <p className="text-xs text-gray-500 mb-3">
-                                            Comparison of UREP target percentage with actual recycled performance by category.
+                                            Comparison of UREP target percentage with actual recycled performance by industry category.
                                         </p>
                                         <div className="overflow-x-auto">
                                             {(() => {
@@ -1732,7 +1791,7 @@ const PostAuditCheck = ({
                                                     );
                                                 }
                                                 const categorySummaryResult = buildCategoryProcurementSummary(
-                                                    monthlyProcurementRaw,
+                                                    normalizedMonthlyProcurementRaw,
                                                     monthlyProcurementFilters
                                                 );
                                                 const categorySummaryData = categorySummaryResult.data || [];
@@ -1753,7 +1812,7 @@ const PostAuditCheck = ({
                                                         <thead className="bg-gray-50">
                                                             <tr>
                                                                 <th className="px-3 py-2 text-left font-semibold text-gray-700">
-                                                                    Category
+                                                                    Industry Category
                                                                 </th>
                                                                 <th className="px-3 py-2 text-right font-semibold text-gray-700">
                                                                     Target %
@@ -1855,6 +1914,23 @@ const PostAuditCheck = ({
                                             </p>
                                         </div>
 
+                                        {isProducer && costAnalysisSubTab === 'Polymer' && (
+                                            <div className="mb-4 flex space-x-4 border-b border-gray-200">
+                                                <button
+                                                    onClick={() => setProducerPolymerTab('Polymer Type')}
+                                                    className={`pb-2 text-sm font-medium transition-colors ${producerPolymerTab === 'Polymer Type' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+                                                >
+                                                    Polymer Type
+                                                </button>
+                                                <button
+                                                    onClick={() => setProducerPolymerTab('Recycled Polymer Used')}
+                                                    className={`pb-2 text-sm font-medium transition-colors ${producerPolymerTab === 'Recycled Polymer Used' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+                                                >
+                                                    Recycled Polymer Used
+                                                </button>
+                                            </div>
+                                        )}
+
                                         {/* Dynamic Content Table */}
                                         <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
                                             <table className="min-w-full divide-y divide-gray-200">
@@ -1866,7 +1942,7 @@ const PostAuditCheck = ({
                                                             </th>
                                                         )}
                                                         <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                                            {costAnalysisSubTab} Name
+                                                            {isProducer && costAnalysisSubTab === 'Polymer' && producerPolymerTab === 'Recycled Polymer Used' ? 'Recycled Polymer Used' : `${costAnalysisSubTab} Name`}
                                                         </th>
                                                         <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">
                                                             Recycled Qty
@@ -1893,10 +1969,17 @@ const PostAuditCheck = ({
                                                 <tbody className="bg-white divide-y divide-gray-100">
                                                     {(() => {
                                                         // Group data based on the selected sub-tab
-                                                        const groupedData = postValidationData.reduce((acc, row) => {
+                                                        const costAnalysisRows =
+                                                            isProducer && costAnalysisSubTab === 'Polymer'
+                                                                ? (Array.isArray(monthlyProcurementRaw) ? monthlyProcurementRaw : [])
+                                                                : (Array.isArray(postValidationData) ? postValidationData : []);
+
+                                                        const groupedData = costAnalysisRows.reduce((acc, row) => {
                                                             let key = 'Unknown';
                                                             let displayName = 'Unknown';
                                                             let productName = 'Unknown';
+                                                            let foodGrade = '';
+                                                            let recycledPolymerUsed = '';
 
                                                             if (costAnalysisSubTab === 'Product') {
                                                                 const pName = row.productName || 'Unknown';
@@ -1913,8 +1996,53 @@ const PostAuditCheck = ({
                                                                 productName = pName;
                                                             }
                                                             else if (costAnalysisSubTab === 'Polymer') {
-                                                                key = row.componentPolymer || row.polymer || 'Unknown';
-                                                                displayName = key;
+                                                                const sc = pickText(row?.systemCode, row?.system_code, row?.['System Code'], row?.['systemCode']);
+                                                                const lookup = sc ? procurementAttrsBySystemCode.get(sc) : undefined;
+
+                                                                let polymerName =
+                                                                    pickText(
+                                                                        row?.polymerType,
+                                                                        row?.['Polymer Type'],
+                                                                        lookup?.polymerType,
+                                                                        lookup?.['Polymer Type'],
+                                                                        row?.componentPolymer,
+                                                                        row?.['Component Polymer'],
+                                                                        row?.polymer,
+                                                                        row?.['Polymer']
+                                                                    ) || 'Unknown';
+                                                                    
+                                                                const upPolymer = polymerName.toUpperCase();
+                                                                if (['PP', 'PET', 'LLDPE', 'LDPE', 'HDPE'].includes(upPolymer)) {
+                                                                    polymerName = upPolymer;
+                                                                }
+
+                                                                foodGrade =
+                                                                    pickText(
+                                                                        row?.foodGrade,
+                                                                        row?.['Food Grade'],
+                                                                        lookup?.foodGrade,
+                                                                        lookup?.['Food Grade']
+                                                                    );
+                                                                recycledPolymerUsed =
+                                                                    pickText(
+                                                                        row?.recycledPolymerUsed,
+                                                                        row?.['Recycled Polymer Used'],
+                                                                        lookup?.recycledPolymerUsed,
+                                                                        lookup?.['Recycled Polymer Used']
+                                                                    ) || 'Unknown';
+
+                                                                if (isProducer) {
+                                                                    if (producerPolymerTab === 'Recycled Polymer Used') {
+                                                                        key = recycledPolymerUsed;
+                                                                        displayName = key;
+                                                                    } else {
+                                                                        key = polymerName;
+                                                                        displayName = polymerName;
+                                                                    }
+                                                                } else {
+                                                                    key = polymerName;
+                                                                    displayName = polymerName;
+                                                                }
                                                             }
                                                             else if (costAnalysisSubTab === 'Category') {
                                                                 key = row.category || 'Unknown';
@@ -1928,6 +2056,8 @@ const PostAuditCheck = ({
                                                             if (!acc[key]) acc[key] = { 
                                                                 displayName,
                                                                 productName,
+                                                                foodGrade,
+                                                                recycledPolymerUsed,
                                                                 vRates: [], 
                                                                 rRates: [], 
                                                                 totalSpend: 0,
@@ -1941,6 +2071,11 @@ const PostAuditCheck = ({
                                                             };
                                                             
                                                             acc[key].items.push(row);
+
+                                                            if (isProducer && costAnalysisSubTab === 'Polymer') {
+                                                                if (!acc[key].foodGrade && foodGrade) acc[key].foodGrade = foodGrade;
+                                                                if (!acc[key].recycledPolymerUsed && recycledPolymerUsed) acc[key].recycledPolymerUsed = recycledPolymerUsed;
+                                                            }
 
                                                             if (parseFloat(row.virginRate)) acc[key].vRates.push(parseFloat(row.virginRate));
                                                             if (parseFloat(row.recycledRate)) acc[key].rRates.push(parseFloat(row.recycledRate));
@@ -2027,7 +2162,9 @@ const PostAuditCheck = ({
                                                                                         {isExpanded ? <FaMinus size={10} /> : <FaPlus size={10} />}
                                                                                     </button>
                                                                                 )}
-                                                                                <div>{stats.displayName}</div>
+                                                                                <div>
+                                                                                    <div>{stats.displayName}</div>
+                                                                                </div>
                                                                             </div>
                                                                             {costAnalysisSubTab === 'Product' && stats.description && (
                                                                                 <div className="text-xs text-gray-500 mt-0.5 ml-6">{stats.description}</div>

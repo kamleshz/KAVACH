@@ -13,7 +13,8 @@ import {
   CATEGORIES, 
   CATEGORY_II_TYPE_OPTIONS, 
   CONTAINER_CAPACITIES, 
-  LAYER_TYPES 
+  LAYER_TYPES,
+  INDIA_STATES
 } from '../../constants/complianceConstants';
 
 const ProductCompliance = ({
@@ -172,6 +173,31 @@ const ProductCompliance = ({
     const [showUnsavedModal, setShowUnsavedModal] = useState(false);
     const [isSavingTab, setIsSavingTab] = useState(false);
 
+    const hasComponentPolymerMismatch = !isProducer && (Array.isArray(componentRows) ? componentRows : []).some((r) => {
+        const pt = (r?.polymerType || '').toString().trim();
+        const cp = (r?.componentPolymer || '').toString().trim();
+        return pt && pt.toLowerCase() !== 'others' && cp && pt.toLowerCase() !== cp.toLowerCase();
+    });
+
+    const hasProducerRecycledPolymerMismatch = isProducer && (Array.isArray(componentRows) ? componentRows : []).some((r) => {
+        const pt = (r?.polymerType || '').toString().trim().toUpperCase();
+        const recycled = (r?.recycledPolymerUsed || '').toString().trim().toLowerCase();
+        return recycled === 'rpet' && pt !== 'PET';
+    });
+
+    const stripVolatile = (arr, keys = []) => {
+        try {
+            return (Array.isArray(arr) ? arr : []).map((r) => {
+                if (!r || typeof r !== 'object') return r;
+                const c = { ...r };
+                keys.forEach(k => { if (k in c) delete c[k]; });
+                return c;
+            });
+        } catch {
+            return arr;
+        }
+    };
+
     const checkUnsavedChanges = (tab) => {
         try {
             if (tab === 'product-compliance') {
@@ -185,7 +211,9 @@ const ProductCompliance = ({
             }
             if (tab === 'component-details') {
                 if (!lastSavedComponentRows) return false;
-                return JSON.stringify(componentRows) !== JSON.stringify(lastSavedComponentRows);
+                const a = stripVolatile(componentRows, ['_validationError']);
+                const b = stripVolatile(lastSavedComponentRows, ['_validationError']);
+                return JSON.stringify(a) !== JSON.stringify(b);
             }
             if (tab === 'recycled-quantity-used') {
                 if (!lastSavedRecycledRows) return false;
@@ -200,6 +228,11 @@ const ProductCompliance = ({
 
     const handleTabClick = (newTab) => {
         if (newTab === subTab) return;
+
+        if (subTab === 'component-details' && hasProducerRecycledPolymerMismatch) {
+            notify('error', "Recycled Polymer Used 'rPET' requires Polymer Type 'PET'");
+            return;
+        }
         
         if (checkUnsavedChanges(subTab)) {
             setPendingTab(newTab);
@@ -212,6 +245,16 @@ const ProductCompliance = ({
     const confirmSaveAndSwitch = async () => {
         setIsSavingTab(true);
         try {
+            if (subTab === 'component-details') {
+                if (hasComponentPolymerMismatch) {
+                    notify('error', 'Polymer Type and Component Polymer must match (except Others)');
+                    return;
+                }
+                if (hasProducerRecycledPolymerMismatch) {
+                    notify('error', "Recycled Polymer Used 'rPET' requires Polymer Type 'PET'");
+                    return;
+                }
+            }
             let success = false;
             if (subTab === 'product-compliance') {
                 success = await handleBulkSave();
@@ -238,6 +281,10 @@ const ProductCompliance = ({
     };
 
     const discardAndSwitch = () => {
+        if (subTab === 'component-details' && hasProducerRecycledPolymerMismatch) {
+            notify('error', "Recycled Polymer Used 'rPET' requires Polymer Type 'PET'");
+            return;
+        }
         setSubTab(pendingTab);
         setShowUnsavedModal(false);
         setPendingTab(null);
@@ -254,7 +301,12 @@ const ProductCompliance = ({
                         <Button key="cancel" onClick={() => setShowUnsavedModal(false)}>
                             Cancel
                         </Button>,
-                        <Button key="discard" onClick={discardAndSwitch} danger>
+                        <Button
+                            key="discard"
+                            onClick={discardAndSwitch}
+                            danger
+                            disabled={subTab === 'component-details' && hasProducerRecycledPolymerMismatch}
+                        >
                             Don't Save
                         </Button>,
                         <Button 
@@ -263,6 +315,10 @@ const ProductCompliance = ({
                             onClick={confirmSaveAndSwitch}
                             loading={isSavingTab}
                             icon={<SaveOutlined />}
+                            disabled={
+                                subTab === 'component-details' &&
+                                (hasComponentPolymerMismatch || hasProducerRecycledPolymerMismatch)
+                            }
                         >
                             Save & Switch
                         </Button>
@@ -361,7 +417,7 @@ const ProductCompliance = ({
                                     { label: 'System Code', width: 'min-w-[120px]' },
                                     { label: 'Component Description', width: 'min-w-[200px]' },
                                     { label: 'Supplier Name', width: 'min-w-[150px]' },
-                                    ...(isProducer ? [{ label: 'Supplier State', width: 'min-w-[140px]' }] : []),
+                                    { label: 'Supplier State', width: 'min-w-[140px]' },
                                     { label: 'Supplier Type', width: 'min-w-[150px]' },
                                     { label: 'Supplier Category', width: 'min-w-[150px]' },
                                     { label: 'Generate Supplier Code', width: 'min-w-[150px]' },
@@ -767,18 +823,21 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
-                                    {isProducer && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.supplierState || '-'}</div>
                                             ) : (
-                                            <input
+                                            <select
                                                 className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${supplierStateChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
-                                                placeholder="Supplier State"
                                                 value={row.supplierState || ''}
                                                 onChange={(e)=>handleRowChange(globalIndex,'supplierState',e.target.value)}
-                                            />
+                                            >
+                                                <option value="">Select State</option>
+                                                {INDIA_STATES.map((s)=>(
+                                                    <option key={s} value={s}>{s}</option>
+                                                ))}
+                                            </select>
                                             )}
                                             {supplierStateChanged && (
                                                 <div className="mt-1 text-[9px] leading-tight">
@@ -788,7 +847,6 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
-                                    )}
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -1081,6 +1139,7 @@ const ProductCompliance = ({
                                         { label: 'Name of Supplier', width: 'min-w-[150px]' },
                                         { label: 'Supplier Type', width: 'min-w-[150px]' },
                                         { label: 'Supplier Status', width: 'min-w-[120px]' },
+                                        { label: 'Application Type', width: 'min-w-[140px]' },
                                         { label: 'Food Grade', width: 'min-w-[120px]' },
                                         { label: 'EPR Certificate Number', width: 'min-w-[150px]' },
                                         { label: 'FSSAI Lic No', width: 'min-w-[150px]' },
@@ -1088,6 +1147,7 @@ const ProductCompliance = ({
                                         { label: 'Actions', width: 'min-w-[100px]' }
                                     ].filter(h => {
                                         if (h.label === 'Supplier Type' && !isProducer) return false;
+                                        if (h.label === 'Application Type' && !isProducer) return false;
                                         if (h.label === 'FSSAI Valid Upto' && isProducer) return false;
                                         return !isManager || (h.label !== 'Actions' && h.label !== 'System Code');
                                     }).map((header) => (
@@ -1100,8 +1160,9 @@ const ProductCompliance = ({
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {currentSupplierRows.map((row, index) => {
                                     const idx = indexOfFirstSupplierRow + index;
-                                    const isFoodGradeYes = (row.foodGrade || '').trim().toLowerCase() === 'yes';
-                                    const disableFssai = !row.componentCode || !isFoodGradeYes;
+                                    const foodGrade = (row.foodGrade || '').trim().toLowerCase();
+                                    const isFoodGradeFood = foodGrade === 'food' || foodGrade === 'yes';
+                                    const disableFssai = !isFoodGradeFood;
                                     return (
                                     <tr key={idx} className="hover:bg-gray-50 transition-colors duration-150 group">
                                         <td className="px-2 py-2 text-center text-xs text-black align-middle font-bold">{idx + 1}</td>
@@ -1193,6 +1254,24 @@ const ProductCompliance = ({
                                             </select>
                                             )}
                                         </td>
+                                        {isProducer && (
+                                        <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                            {isManager ? (
+                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.applicationType || '-'}</div>
+                                            ) : (
+                                            <select
+                                                className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
+                                                value={row.applicationType || ''}
+                                                onChange={(e) => handleSupplierChange(idx, 'applicationType', e.target.value)}
+                                                disabled={isManager}
+                                            >
+                                                <option value="">Select</option>
+                                                <option value="Liquid">Liquid</option>
+                                                <option value="Solid">Solid</option>
+                                            </select>
+                                            )}
+                                        </td>
+                                        )}
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.foodGrade || '-'}</div>
@@ -1204,8 +1283,8 @@ const ProductCompliance = ({
                                                 disabled={isManager}
                                             >
                                                 <option value="">Select</option>
-                                                <option value="Yes">Yes</option>
-                                                <option value="No">No</option>
+                                                <option value="Food">Food</option>
+                                                <option value="Non Food">Non Food</option>
                                             </select>
                                             )}
                                         </td>
@@ -1364,7 +1443,9 @@ const ProductCompliance = ({
                                         { label: 'Component code', width: 'min-w-[120px]' },
                                         { label: 'Component Descrecption', width: 'min-w-[200px]' },
                                         { label: 'Supplier Name', width: 'min-w-[200px]' },
+                                        ...(isProducer ? [{ label: 'Food Grade', width: 'min-w-[120px]' }] : []),
                                         { label: 'Polymer Type', width: 'min-w-[130px]' },
+                                        ...(isProducer ? [{ label: 'Recycled Polymer Used', width: 'min-w-[170px]' }] : []),
                                         { label: 'Component Polymer', width: 'min-w-[130px]' },
                                         { label: 'Polymer Code', width: 'min-w-[100px]' },
                                         { label: 'Category of EPR', width: 'min-w-[130px]' },
@@ -1456,6 +1537,24 @@ const ProductCompliance = ({
                                             />
                                             )}
                                         </td>
+                                        {isProducer && (
+                                        <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                            {(() => {
+                                                const matched = (Array.isArray(supplierRows) ? supplierRows : []).find((s) => (s?.systemCode || '').toString().trim() === (row?.systemCode || '').toString().trim());
+                                                const resolvedFoodGrade = (matched?.foodGrade || row?.foodGrade || '').toString().trim();
+                                                return isManager ? (
+                                                    <div className="text-center text-xs text-gray-700 py-1.5">{resolvedFoodGrade || '-'}</div>
+                                                ) : (
+                                                    <input
+                                                        className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded block px-2 py-1.5 cursor-not-allowed"
+                                                        value={resolvedFoodGrade}
+                                                        readOnly
+                                                        disabled
+                                                    />
+                                                );
+                                            })()}
+                                        </td>
+                                        )}
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.polymerType || '-'}</div>
@@ -1471,23 +1570,56 @@ const ProductCompliance = ({
                                             </select>
                                             )}
                                         </td>
+                                        {isProducer && (
+                                        <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                            {isManager ? (
+                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.recycledPolymerUsed || '-'}</div>
+                                            ) : (
+                                            <select
+                                                className={`w-full text-xs rounded focus:ring-1 block px-2 py-1.5 transition-all hover:border-primary-400 ${
+                                                    row.category !== 'Category I'
+                                                        ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                                                        : ((row.recycledPolymerUsed || '').toString().trim().toLowerCase() === 'rpet' && (row.polymerType || '').toUpperCase() !== 'PET'
+                                                            ? 'bg-red-100 border border-red-500 text-red-700 focus:ring-red-500 focus:border-red-500'
+                                                            : 'bg-white border border-gray-300 text-gray-700 focus:ring-primary-500 focus:border-primary-500')
+                                                }`}
+                                                value={row.category === 'Category I' ? (row.recycledPolymerUsed || '') : ''}
+                                                onChange={(e) => handleComponentChange(idx, 'recycledPolymerUsed', e.target.value)}
+                                                disabled={isManager || row.category !== 'Category I'}
+                                            >
+                                                <option value="">Select</option>
+                                                <option value="Not Applicable">Not Applicable</option>
+                                                <option value="rPET">rPET</option>
+                                            </select>
+                                            )}
+                                        </td>
+                                        )}
                                         {!isProducer && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.componentPolymer || '-'}</div>
                                             ) : (
+                                            (() => {
+                                                const isMismatch =
+                                                    row.polymerType &&
+                                                    (row.polymerType || '').toString().trim().toLowerCase() !== 'others' &&
+                                                    row.componentPolymer &&
+                                                    row.polymerType.toLowerCase() !== row.componentPolymer.toLowerCase();
+                                                return (
                                             <input 
                                                 className={`w-full border ${
-                                                    row.polymerType && row.polymerType !== 'Others' && row.componentPolymer && row.polymerType.toLowerCase() !== row.componentPolymer.toLowerCase()
-                                                    ? 'bg-red-100 border-red-500 text-red-700 focus:ring-red-500 focus:border-red-500' 
-                                                    : 'bg-white border-gray-300 text-gray-700 focus:ring-primary-500 focus:border-primary-500'
+                                                    isMismatch
+                                                        ? 'bg-red-100 border-red-500 text-red-700 focus:ring-red-500 focus:border-red-500'
+                                                        : 'bg-white border-gray-300 text-gray-700 focus:ring-primary-500 focus:border-primary-500'
                                                 } text-xs rounded focus:ring-1 block px-2 py-1.5 transition-all hover:border-primary-400`}
-                                                placeholder="Component Polymer" 
+                                                placeholder="Component Polymer"
                                                 value={row.componentPolymer} 
                                                 onChange={(e)=>handleComponentChange(idx,'componentPolymer',e.target.value)} 
                                                 readOnly={isManager}
                                                 disabled={isManager}
                                             />
+                                                );
+                                            })()
                                             )}
                                         </td>
                                         )}
@@ -1528,6 +1660,7 @@ const ProductCompliance = ({
                                                     handleComponentChange(idx, 'category', value);
                                                     if (value !== 'Category I') {
                                                         handleComponentChange(idx, 'containerCapacity', '');
+                                                        handleComponentChange(idx, 'recycledPolymerUsed', '');
                                                     }
                                                     if (value !== 'Category II') {
                                                         handleComponentChange(idx, 'categoryIIType', '');
@@ -1708,15 +1841,35 @@ const ProductCompliance = ({
                             </button>
                             <button
                                 onClick={() => {
+                                    const resolvedRows = isProducer
+                                        ? (Array.isArray(monthlyRows) ? monthlyRows : []).map((r) => {
+                                            const curr = { ...r };
+                                            const sc = (curr.systemCode || '').toString().trim();
+                                            if (!sc) return curr;
+                                            const productMatch = systemCodeOptions.find((opt) => opt.code === sc);
+                                            const supplierMatch = (Array.isArray(supplierRows) ? supplierRows : []).find((x) => (x?.systemCode || '').toString().trim() === sc);
+                                            const compMatch =
+                                                (Array.isArray(componentRows) ? componentRows : []).find((x) => (x?.systemCode || '').toString().trim() === sc) ||
+                                                (Array.isArray(componentRows) ? componentRows : []).find((x) => (x?.componentCode || '').toString().trim() === (curr?.componentCode || '').toString().trim());
+                                            curr.supplierCategory = (productMatch?.data?.supplierCategory || curr.supplierCategory || '').toString();
+                                            curr.foodGrade = (supplierMatch?.foodGrade || compMatch?.foodGrade || curr.foodGrade || '').toString();
+                                            curr.recycledPolymerUsed = (compMatch?.recycledPolymerUsed || curr.recycledPolymerUsed || '').toString();
+                                            if (compMatch) {
+                                                curr.polymerType = compMatch.polymerType || curr.polymerType || '';
+                                            }
+                                            curr.componentPolymer = '';
+                                            return curr;
+                                        })
+                                        : monthlyRows;
                                     const payload = {
                                         type,
                                         itemId,
-                                        rows: monthlyRows
+                                        rows: resolvedRows
                                     };
                                     api.post(API_ENDPOINTS.CLIENT.MONTHLY_PROCUREMENT(clientId), payload)
                                        .then(res => {
                                            notify('success', 'Saved all monthly procurement rows');
-                                           const rows = res.data?.data || monthlyRows;
+                                           const rows = res.data?.data || resolvedRows;
                                            setMonthlyRows(rows);
                                            setLastSavedMonthlyRows(rows);
                                        })
@@ -1744,7 +1897,7 @@ const ProductCompliance = ({
                             <button
                                 onClick={() => setMonthlyRows(prev => [...prev, {
                                     systemCode:'', skuCode: '', supplierName:'', componentCode:'', componentDescription:'',
-                                    polymerType:'', componentPolymer:'', category:'', dateOfInvoice:'',
+                                    supplierCategory: '', foodGrade: '', polymerType:'', recycledPolymerUsed: '', componentPolymer:'', category:'', dateOfInvoice:'',
                                     monthName:'', quarter:'', yearlyQuarter:'', purchaseQty:'', uom:'',
                                     perPieceWeightKg:'', monthlyPurchaseMt:'', recycledPercent:'', recycledQty:'', recycledRate: '', recycledQrtAmount: '',
                                     virginQty: '', virginRate: '', virginQtyAmount: '',
@@ -1764,9 +1917,10 @@ const ProductCompliance = ({
                                 <tr>
                                     <th className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 w-12 ${isManager ? "bg-green-50" : "bg-gray-50"}`}>#</th>
             {[
-            'System Code','SKU Code','Supplier Name','Component code','Component Description','Polymer Type','Component Polymer','Category of EPR','Date of invoice','Purchase Qty','UOM','Per Piece Weight','Monthly purchase MT','Recycled %','Recycled QTY','Recycled Rate','Recycled Qrt Amount','Virgin Rate','Virgin Qty','Virgin Qty Amount','RC % Mentioned','Actions'
+            'System Code','SKU Code','Supplier Name','Supplier Category','Food Grade','Component code','Component Description','Polymer Type','Recycled Polymer Used','Component Polymer','Category of EPR','Date of invoice','Purchase Qty','UOM','Per Piece Weight','Monthly purchase MT','Recycled %','Recycled QTY','Recycled Rate','Recycled Qrt Amount','Virgin Rate','Virgin Qty','Virgin Qty Amount','RC % Mentioned','Actions'
         ].filter(label => {
             if (isProducer && (label === 'SKU Code' || label === 'Component Polymer')) return false;
+            if (!isProducer && (label === 'Supplier Category' || label === 'Food Grade' || label === 'Recycled Polymer Used')) return false;
             return !isManager || (label !== 'Actions' && label !== 'System Code');
         }).map((label) => (
             <th key={label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 bg-white' : ''} ${label === 'UOM' ? 'min-w-[100px]' : ''} ${isManager ? "bg-green-50" : "bg-gray-50"}`}>
@@ -1788,6 +1942,24 @@ const ProductCompliance = ({
                                         if (uom === 'MT') return qty;
                                         return Number(r.monthlyPurchaseMt) || 0;
                                     };
+                                    const resolveMonthlyAutoFields = (curr) => {
+                                        if (!isProducer) return curr;
+                                        const sc = (curr.systemCode || '').toString().trim();
+                                        if (!sc) return curr;
+                                        const productMatch = systemCodeOptions.find((opt) => opt.code === sc);
+                                        const supplierMatch = (Array.isArray(supplierRows) ? supplierRows : []).find((r) => (r?.systemCode || '').toString().trim() === sc);
+                                        const compMatch =
+                                            (Array.isArray(componentRows) ? componentRows : []).find((r) => (r?.systemCode || '').toString().trim() === sc) ||
+                                            (Array.isArray(componentRows) ? componentRows : []).find((r) => (r?.componentCode || '').toString().trim() === (curr?.componentCode || '').toString().trim());
+                                        curr.supplierCategory = (productMatch?.data?.supplierCategory || curr.supplierCategory || '').toString();
+                                        curr.foodGrade = (supplierMatch?.foodGrade || compMatch?.foodGrade || curr.foodGrade || '').toString();
+                                        curr.recycledPolymerUsed = (compMatch?.recycledPolymerUsed || curr.recycledPolymerUsed || '').toString();
+                                        if (compMatch) {
+                                            curr.polymerType = compMatch.polymerType || curr.polymerType || '';
+                                        }
+                                        curr.componentPolymer = ''; // Ensure it's cleared for Producer
+                                        return curr;
+                                    };
                                     const fillFromSystemCode = (curr) => {
                                         const sc = (curr.systemCode || '').trim();
                                         if (!sc) return curr;
@@ -1801,10 +1973,10 @@ const ProductCompliance = ({
                                         const compMatch = componentRows.find(r => (r.componentCode || '').trim() === (curr.componentCode || '').trim());
                                         if (compMatch) {
                                             curr.polymerType = compMatch.polymerType || '';
-                                            curr.componentPolymer = compMatch.componentPolymer || '';
+                                            curr.componentPolymer = isProducer ? '' : (compMatch.componentPolymer || '');
                                             curr.category = compMatch.category || '';
                                         }
-                                        return curr;
+                                        return resolveMonthlyAutoFields(curr);
                                     };
                                     const updateField = (field, value) => {
                                         if (field === 'systemCode' && value) {
@@ -1897,11 +2069,19 @@ const ProductCompliance = ({
                                     };
                                     const saveRow = async () => {
                                         setSavingMonthlyRow(idx);
+                                        const resolvedRow = isProducer ? resolveMonthlyAutoFields({ ...(monthlyRows[idx] || {}) }) : (monthlyRows[idx] || {});
+                                        if (isProducer) {
+                                            setMonthlyRows((prev) => {
+                                                const copy = [...prev];
+                                                copy[idx] = resolvedRow;
+                                                return copy;
+                                            });
+                                        }
                                         const payload = {
                                             type,
                                             itemId,
                                             rowIndex: idx,
-                                            row: monthlyRows[idx]
+                                            row: resolvedRow
                                         };
                                         try {
                                             const res = await api.post(API_ENDPOINTS.CLIENT.MONTHLY_PROCUREMENT(clientId), payload);
@@ -1927,6 +2107,7 @@ const ProductCompliance = ({
                                             setMonthlyRows(prev => prev.filter((_, i) => i !== idx));
                                         }
                                     };
+                                    const resolvedRowForDisplay = isProducer ? resolveMonthlyAutoFields({ ...row }) : row;
                                     return (
                                         <tr key={idx} className="hover:bg-gray-50">
                                             <td className="px-3 py-2 text-center font-bold text-black">{idx + 1}</td>
@@ -1934,9 +2115,12 @@ const ProductCompliance = ({
                                                 { key:'systemCode', placeholder:'System Code', type:'select-system' },
                                                 { key:'skuCode', placeholder:'SKU Code', type:'text', readOnly: true },
                                                 { key:'supplierName', placeholder:'Supplier Name', type:'text', readOnly: true },
+                                                { key:'supplierCategory', placeholder:'Supplier Category', type:'text', readOnly: true },
+                                                { key:'foodGrade', placeholder:'Food Grade', type:'text', readOnly: true },
                                                 { key:'componentCode', placeholder:'Component code', type:'text', readOnly: true },
                                                 { key:'componentDescription', placeholder:'Component Description', type:'text', readOnly: true },
                                                 { key:'polymerType', placeholder:'Polymer Type', type:'text', readOnly: true },
+                                                { key:'recycledPolymerUsed', placeholder:'Recycled Polymer Used', type:'text', readOnly: true },
                                                 { key:'componentPolymer', placeholder:'Component Polymer', type:'text', readOnly: true },
                                                 { key:'category', placeholder:'Category of EPR', type:'text', readOnly: true },
                                                 { key:'dateOfInvoice', placeholder:'Date of invoice', type:'text' },
@@ -1945,6 +2129,7 @@ const ProductCompliance = ({
                                                 { key:'perPieceWeightKg', placeholder:'Per Piece Weight', type:'text' },
                                             ].filter(col => {
                                                 if (isProducer && (col.key === 'skuCode' || col.key === 'componentPolymer')) return false;
+                                                if (!isProducer && (col.key === 'supplierCategory' || col.key === 'foodGrade' || col.key === 'recycledPolymerUsed')) return false;
                                                 return !isManager || col.key !== 'systemCode';
                                             }).map((col) => (
                                                 <td key={col.key} className="px-2 py-2 whitespace-nowrap align-middle">
@@ -1952,7 +2137,7 @@ const ProductCompliance = ({
                                                         <div className="text-center text-xs text-gray-700 py-1.5">
                                                             {col.type === 'select-system' 
                                                                 ? (systemCodeOptions.find(opt => opt.code === row[col.key])?.label || row[col.key] || '-')
-                                                                : (row[col.key] || '-')
+                                                                : ((col.key === 'supplierCategory' || col.key === 'foodGrade' || col.key === 'recycledPolymerUsed' || col.key === 'polymerType') ? (resolvedRowForDisplay[col.key] || '-') : (row[col.key] || '-'))
                                                             }
                                                         </div>
                                                     ) : (
@@ -1997,7 +2182,7 @@ const ProductCompliance = ({
                                                                 : 'bg-white border border-gray-300 text-gray-700'
                                                             }`}
                                                             placeholder={col.placeholder}
-                                                            value={row[col.key] ?? ''}
+                                                            value={(col.key === 'supplierCategory' || col.key === 'foodGrade' || col.key === 'recycledPolymerUsed' || col.key === 'polymerType') ? (resolvedRowForDisplay[col.key] ?? '') : (row[col.key] ?? '')}
                                                             onChange={(e)=>updateField(col.key, e.target.value)}
                                                             readOnly={isManager || col.readOnly || (col.key === 'dateOfInvoice' && row[col.key] === 'Not Applicable') || (row.uom === 'Not Applicable' && ['purchaseQty', 'perPieceWeightKg'].includes(col.key))}
                                                             disabled={isManager}

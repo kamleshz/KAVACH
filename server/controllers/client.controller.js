@@ -351,11 +351,12 @@ export const getProductComplianceController = async (req, res) => {
         const { clientId } = req.params;
         const { type, itemId } = req.query;
         const doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
+        const rows = Array.isArray(doc?.rows) ? doc.rows.filter((r) => r && typeof r === 'object') : [];
         return res.status(200).json({
             message: "Product compliance fetched",
             error: false,
             success: true,
-            data: doc?.rows || [],
+            data: rows,
             hasDoc: !!doc
         });
     } catch (error) {
@@ -375,7 +376,7 @@ export const getAllProductComplianceRowsController = async (req, res) => {
         let allRows = [];
         docs.forEach(doc => {
             if (Array.isArray(doc.rows)) {
-                allRows = allRows.concat(doc.rows);
+                allRows = allRows.concat(doc.rows.filter((r) => r && typeof r === 'object'));
             }
         });
 

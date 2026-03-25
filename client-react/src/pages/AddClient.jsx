@@ -2460,7 +2460,17 @@ const AddClientContent = () => {
                       const purchase = Number(row.monthlyPurchaseMt) || 0;
                       const recycled = Number(row.recycledQty) || 0;
                       const category = (row.category || '').toString().trim() || 'Unknown';
-                      const polymer = (row.componentPolymer || row.polymerType || '').toString().trim() || 'Unknown';
+                      
+                      // For Producer, prefer the matching component's polymerType or the row's polymerType
+                      let polymer = '';
+                      if (isProducer) {
+                          polymer = (row.polymerType || row.componentPolymer || '').toString().trim() || 'Unknown';
+                      } else {
+                          polymer = (row.componentPolymer || row.polymerType || '').toString().trim() || 'Unknown';
+                      }
+                      
+                      const recycledPolymerUsed = (row.recycledPolymerUsed || '').toString().trim() || 'Unknown';
+                      
                       const quarter = (row.quarter || '').toString().trim() || 'Unknown';
                       const yearlyQuarter = (row.yearlyQuarter || '').toString().trim() || 'Unknown';
                       let half = 'Unknown';
@@ -2469,12 +2479,14 @@ const AddClientContent = () => {
                       }
 
                       allRows.push({
+                          ...row,
                           monthLabel,
                           monthIndex,
                           monthlyPurchaseMt: purchase,
                           recycledQty: recycled,
                           category,
                           polymer,
+                          recycledPolymerUsed,
                           quarter,
                           yearlyQuarter,
                           half,

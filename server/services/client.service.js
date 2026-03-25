@@ -190,18 +190,29 @@ class ClientService {
             throw new ApiError(404, `${type} detail not found`);
         }
 
-        const sanitize = (r) => ({
-            systemCode: r.systemCode || '',
-            componentCode: r.componentCode || '',
-            componentDescription: r.componentDescription || '',
-            supplierName: r.supplierName || '',
-            supplierType: r.supplierType || '',
-            supplierStatus: r.supplierStatus || '',
-            foodGrade: (r.foodGrade ?? r.foodgrade ?? '') || '',
-            eprCertificateNumber: r.eprCertificateNumber || '',
-            fssaiLicNo: r.fssaiLicNo || '',
-            fssaiValidUpto: r.fssaiValidUpto || ''
-        });
+        const sanitize = (r) => {
+            const rawFoodGrade = (r.foodGrade ?? r.foodgrade ?? '') || '';
+            const foodGradeText = (rawFoodGrade ?? '').toString().trim();
+            const foodGradeLower = foodGradeText.toLowerCase();
+            let foodGrade = foodGradeText;
+            if (foodGradeLower === 'yes' || foodGradeLower === 'food') foodGrade = 'Food';
+            else if (foodGradeLower === 'no' || foodGradeLower === 'non food' || foodGradeLower === 'non-food' || foodGradeLower === 'nonfood') foodGrade = 'Non Food';
+
+            return {
+                systemCode: r.systemCode || '',
+                componentCode: r.componentCode || '',
+                componentDescription: r.componentDescription || '',
+                supplierName: r.supplierName || '',
+                supplierState: r.supplierState || '',
+                supplierType: r.supplierType || '',
+                supplierStatus: r.supplierStatus || '',
+                applicationType: r.applicationType || '',
+                foodGrade,
+                eprCertificateNumber: r.eprCertificateNumber || '',
+                fssaiLicNo: r.fssaiLicNo || '',
+                fssaiValidUpto: r.fssaiValidUpto || ''
+            };
+        };
 
         let doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
         if (!doc) {
@@ -253,7 +264,7 @@ class ClientService {
             } else {
                 doc.supplierCompliance.set(idx, single);
             }
-            pushDiffs('Supplier Compliance', idx + 1, beforeRow, single, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo']);
+            pushDiffs('Supplier Compliance', idx + 1, beforeRow, single, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierStatus', 'applicationType', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo']);
             doc.markModified('supplierCompliance');
         } else {
             let parsed = rows;
@@ -265,7 +276,7 @@ class ClientService {
             const afterRows = parsed.map(sanitize);
             const maxLen = Math.max(beforeRows.length, afterRows.length);
             for (let i = 0; i < maxLen; i += 1) {
-                pushDiffs('Supplier Compliance', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo', 'fssaiValidUpto']);
+                pushDiffs('Supplier Compliance', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierStatus', 'applicationType', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo', 'fssaiValidUpto']);
             }
             doc.supplierCompliance = afterRows;
             doc.markModified('supplierCompliance');
@@ -587,24 +598,30 @@ class ClientService {
         if (!itemFound) {
             throw new ApiError(404, `${type} detail not found`);
         }
-        const sanitize = (r) => ({
-            systemCode: r.systemCode || '',
-            skuCode: r.skuCode || '',
-            componentCode: r.componentCode || '',
-            componentDescription: r.componentDescription || '',
-            supplierName: r.supplierName || '',
-            polymerType: r.polymerType || '',
-            componentPolymer: r.componentPolymer || '',
-            polymerCode: r.polymerCode || null,
-            category: r.category || '',
-            categoryIIType: r.categoryIIType || '',
-            containerCapacity: r.containerCapacity || '',
-            foodGrade: r.foodGrade || '',
-            layerType: r.layerType || '',
-            thickness: r.thickness || '',
-            auditorRemarks: r.auditorRemarks || '-',
-            managerRemarks: r.managerRemarks || '-'
-        });
+        const sanitize = (r) => {
+            const category = r.category || '';
+            const polymerType = r.polymerType || '';
+            const recycled = category === 'Category I' ? (r.recycledPolymerUsed || '') : '';
+            return {
+                systemCode: r.systemCode || '',
+                skuCode: r.skuCode || '',
+                componentCode: r.componentCode || '',
+                componentDescription: r.componentDescription || '',
+                supplierName: r.supplierName || '',
+                polymerType,
+                recycledPolymerUsed: recycled,
+                componentPolymer: r.componentPolymer || '',
+                polymerCode: r.polymerCode || null,
+                category,
+                categoryIIType: r.categoryIIType || '',
+                containerCapacity: r.containerCapacity || '',
+                foodGrade: r.foodGrade || '',
+                layerType: r.layerType || '',
+                thickness: r.thickness || '',
+                auditorRemarks: r.auditorRemarks || '-',
+                managerRemarks: r.managerRemarks || '-'
+            };
+        };
         let doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
         if (!doc) {
             doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [], componentDetails: [] });
@@ -647,12 +664,17 @@ class ClientService {
                 throw new ApiError(400, "Invalid rowIndex");
             }
             const beforeRow = doc.componentDetails?.[idx] || {};
+            // Validate rPET usage
+            if ((single.recycledPolymerUsed || '').toString().trim().toLowerCase() === 'rpet' &&
+                (single.polymerType || '').toString().trim().toUpperCase() !== 'PET') {
+                throw new ApiError(400, "Recycled Polymer Used 'rPET' requires Polymer Type 'PET'");
+            }
             if (idx >= doc.componentDetails.length) {
                 doc.componentDetails.push(single);
             } else {
                 doc.componentDetails.set(idx, single);
             }
-            pushDiffs('Component Details', idx + 1, beforeRow, single, ['skuCode', 'componentCode', 'componentDescription', 'supplierName', 'polymerType', 'componentPolymer', 'polymerCode', 'category', 'containerCapacity', 'foodGrade', 'layerType', 'thickness', 'auditorRemarks', 'managerRemarks']);
+            pushDiffs('Component Details', idx + 1, beforeRow, single, ['skuCode', 'componentCode', 'componentDescription', 'supplierName', 'polymerType', 'recycledPolymerUsed', 'componentPolymer', 'polymerCode', 'category', 'containerCapacity', 'foodGrade', 'layerType', 'thickness', 'auditorRemarks', 'managerRemarks']);
         } else {
             let parsed = rows;
             if (typeof parsed === 'string') {
@@ -661,9 +683,16 @@ class ClientService {
             if (!Array.isArray(parsed)) parsed = [];
             const beforeRows = Array.isArray(doc.componentDetails) ? doc.componentDetails : [];
             const afterRows = parsed.map(sanitize);
+            // Validate all rows
+            for (const r of afterRows) {
+                if ((r.recycledPolymerUsed || '').toString().trim().toLowerCase() === 'rpet' &&
+                    (r.polymerType || '').toString().trim().toUpperCase() !== 'PET') {
+                    throw new ApiError(400, "Recycled Polymer Used 'rPET' requires Polymer Type 'PET'");
+                }
+            }
             const maxLen = Math.max(beforeRows.length, afterRows.length);
             for (let i = 0; i < maxLen; i += 1) {
-                pushDiffs('Component Details', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['skuCode', 'componentCode', 'componentDescription', 'supplierName', 'polymerType', 'componentPolymer', 'polymerCode', 'category', 'categoryIIType', 'containerCapacity', 'foodGrade', 'layerType', 'thickness', 'auditorRemarks', 'managerRemarks']);
+                pushDiffs('Component Details', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['skuCode', 'componentCode', 'componentDescription', 'supplierName', 'polymerType', 'recycledPolymerUsed', 'componentPolymer', 'polymerCode', 'category', 'categoryIIType', 'containerCapacity', 'foodGrade', 'layerType', 'thickness', 'auditorRemarks', 'managerRemarks']);
             }
             doc.componentDetails = afterRows;
         }
@@ -867,9 +896,12 @@ class ClientService {
                 systemCode: r.systemCode || '',
                 skuCode: r.skuCode || '',
                 supplierName: r.supplierName || '',
+                supplierCategory: r.supplierCategory || '',
+                foodGrade: r.foodGrade || '',
                 componentCode: r.componentCode || '',
                 componentDescription: r.componentDescription || '',
                 polymerType: r.polymerType || '',
+                recycledPolymerUsed: r.recycledPolymerUsed || '',
                 componentPolymer: r.componentPolymer || '',
                 category: r.category || '',
                 dateOfInvoice: r.dateOfInvoice || '',
@@ -887,7 +919,7 @@ class ClientService {
                 virginQty: Number(r.virginQty) || 0,
                 virginRate: Number(r.virginRate) || 0,
                 virginQtyAmount: Number(r.virginQtyAmount) || 0,
-                rcPercentMentioned: (r.rcPercentMentioned || '').toString()
+                rcPercentMentioned: r.rcPercentMentioned || ''
             };
         };
 
@@ -939,7 +971,7 @@ class ClientService {
             } else {
                 doc.procurementDetails.set(idx, single);
             }
-            pushDiffs('Monthly Procurement Data', idx + 1, beforeRow, single, ['systemCode', 'skuCode', 'supplierName', 'componentCode', 'componentDescription', 'polymerType', 'componentPolymer', 'category', 'dateOfInvoice', 'monthName', 'quarter', 'yearlyQuarter', 'purchaseQty', 'uom', 'perPieceWeightKg', 'monthlyPurchaseMt', 'recycledPercent', 'recycledQty', 'recycledRate', 'recycledQrtAmount', 'virginQty', 'virginRate', 'virginQtyAmount', 'rcPercentMentioned']);
+            pushDiffs('Monthly Procurement Data', idx + 1, beforeRow, single, ['systemCode', 'skuCode', 'supplierName', 'supplierCategory', 'foodGrade', 'componentCode', 'componentDescription', 'polymerType', 'recycledPolymerUsed', 'componentPolymer', 'category', 'dateOfInvoice', 'monthName', 'quarter', 'yearlyQuarter', 'purchaseQty', 'uom', 'perPieceWeightKg', 'monthlyPurchaseMt', 'recycledPercent', 'recycledQty', 'recycledRate', 'recycledQrtAmount', 'virginQty', 'virginRate', 'virginQtyAmount', 'rcPercentMentioned']);
         } else {
             let parsed = rows;
             if (typeof parsed === 'string') {
@@ -950,7 +982,7 @@ class ClientService {
             const afterRows = parsed.map(sanitize);
             const maxLen = Math.max(beforeRows.length, afterRows.length);
             for (let i = 0; i < maxLen; i += 1) {
-                pushDiffs('Monthly Procurement Data', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['systemCode', 'skuCode', 'supplierName', 'componentCode', 'componentDescription', 'polymerType', 'componentPolymer', 'category', 'dateOfInvoice', 'monthName', 'quarter', 'yearlyQuarter', 'purchaseQty', 'uom', 'perPieceWeightKg', 'monthlyPurchaseMt', 'recycledPercent', 'recycledQty', 'recycledRate', 'recycledQrtAmount', 'virginQty', 'virginRate', 'virginQtyAmount', 'rcPercentMentioned']);
+                pushDiffs('Monthly Procurement Data', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['systemCode', 'skuCode', 'supplierName', 'supplierCategory', 'foodGrade', 'componentCode', 'componentDescription', 'polymerType', 'recycledPolymerUsed', 'componentPolymer', 'category', 'dateOfInvoice', 'monthName', 'quarter', 'yearlyQuarter', 'purchaseQty', 'uom', 'perPieceWeightKg', 'monthlyPurchaseMt', 'recycledPercent', 'recycledQty', 'recycledRate', 'recycledQrtAmount', 'virginQty', 'virginRate', 'virginQtyAmount', 'rcPercentMentioned']);
             }
             doc.procurementDetails = afterRows;
         }

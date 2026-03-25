@@ -24,6 +24,7 @@ import {
   FaCalendarAlt,
   FaUserTie,
   FaRecycle,
+  FaChartLine,
   FaBolt,
   FaOilCan,
   FaCarSide,
@@ -101,6 +102,13 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [selectedIndustryCategory, setSelectedIndustryCategory] = useState('All');
   const [selectedComplianceStatus, setSelectedComplianceStatus] = useState('All');
+  const [selectedFoodGrade, setSelectedFoodGrade] = useState('All');
+  const [producerViewMode, setProducerViewMode] = useState('cards');
+  const [producerCardOpen, setProducerCardOpen] = useState(new Set());
+  const [brandOwnerViewMode, setBrandOwnerViewMode] = useState('accordion');
+  const [expandedBrandOwnerSku, setExpandedBrandOwnerSku] = useState(null);
+  const [closingBrandOwnerSku, setClosingBrandOwnerSku] = useState(null);
+  const [brandOwnerComponentStatusFilter, setBrandOwnerComponentStatusFilter] = useState(null);
   const isProducerEntity = (client?.entityType || '').toString().toLowerCase().includes('producer');
 
   const { type, itemId } = useMemo(() => {
@@ -220,6 +228,15 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                   supplierStatus: supplierRow.supplierStatus || '-',
                   eprCertificateNumber: supplierRow.eprCertificateNumber || '-',
                   polymerType: componentRow.polymerType || procurement.polymerType || '-',
+                  foodGrade: supplierRow.foodGrade || componentRow.foodGrade || '-',
+                  recycledPolymerUsed:
+                    procurement.recycledPolymerUsed ||
+                    procurement.recycled_polymer_used ||
+                    procurement['Recycled Polymer Used'] ||
+                    componentRow.recycledPolymerUsed ||
+                    componentRow.recycled_polymer_used ||
+                    componentRow['Recycled Polymer Used'] ||
+                    '-',
                   componentPolymer:
                     componentRow.componentPolymer || procurement.componentPolymer || '-',
                   category: componentRow.category || procurement.category || '-',
@@ -273,6 +290,12 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                 supplierStatus: supplierRow.supplierStatus || '-',
                 eprCertificateNumber: supplierRow.eprCertificateNumber || '-',
                 polymerType: componentRow.polymerType || '-',
+                foodGrade: supplierRow.foodGrade || componentRow.foodGrade || '-',
+                recycledPolymerUsed:
+                  componentRow.recycledPolymerUsed ||
+                  componentRow.recycled_polymer_used ||
+                  componentRow['Recycled Polymer Used'] ||
+                  '-',
                 componentPolymer: componentRow.componentPolymer || '-',
                 category: componentRow.category || '-',
                 categoryIIType: componentRow.categoryIIType || '-',
@@ -353,6 +376,14 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                     eprCertificateNumber: supplierRow.eprCertificateNumber || '-',
                     polymerType: componentRow.polymerType || procurement.polymerType || '-',
                     componentPolymer: componentRow.componentPolymer || procurement.componentPolymer || '-',
+                    recycledPolymerUsed:
+                      procurement.recycledPolymerUsed ||
+                      procurement.recycled_polymer_used ||
+                      procurement['Recycled Polymer Used'] ||
+                      componentRow.recycledPolymerUsed ||
+                      componentRow.recycled_polymer_used ||
+                      componentRow['Recycled Polymer Used'] ||
+                      '-',
                     category: componentRow.category || procurement.category || '-',
                 categoryIIType: componentRow.categoryIIType || '-',
                 containerCapacity: componentRow.containerCapacity !== undefined && componentRow.containerCapacity !== null ? componentRow.containerCapacity : '-',
@@ -398,6 +429,11 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                 eprCertificateNumber: supplierRow.eprCertificateNumber || '-',
                 polymerType: componentRow.polymerType || '-',
                 componentPolymer: componentRow.componentPolymer || '-',
+                recycledPolymerUsed:
+                  componentRow.recycledPolymerUsed ||
+                  componentRow.recycled_polymer_used ||
+                  componentRow['Recycled Polymer Used'] ||
+                  '-',
                 category: componentRow.category || '-',
                 categoryIIType: componentRow.categoryIIType || '-',
                 containerCapacity: componentRow.containerCapacity !== undefined && componentRow.containerCapacity !== null ? componentRow.containerCapacity : '-',
@@ -754,7 +790,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
           />
         </div>
 
-        {initialViewMode === 'client-connect' && (regs.length > 0 || capacityRows.length > 0) && (
+        {initialViewMode !== 'client-connect' && (regs.length > 0 || capacityRows.length > 0) && (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
               <FaIndustry className="text-primary-600 text-sm" />
@@ -1554,7 +1590,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                           </div>
                         </div>
 
-                        {initialViewMode !== 'client-connect' && (
+                        {initialViewMode === 'client-connect' && (
                           <div className="space-y-4">
                             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                               <div className="flex items-center gap-2">
@@ -1681,6 +1717,67 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                                 </div>
                               </div>
                             )}
+                          </div>
+                        )}
+                        {initialViewMode === 'client-connect' && Array.isArray(pf.ctoProductionCapacityValidation) && pf.ctoProductionCapacityValidation.length > 0 && (
+                          <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200">
+                            <table className="w-full text-left border-collapse">
+                              <thead className="bg-gray-50 text-gray-700 text-xs uppercase tracking-wider">
+                                <tr>
+                                  <th className="p-3 font-semibold border-b">Product Name</th>
+                                  <th className="p-3 font-semibold border-b">Machine name</th>
+                                  <th className="p-3 font-semibold border-b">Production output in one HR</th>
+                                  <th className="p-3 font-semibold border-b">UOM</th>
+                                  <th className="p-3 font-semibold border-b">Power per hr KWH</th>
+                                  <th className="p-3 font-semibold border-b">Machine working days</th>
+                                  <th className="p-3 font-semibold border-b">Machine Total working hours per day</th>
+                                  <th className="p-3 font-semibold border-b">Total monthly capacity (KG)</th>
+                                  <th className="p-3 font-semibold border-b">Total monthly capacity (MT)</th>
+                                  <th className="p-3 font-semibold border-b">Total electricity per month KWH</th>
+                                  <th className="p-3 font-semibold border-b">Consent capacity</th>
+                                  <th className="p-3 font-semibold border-b">UOM</th>
+                                  <th className="p-3 font-semibold border-b">Utilization %</th>
+                                </tr>
+                              </thead>
+                              <tbody className="text-sm divide-y divide-gray-100">
+                                {pf.ctoProductionCapacityValidation.map((r, idx) => {
+                                  const fmt = (v) => {
+                                    if (v === null || v === undefined) return '';
+                                    const n = Number(v);
+                                    if (!Number.isFinite(n)) return '';
+                                    return (Math.round(n * 100) / 100).toString();
+                                  };
+                                  const uom = (r.uom || '').toString().trim().toUpperCase();
+                                  const consentUom = (r.consentUom || uom || '').toString().trim().toUpperCase();
+                                  const totalMonthlyCapacity = Number(r.totalMonthlyCapacity) || 0;
+                                  const totalMonthlyCapacityMt = Number(r.totalMonthlyCapacityMt) || (uom === 'KG' ? totalMonthlyCapacity / 1000 : 0);
+                                  const consentCapacity = Number(r.consentCapacity) || 0;
+                                  const util = Number.isFinite(Number(r.utilizationPercent))
+                                    ? Number(r.utilizationPercent)
+                                    : (consentCapacity > 0
+                                      ? (((uom === 'KG' && consentUom === 'MT') ? (totalMonthlyCapacity / 1000) : totalMonthlyCapacity) / consentCapacity) * 100
+                                      : 0);
+                                  const isHigh = util >= 100;
+                                  return (
+                                    <tr key={idx} className="hover:bg-gray-50">
+                                      <td className="p-3 text-gray-700">{r.productName || '-'}</td>
+                                      <td className="p-3 text-gray-700">{r.machineName || '-'}</td>
+                                      <td className="p-3 text-gray-700">{fmt(r.productionOutputPerHr)}</td>
+                                      <td className="p-3 text-gray-700">{uom || '-'}</td>
+                                      <td className="p-3 text-gray-700">{fmt(r.powerPerHrKwh)}</td>
+                                      <td className="p-3 text-gray-700">{fmt(r.workingDays)}</td>
+                                      <td className="p-3 text-gray-700">{fmt(r.workingHoursPerDay)}</td>
+                                      <td className="p-3 text-gray-700">{fmt(totalMonthlyCapacity)}</td>
+                                      <td className="p-3 text-gray-700">{uom === 'KG' ? fmt(totalMonthlyCapacityMt) : 'NA'}</td>
+                                      <td className="p-3 text-gray-700">{fmt(r.totalElectricityConsumptionPerMonthKwh)}</td>
+                                      <td className="p-3 text-gray-700">{fmt(consentCapacity)}</td>
+                                      <td className="p-3 text-gray-700">{uom === 'KG' ? 'MT' : (consentUom || '-')}</td>
+                                      <td className={`p-3 ${isHigh ? 'text-red-600 font-semibold' : 'text-gray-700'}`}>{fmt(util)}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
                           </div>
                         )}
                       </div>
@@ -1840,16 +1937,54 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
 
 
   const renderSkuSummary = () => {
+    const normalizeLayerType = (value) => {
+      const raw = (value ?? '').toString().trim();
+      if (!raw) return '—';
+      const s = raw.toLowerCase();
+      if (s.includes('multi')) return 'Multilayer';
+      if (s.includes('mono') || s.includes('single')) return 'Monolayer';
+      return raw;
+    };
+
+    const toggleBrandOwnerSku = (skuKey) => {
+      const currentExpanded = expandedBrandOwnerSku;
+
+      if (currentExpanded && currentExpanded !== skuKey) {
+        const toClose = currentExpanded;
+        setClosingBrandOwnerSku(toClose);
+        window.setTimeout(() => {
+          setClosingBrandOwnerSku((prev) => (prev === toClose ? null : prev));
+        }, 260);
+      }
+
+      if (currentExpanded === skuKey) {
+        setClosingBrandOwnerSku(skuKey);
+        window.setTimeout(() => {
+          setExpandedBrandOwnerSku((prev) => (prev === skuKey ? null : prev));
+          setClosingBrandOwnerSku((prev) => (prev === skuKey ? null : prev));
+        }, 260);
+        return;
+      }
+
+      setExpandedBrandOwnerSku(skuKey);
+      setClosingBrandOwnerSku(null);
+    };
+
     const categories = ['All', ...new Set(skuTableData.map(item => item.industryCategory).filter(Boolean))];
+    const foodGrades = ['All', ...new Set(skuTableData.map(item => item.foodGrade).filter(Boolean))];
     const complianceOptions = ['All', 'Compliant', 'Non-Compliant'];
 
     const filteredByIndustry = selectedIndustryCategory === 'All' 
       ? skuTableData 
       : skuTableData.filter(item => item.industryCategory === selectedIndustryCategory);
 
-    const filteredData = selectedComplianceStatus === 'All'
+    const filteredByFood = selectedFoodGrade === 'All'
       ? filteredByIndustry
-      : filteredByIndustry.filter(item => item.productComplianceStatus === selectedComplianceStatus);
+      : filteredByIndustry.filter(item => (item.foodGrade || '-') === selectedFoodGrade);
+
+    const filteredData = selectedComplianceStatus === 'All'
+      ? filteredByFood
+      : filteredByFood.filter(item => item.productComplianceStatus === selectedComplianceStatus);
 
     // Calculate status counts based on ALL data (or filtered? usually dashboard cards show summary of current view)
     // Let's use filteredData for dynamic updates as requested by standard patterns
@@ -1886,6 +2021,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
       { title: 'EPR Cert. No', dataIndex: 'eprCertificateNumber', key: 'eprCertificateNumber', width: 120 },
       { title: 'Polymer Type', dataIndex: 'polymerType', key: 'polymerType', width: 100 },
       { title: 'Component Polymer', dataIndex: 'componentPolymer', key: 'componentPolymer', width: 120 },
+      { title: 'Recycled Polymer Used', dataIndex: 'recycledPolymerUsed', key: 'recycledPolymerUsed', width: 160 },
       { title: 'Category', dataIndex: 'category', key: 'category', width: 100 },
       { title: 'Category II Type', dataIndex: 'categoryIIType', key: 'categoryIIType', width: 120 },
       { title: 'Container Capacity', dataIndex: 'containerCapacity', key: 'containerCapacity', width: 120 },
@@ -1954,6 +2090,17 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
       }
     ];
 
+    const producerDetailColumns = detailColumns
+      .filter((col) => col.key !== 'componentPolymer')
+      .map((col) => {
+        if (col.key !== 'layerType') return col;
+        return {
+          ...col,
+          title: 'Multilayer/Monolayer',
+          render: (val) => <span className="text-gray-800">{normalizeLayerType(val)}</span>
+        };
+      });
+
     const expandedRowRender = (record) => {
       return (
         <Table
@@ -1972,7 +2119,7 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
 
     if (isProducerEntity) {
         // Use standard component table columns for Producer (flat view)
-        columns = detailColumns;
+        columns = producerDetailColumns;
     } else {
         // Standard SKU -> Component Table for Brand Owners
         columns = [
@@ -2121,6 +2268,17 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
                 options={categories.map(c => ({ value: c, label: c }))}
               />
             </div>
+            {isProducerEntity && (
+              <div className="w-full md:w-64">
+                <span className="text-sm font-semibold text-gray-700 block mb-1">Filter by Food Grade:</span>
+                <Select
+                  className="w-full"
+                  value={selectedFoodGrade}
+                  onChange={setSelectedFoodGrade}
+                  options={foodGrades.map(f => ({ value: f, label: f }))}
+                />
+              </div>
+            )}
             <div className="w-full md:w-64">
               <span className="text-sm font-semibold text-gray-700 block mb-1">Compliance Status:</span>
               <Select
@@ -2131,7 +2289,47 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
               />
             </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
+            {isProducerEntity && (
+              <div className="inline-flex items-center rounded-lg bg-gray-100 p-0.5 mr-2">
+                <button
+                  onClick={() => setProducerViewMode('cards')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
+                    producerViewMode === 'cards' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Cards
+                </button>
+                <button
+                  onClick={() => setProducerViewMode('table')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
+                    producerViewMode === 'table' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Table
+                </button>
+              </div>
+            )}
+            {!isProducerEntity && (
+              <div className="inline-flex items-center rounded-lg bg-gray-100 p-0.5 mr-2">
+                <button
+                  onClick={() => setBrandOwnerViewMode('accordion')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
+                    brandOwnerViewMode === 'accordion' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  List
+                </button>
+                <button
+                  onClick={() => setBrandOwnerViewMode('table')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
+                    brandOwnerViewMode === 'table' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Table
+                </button>
+              </div>
+            )}
             <div className="bg-gradient-to-br from-green-50 to-white px-4 py-3 rounded-xl border border-green-200 flex items-center gap-3 min-w-[180px] shadow-sm">
               <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
                 <FaCheckCircle className="text-green-600" />
@@ -2161,20 +2359,548 @@ const ClientDetail = ({ clientId, embedded = false, initialViewMode, onAuditComp
           </div>
         </div>
 
-        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-          <Table
-            columns={columns}
-            dataSource={filteredData}
-            pagination={false}
-            rowKey={(row, index) => row.key || row._id || `${row.skuCode || 'sku'}-${index}`}
-          scroll={{ x: 1200 }}
-          size="middle"
-          expandable={isProducerEntity ? undefined : {
-            expandedRowRender,
-            rowExpandable: (record) => record.details && record.details.length > 0,
-          }}
-        />
-        </div>
+        {isProducerEntity && producerViewMode === 'cards' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredData.map((item, idx) => {
+              const cardKey = item.key || `${item.componentCode}-${idx}`;
+              const status = item.componentComplianceStatus || item.productComplianceStatus || 'Pending';
+              const isOpen = producerCardOpen.has(cardKey);
+              const toggleOpen = () => {
+                setProducerCardOpen((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(cardKey)) next.delete(cardKey);
+                  else next.add(cardKey);
+                  return next;
+                });
+              };
+
+              return (
+                <div key={cardKey} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                  <div className="h-1 bg-purple-500" />
+
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[11px] font-semibold">
+                        {item.componentCode || '-'}
+                      </span>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold border ${
+                        status === 'Compliant'
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : status === 'Non-Compliant'
+                          ? 'bg-red-50 text-red-700 border-red-200'
+                          : 'bg-yellow-50 text-amber-700 border-yellow-200'
+                      }`}>
+                        {status}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex items-start gap-3">
+                      <div className="h-14 w-14 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {item.componentImage ? (
+                          <Image
+                            src={typeof item.componentImage === 'string' ? resolveUrl(item.componentImage) : ''}
+                            alt="Component"
+                            className="w-full h-full object-cover"
+                            preview={item.componentImage ? { src: typeof item.componentImage === 'string' ? resolveUrl(item.componentImage) : '' } : false}
+                          />
+                        ) : (
+                          <div className="text-[10px] text-gray-400 text-center leading-tight px-2">
+                            No Image
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-900 leading-snug">
+                          {item.componentDescription || '-'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-100 p-4 space-y-4">
+                    <div>
+                      <div className="w-full flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-md">
+                        <FaUser className="text-[11px] text-blue-700" />
+                        <span>SUPPLIER</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                        <div className="col-span-2">
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">SUPPLIER NAME</div>
+                          <div className="mt-0.5 text-gray-900 font-semibold">{item.supplierName || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">SUPPLIER STATUS</div>
+                          <div className="mt-0.5">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                              (item.supplierStatus || '').toLowerCase().includes('reg')
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : (item.supplierStatus || '').toLowerCase().includes('unreg')
+                                ? 'bg-red-50 text-red-700 border-red-200'
+                                : 'bg-gray-50 text-gray-700 border-gray-200'
+                            }`}>
+                              {item.supplierStatus || '—'}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">EPR CERT. NO</div>
+                          <div className="mt-0.5 text-gray-900 font-semibold">{item.eprCertificateNumber || '—'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="w-full flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-md">
+                        <FaRecycle className="text-[11px] text-emerald-700" />
+                        <span>POLYMER DETAILS</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">POLYMER TYPE</div>
+                          <div className="mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
+                              {item.polymerType || '—'}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">RECYCLED POLYMER</div>
+                          <div className="mt-1 text-gray-900 font-semibold">{item.recycledPolymerUsed || '—'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="w-full flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-purple-50 text-purple-700 px-2.5 py-1.5 rounded-md">
+                        <FaIdCard className="text-[11px] text-purple-700" />
+                        <span>CLASSIFICATION</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">CATEGORY</div>
+                          <div className="mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-semibold">
+                              {item.category || '—'}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">CATEGORY II TYPE</div>
+                          <div className="mt-1 text-gray-900 font-semibold">{item.categoryIIType || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">MULTILAYER/MONOLAYER</div>
+                          <div className="mt-1 text-gray-900 font-semibold">{normalizeLayerType(item.layerType)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">CONTAINER CAPACITY</div>
+                          <div className="mt-1 text-gray-900 font-semibold">{item.containerCapacity || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">THICKNESS (M)</div>
+                          <div className="mt-1 text-gray-900 font-semibold">{item.thickness || '—'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="w-full flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-orange-50 text-orange-700 px-2.5 py-1.5 rounded-md">
+                        <FaChartLine className="text-[11px] text-orange-700" />
+                        <span>MEASUREMENTS</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">MONTHLY (MT)</div>
+                          <div className="mt-1 text-gray-900 font-semibold">{item.monthlyPurchaseMt || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">RECYCLED QTY</div>
+                          <div className="mt-1 text-gray-900 font-semibold">{item.recycledQty || '—'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-3">
+                      <div className="w-full flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-gray-50 text-gray-700 px-2.5 py-1.5 rounded-md">
+                        <FaFile className="text-[11px] text-gray-500" />
+                        <span>REMARKS & DOCUMENTS</span>
+                      </div>
+                      <div className="mt-2 space-y-2 text-xs">
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">AUDITOR REMARKS</div>
+                          <div className="mt-0.5 text-gray-900 font-semibold whitespace-pre-wrap">{item.auditorRemarks || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">ADDITIONAL DOCUMENT</div>
+                          <div className="mt-0.5">
+                            {item.additionalDocument ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const url = typeof item.additionalDocument === 'string' ? resolveUrl(item.additionalDocument) : '';
+                                  if (url) window.open(url, '_blank');
+                                }}
+                                className="text-[11px] font-semibold text-primary-600 hover:text-primary-800 underline"
+                              >
+                                View
+                              </button>
+                            ) : (
+                              <span className="text-gray-900 font-semibold">—</span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">MANAGER REMARKS</div>
+                          <div className="mt-0.5 text-gray-900 font-semibold whitespace-pre-wrap">{item.managerRemarks || '—'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (!isProducerEntity && initialViewMode === 'client-connect' && brandOwnerViewMode === 'accordion') ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filteredData.map((sku, idx) => {
+              const skuKey = sku.key || sku._id || sku.skuCode || `sku-${idx}`;
+              const isExpanded = expandedBrandOwnerSku === skuKey && closingBrandOwnerSku !== skuKey;
+              const isClosing = closingBrandOwnerSku === skuKey;
+              const status = sku.productComplianceStatus || 'Pending';
+              const borderClass =
+                status === 'Compliant'
+                  ? 'border-l-green-500'
+                  : status === 'Non-Compliant'
+                  ? 'border-l-red-500'
+                  : 'border-l-gray-300';
+
+              const componentCount = new Set((sku.details || []).map((d) => (d.componentCode || '').trim()).filter(Boolean)).size;
+              const compliantCount = (sku.details || []).filter((d) => {
+                const st = (d.componentComplianceStatus || d.complianceStatus || 'Pending').toString();
+                return st === 'Compliant';
+              }).length;
+              const nonCompliantCount = (sku.details || []).filter((d) => {
+                const st = (d.componentComplianceStatus || d.complianceStatus || 'Pending').toString();
+                return st === 'Non-Compliant';
+              }).length;
+
+              return (
+                <div key={skuKey} className={`border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm border-l-4 ${borderClass} ${isExpanded ? 'lg:col-span-2' : ''}`}>
+                  <div className={`px-4 py-4 ${status === 'Compliant' ? 'bg-green-50/30' : status === 'Non-Compliant' ? 'bg-red-50/30' : 'bg-gray-50/30'}`}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="h-12 w-12 rounded-lg border border-gray-200 bg-white flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {sku.productImage ? (
+                            <Image
+                              src={typeof sku.productImage === 'string' ? resolveUrl(sku.productImage) : ''}
+                              alt="Product"
+                              className="w-full h-full object-cover"
+                              preview={sku.productImage ? { src: typeof sku.productImage === 'string' ? resolveUrl(sku.productImage) : '' } : false}
+                            />
+                          ) : (
+                            <div className="text-[10px] text-gray-400 text-center leading-tight px-2">No Image</div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[11px] font-semibold">
+                              {sku.skuCode || '—'}
+                            </span>
+                            {sku.industryCategory ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-semibold border border-blue-200">
+                                {sku.industryCategory}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-1 text-base font-semibold text-gray-900 truncate">{sku.skuDescription || '—'}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold border ${
+                          status === 'Compliant'
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : status === 'Non-Compliant'
+                            ? 'bg-red-50 text-red-700 border-red-200'
+                            : 'bg-gray-50 text-gray-700 border-gray-200'
+                        }`}>
+                          <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+                          {status}
+                        </span>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+                          <FaRecycle className="text-green-600" />
+                          <span className="text-gray-500">Recycled Qty:</span>
+                          <span className="text-gray-900">{sku.recycledQty || '0.000'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="px-4 py-3 border-t border-gray-100 bg-white flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] font-bold tracking-wider text-gray-600">{componentCount} COMPONENTS</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isExpanded) toggleBrandOwnerSku(skuKey);
+                          setBrandOwnerComponentStatusFilter('Compliant');
+                        }}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-green-50 text-green-700 border-green-200"
+                      >
+                        Compliant: {compliantCount}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isExpanded) toggleBrandOwnerSku(skuKey);
+                          setBrandOwnerComponentStatusFilter('Non-Compliant');
+                        }}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-red-50 text-red-700 border-red-200"
+                      >
+                        Non‑Compliant: {nonCompliantCount}
+                      </button>
+                      {isExpanded && brandOwnerComponentStatusFilter && (
+                        <button
+                          type="button"
+                          onClick={() => setBrandOwnerComponentStatusFilter(null)}
+                          className="ml-1 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-600 hover:text-gray-800"
+                          title="Show all components"
+                        >
+                          Show All
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleBrandOwnerSku(skuKey)}
+                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800"
+                    >
+                      <span>{isExpanded ? 'Collapse' : 'View Components'}</span>
+                      <FaChevronDown className={`text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
+
+                  <div
+                    className={`border-t border-gray-100 bg-white overflow-hidden transition-all duration-300 ease-in-out ${
+                      isExpanded ? 'max-h-[6000px] opacity-100' : 'max-h-0 opacity-0'
+                    }`}
+                  >
+                    {(isExpanded || isClosing) && (
+                      <div className="px-4 py-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {((sku.details || []).filter((comp) => {
+                            if (!brandOwnerComponentStatusFilter) return true;
+                            const st = (comp.componentComplianceStatus || comp.complianceStatus || 'Pending').toString();
+                            return st === brandOwnerComponentStatusFilter;
+                          })).map((comp, cidx) => {
+                            const compKey = comp.key || comp._id || `${comp.componentCode || 'comp'}-${comp.supplierName || 'supp'}-${cidx}`;
+                            const compStatus = comp.componentComplianceStatus || comp.complianceStatus || 'Pending';
+                            const supplierStatus = (comp.supplierStatus || '').toString();
+                            const isRegistered = supplierStatus.toLowerCase().includes('reg');
+                            const isUnregistered = supplierStatus.toLowerCase().includes('unreg');
+
+                            return (
+                              <div key={compKey} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                                <div className="h-1 bg-gray-200" />
+                                <div className="p-4">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[11px] font-semibold">
+                                      {comp.componentCode || '—'}
+                                    </span>
+                                    <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold border ${
+                                      compStatus === 'Compliant'
+                                        ? 'bg-green-50 text-green-700 border-green-200'
+                                        : compStatus === 'Non-Compliant'
+                                        ? 'bg-red-50 text-red-700 border-red-200'
+                                        : 'bg-gray-50 text-gray-700 border-gray-200'
+                                    }`}>
+                                      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+                                      {compStatus}
+                                    </span>
+                                  </div>
+
+                                  <div className="mt-3 flex items-start gap-3">
+                                    <div className="h-14 w-14 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                      {comp.componentImage ? (
+                                        <Image
+                                          src={typeof comp.componentImage === 'string' ? resolveUrl(comp.componentImage) : ''}
+                                          alt="Component"
+                                          className="w-full h-full object-cover"
+                                          preview={comp.componentImage ? { src: typeof comp.componentImage === 'string' ? resolveUrl(comp.componentImage) : '' } : false}
+                                        />
+                                      ) : (
+                                        <div className="text-[10px] text-gray-400 text-center leading-tight px-2">No Image</div>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-semibold text-gray-900 leading-snug">
+                                        {comp.componentDescription || '—'}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-4 space-y-3">
+                                    <div>
+                                      <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-md -mx-0.5">
+                                        <FaUser className="text-[11px]" />
+                                        SUPPLIER
+                                      </div>
+                                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                                        <div className="text-gray-500 font-bold">Supplier Name</div>
+                                        <div className="text-gray-900 font-semibold truncate">{comp.supplierName || '—'}</div>
+                                        <div className="text-gray-500 font-bold">Supplier Status</div>
+                                        <div>
+                                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                                            isRegistered
+                                              ? 'bg-green-50 text-green-700 border-green-200'
+                                              : isUnregistered
+                                              ? 'bg-red-50 text-red-700 border-red-200'
+                                              : 'bg-gray-50 text-gray-700 border-gray-200'
+                                          }`}>
+                                            {supplierStatus || '—'}
+                                          </span>
+                                        </div>
+                                        <div className="text-gray-500 font-bold">EPR Cert. No</div>
+                                        <div className="text-gray-900 font-semibold">{comp.eprCertificateNumber || '—'}</div>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-md -mx-0.5">
+                                        <FaRecycle className="text-[11px]" />
+                                        POLYMER DETAILS
+                                      </div>
+                                      <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Polymer Type</div>
+                                          <div className="mt-1">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
+                                              {comp.polymerType || '—'}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Comp. Polymer</div>
+                                          <div className="mt-1 text-gray-900 font-semibold">{comp.componentPolymer || '—'}</div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-purple-50 text-purple-700 px-2.5 py-1.5 rounded-md -mx-0.5">
+                                        <FaIdCard className="text-[11px]" />
+                                        CLASSIFICATION
+                                      </div>
+                                      <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Category</div>
+                                          <div className="mt-1">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-semibold">
+                                              {comp.category || '—'}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Category II Type</div>
+                                          <div className="mt-1 text-gray-900 font-semibold">{comp.categoryIIType || '—'}</div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Multilayer/Monolayer</div>
+                                          <div className="mt-1 text-gray-900 font-semibold">{normalizeLayerType(comp.layerType)}</div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Container Capacity</div>
+                                          <div className="mt-1 text-gray-900 font-semibold">{comp.containerCapacity || '—'}</div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Thickness (M)</div>
+                                          <div className="mt-1 text-gray-900 font-semibold">{comp.thickness || '—'}</div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-orange-50 text-orange-700 px-2.5 py-1.5 rounded-md -mx-0.5">
+                                        <FaChartLine className="text-[11px]" />
+                                        MEASUREMENTS
+                                      </div>
+                                      <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Monthly Purchase (MT)</div>
+                                          <div className="mt-1 text-gray-900 font-semibold">{comp.monthlyPurchaseMt || '—'}</div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Recycled Qty</div>
+                                          <div className="mt-1 text-gray-900 font-semibold">{comp.recycledQty || '—'}</div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="border-t border-gray-100 pt-3">
+                                      <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider text-gray-600">
+                                        <FaFile className="text-[11px] text-gray-400" />
+                                        REMARKS & DOCUMENTS
+                                      </div>
+                                      <div className="mt-2 space-y-2 text-xs">
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Auditor Remarks</div>
+                                          <div className="mt-0.5 text-gray-900 font-semibold whitespace-pre-wrap">{comp.auditorRemarks || '—'}</div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Additional Document</div>
+                                          <div className="mt-0.5">
+                                            {comp.additionalDocument ? (
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const url = typeof comp.additionalDocument === 'string' ? resolveUrl(comp.additionalDocument) : '';
+                                                  if (url) window.open(url, '_blank');
+                                                }}
+                                                className="text-[11px] font-semibold text-primary-600 hover:text-primary-800 underline"
+                                              >
+                                                View
+                                              </button>
+                                            ) : (
+                                              <span className="text-gray-900 font-semibold">—</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">Manager Remarks</div>
+                                          <div className="mt-0.5 text-gray-900 font-semibold whitespace-pre-wrap">{comp.managerRemarks || '—'}</div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+            <Table
+              columns={columns}
+              dataSource={filteredData}
+              pagination={false}
+              rowKey={(row, index) => row.key || row._id || `${row.skuCode || 'sku'}-${index}`}
+              scroll={{ x: 1200 }}
+              size="middle"
+              expandable={isProducerEntity ? undefined : {
+                expandedRowRender,
+                rowExpandable: (record) => record.details && record.details.length > 0,
+              }}
+            />
+          </div>
+        )}
       </div>
     );
   };

@@ -129,6 +129,7 @@ const SummaryReport = ({
                             supplierStatus: supplierRow.supplierStatus || '-',
                             eprCertificateNumber: supplierRow.eprCertificateNumber || '-',
                             polymerType: componentRow.polymerType || procurement.polymerType || '-',
+                            recycledPolymerUsed: componentRow.recycledPolymerUsed || procurement.recycledPolymerUsed || '-',
                             componentPolymer: componentRow.componentPolymer || procurement.componentPolymer || '-',
                             category: componentRow.category || procurement.category || '-',
                             categoryIIType: componentRow.categoryIIType || '-',
@@ -168,6 +169,7 @@ const SummaryReport = ({
                         supplierStatus: '-',
                         eprCertificateNumber: '-',
                         polymerType: componentRow.polymerType || '-',
+                        recycledPolymerUsed: componentRow.recycledPolymerUsed || '-',
                         componentPolymer: componentRow.componentPolymer || '-',
                         category: componentRow.category || '-',
                         categoryIIType: componentRow.categoryIIType || '-',
@@ -457,6 +459,7 @@ const SummaryReport = ({
         { title: 'Supplier Status', dataIndex: 'supplierStatus', key: 'supplierStatus', width: 120 },
         { title: 'EPR Cert. No', dataIndex: 'eprCertificateNumber', key: 'eprCertificateNumber', width: 120 },
         { title: 'Polymer Type', dataIndex: 'polymerType', key: 'polymerType', width: 100 },
+        { title: 'Recycled Polymer Used', dataIndex: 'recycledPolymerUsed', key: 'recycledPolymerUsed', width: 160 },
         { title: 'Component Polymer', dataIndex: 'componentPolymer', key: 'componentPolymer', width: 120 },
         { title: 'Category of EPR', dataIndex: 'category', key: 'category', width: 100 },
         { title: 'Category II Type', dataIndex: 'categoryIIType', key: 'categoryIIType', width: 120 },
@@ -656,7 +659,10 @@ const SummaryReport = ({
                 );
             }
         }
-    ];
+    ].filter((col) => {
+        if (!isProducer && col.key === 'recycledPolymerUsed') return false;
+        return true;
+    });
 
     const expandedRowRender = (record) => {
         return (

@@ -1624,6 +1624,7 @@ const SupplierComplianceTable = ({ client, type, index, initialData, refreshData
                     componentCode: r['Component Code'] || r.componentCode || '',
                     componentDescription: r['Component Desc'] || r.componentDescription || '',
                     supplierName: r['Supplier Name'] || r.supplierName || '',
+                    supplierState: r['Supplier State'] || r.supplierState || '',
                     supplierType: r['Supplier Type'] || r.supplierType || '',
                     foodGrade: r['Food Grade'] || r.foodGrade || '',
                     eprCertificateNumber: r['EPR Cert No'] || r.eprCertificateNumber || '',
@@ -1641,7 +1642,12 @@ const SupplierComplianceTable = ({ client, type, index, initialData, refreshData
         { label: "Component Code", field: "componentCode" },
         { label: "Component Desc", field: "componentDescription", width: "min-w-[200px]" },
         { label: "Supplier Name", field: "supplierName" },
-        { label: "Supplier Type", field: "supplierType" },
+        ...(isProducer ? [
+            { label: "Supplier Type", field: "supplierType" },
+            { label: "Supplier State", field: "supplierState" }
+        ] : [
+            { label: "Supplier State", field: "supplierState" }
+        ]),
         { label: "Food Grade", field: "foodGrade" },
         { label: "EPR Cert No", field: "eprCertificateNumber" },
         { label: "FSSAI Lic No", field: "fssaiLicNo" }

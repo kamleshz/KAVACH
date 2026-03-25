@@ -150,7 +150,7 @@ const KPIDashboard = ({ mode = 'admin' }) => {
   };
 
   return (
-    <div className="p-4 md:p-6 min-h-screen">
+    <div className="w-full">
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -158,12 +158,6 @@ const KPIDashboard = ({ mode = 'admin' }) => {
           <p className="text-sm text-gray-500 mt-1">Clients by waste stream, state, and assignment</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => navigate('/dashboard/client-connect')}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:border-primary-300 hover:text-primary-700 hover:bg-primary-50 transition-all"
-          >
-            <FaLink className="text-xs" /> Client Connect
-          </button>
           <button
             onClick={() => navigate('/dashboard/add-client')}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 transition-all shadow-sm"

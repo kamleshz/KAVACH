@@ -26,6 +26,7 @@ const Breadcrumbs = () => {
 
   // If we are just on dashboard, don't show breadcrumbs or just show Home
   if (pathnames.length === 0) return null;
+  if (pathnames.length === 1 && pathnames[0] === 'dashboard') return null;
 
   return (
     <nav className="mb-4 flex items-center text-sm text-gray-500 animate-fadeIn">
