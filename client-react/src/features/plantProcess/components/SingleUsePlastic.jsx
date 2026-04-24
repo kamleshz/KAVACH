@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Upload, Table, Tabs, Button, Input, Select, DatePicker } from 'antd';
 import { PlusOutlined, DeleteOutlined, CloseOutlined, UploadOutlined, SaveOutlined, CloudUploadOutlined, UndoOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import DocumentViewerModal from '../DocumentViewerModal';
+import DocumentViewerModal from '../../../components/DocumentViewerModal';
 
 const AREA_NAME_OPTIONS = [
     { value: 'Raw Material Storage Area', label: 'Raw Material Storage Area' },

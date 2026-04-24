@@ -237,6 +237,7 @@ const AddClientContent = () => {
   // const saveSkuRow = handleSaveSkuCompliance;
   
   const [regulationsCoveredUnderCto, setRegulationsCoveredUnderCto] = useState([]);
+  const [ctoAdditionalDetailRows, setCtoAdditionalDetailRows] = useState([]);
   const [waterRegulationsRows, setWaterRegulationsRows] = useState([]);
   const [airRegulationsRows, setAirRegulationsRows] = useState([]);
   const [hazardousWasteRegulationsRows, setHazardousWasteRegulationsRows] = useState([]);
@@ -519,9 +520,9 @@ const AddClientContent = () => {
               eeeFilePath: client.documents?.find(d => d.documentType === 'EEE Import Authorization')?.filePath || ''
             }));
             setRegulationsCoveredUnderCto(Array.isArray(client.productionFacility?.regulationsCoveredUnderCto) ? client.productionFacility.regulationsCoveredUnderCto.map(normalizeCtoRegulationValue).filter(Boolean) : []);
-            setWaterRegulationsRows(Array.isArray(client.productionFacility?.waterRegulations) ? client.productionFacility.waterRegulations.map((r, i) => ({ key: r._id || i, description: r.description || '', permittedQuantity: r.permittedQuantity || '', uom: r.uom || '' })) : []);
-            setAirRegulationsRows(Array.isArray(client.productionFacility?.airRegulations) ? client.productionFacility.airRegulations.map((r, i) => ({ key: r._id || i, parameter: r.parameter || '', permittedLimit: r.permittedLimit || '', uom: r.uom || '' })) : []);
-            setHazardousWasteRegulationsRows(Array.isArray(client.productionFacility?.hazardousWasteRegulations) ? client.productionFacility.hazardousWasteRegulations.map((r, i) => ({ key: r._id || i, nameOfHazardousWaste: r.nameOfHazardousWaste || '', facilityModeOfDisposal: r.facilityModeOfDisposal || '', quantityMtYr: r.quantityMtYr || '', uom: r.uom || '' })) : []);
+            setWaterRegulationsRows(Array.isArray(client.productionFacility?.waterRegulations) ? client.productionFacility.waterRegulations.map((r, i) => ({ key: r._id || i, plantName: r.plantName || '', description: r.description || '', permittedQuantity: r.permittedQuantity || '', uom: r.uom || '' })) : []);
+            setAirRegulationsRows(Array.isArray(client.productionFacility?.airRegulations) ? client.productionFacility.airRegulations.map((r, i) => ({ key: r._id || i, plantName: r.plantName || '', parameter: r.parameter || '', permittedLimit: r.permittedLimit || '', uom: r.uom || '' })) : []);
+            setHazardousWasteRegulationsRows(Array.isArray(client.productionFacility?.hazardousWasteRegulations) ? client.productionFacility.hazardousWasteRegulations.map((r, i) => ({ key: r._id || i, plantName: r.plantName || '', nameOfHazardousWaste: r.nameOfHazardousWaste || '', facilityModeOfDisposal: r.facilityModeOfDisposal || '', quantityMtYr: r.quantityMtYr || '', uom: r.uom || '' })) : []);
 
             if (client.msmeDetails && client.msmeDetails.length > 0) {
                   setMsmeRows(client.msmeDetails.map((m, i) => ({
@@ -607,6 +608,34 @@ const AddClientContent = () => {
                         contactPersonMobile: '', contactPersonEmail: '', documentFile: null, isEditing: true
                     }));
                     setCtoDetailRows(emptyCto);
+                 }
+
+                 const ctoAdditionalList = Array.isArray(client.productionFacility?.ctoAdditionalDetails)
+                    ? client.productionFacility.ctoAdditionalDetails
+                    : [];
+                 if (ctoAdditionalList.length > 0) {
+                    setCtoAdditionalDetailRows(ctoAdditionalList.map((row, index) => ({
+                        key: row._id || index,
+                        plantName: row.plantName || '',
+                        totalCapitalInvestmentLakhs: row.totalCapitalInvestmentLakhs ?? '',
+                        groundWaterUsage: row.groundWaterUsage || '',
+                        cgwaNocRequirement: row.cgwaNocRequirement || '',
+                        cgwaNocDocument: row.cgwaNocDocument || null
+                    })));
+                 } else {
+                    const hasLegacyAdditional =
+                        client.productionFacility?.totalCapitalInvestmentLakhs !== undefined ||
+                        client.productionFacility?.groundWaterUsage ||
+                        client.productionFacility?.cgwaNocRequirement ||
+                        client.productionFacility?.cgwaNocDocument;
+                    setCtoAdditionalDetailRows(hasLegacyAdditional ? [{
+                        key: 'legacy-cto-additional',
+                        plantName: ctoList[0]?.plantName || '',
+                        totalCapitalInvestmentLakhs: client.productionFacility?.totalCapitalInvestmentLakhs ?? '',
+                        groundWaterUsage: client.productionFacility?.groundWaterUsage || '',
+                        cgwaNocRequirement: client.productionFacility?.cgwaNocRequirement || '',
+                        cgwaNocDocument: client.productionFacility?.cgwaNocDocument || null
+                    }] : []);
                  }
 
 
@@ -819,44 +848,51 @@ const AddClientContent = () => {
           return;
       }
 
-      const normalizedGroundWaterUsage =
-          formData.groundWaterUsage === 'Yes' ? 'Yes' : formData.groundWaterUsage === 'No' ? 'No' : '';
-      const normalizedCgwaNocRequirement =
-          normalizedGroundWaterUsage === 'Yes' ? 'Applicable' : normalizedGroundWaterUsage === 'No' ? 'Not Applicable' : '';
-
-      const capitalLakhsParsed = parseFloat(String(formData.totalCapitalInvestmentLakhs ?? '').trim());
-      const totalCapitalInvestmentLakhs = Number.isFinite(capitalLakhsParsed) ? capitalLakhsParsed : 0;
-
       try {
           setLoading(true);
-
-          let cgwaNocDocumentPath = '';
-          if (normalizedGroundWaterUsage === 'Yes') {
-              if (formData.cgwaNocDocument && formData.cgwaNocDocument instanceof File) {
-                  const fd = new FormData();
-                  fd.append('document', formData.cgwaNocDocument);
-                  fd.append('documentType', 'CGWA');
-                  fd.append('documentName', formData.cgwaNocDocument.name);
-                  const res = await api.post(API_ENDPOINTS.CLIENT.UPLOAD_DOC(effectiveId), fd, { headers: { 'Content-Type': undefined } });
-                  cgwaNocDocumentPath = res?.data?.data?.filePath || '';
-              } else if (typeof formData.cgwaNocDocument === 'string') {
-                  cgwaNocDocumentPath = formData.cgwaNocDocument;
+          const preparedRows = await Promise.all((Array.isArray(ctoAdditionalDetailRows) ? ctoAdditionalDetailRows : []).map(async (row) => {
+              const normalizedGroundWaterUsage =
+                  row?.groundWaterUsage === 'Yes' ? 'Yes' : row?.groundWaterUsage === 'No' ? 'No' : '';
+              const capitalLakhsParsed = parseFloat(String(row?.totalCapitalInvestmentLakhs ?? '').trim());
+              let cgwaNocDocumentPath = '';
+              if (normalizedGroundWaterUsage === 'Yes') {
+                  if (row?.cgwaNocDocument && row.cgwaNocDocument instanceof File) {
+                      const fd = new FormData();
+                      fd.append('document', row.cgwaNocDocument);
+                      fd.append('documentType', 'CGWA');
+                      fd.append('documentName', row.cgwaNocDocument.name);
+                      const res = await api.post(API_ENDPOINTS.CLIENT.UPLOAD_DOC(effectiveId), fd, { headers: { 'Content-Type': undefined } });
+                      cgwaNocDocumentPath = res?.data?.data?.filePath || '';
+                  } else if (typeof row?.cgwaNocDocument === 'string') {
+                      cgwaNocDocumentPath = row.cgwaNocDocument;
+                  }
               }
-          }
+              return {
+                  key: row?.key || Date.now() + Math.random(),
+                  plantName: (row?.plantName || '').toString().trim(),
+                  totalCapitalInvestmentLakhs: Number.isFinite(capitalLakhsParsed) ? capitalLakhsParsed : 0,
+                  groundWaterUsage: normalizedGroundWaterUsage,
+                  cgwaNocRequirement: normalizedGroundWaterUsage === 'Yes' ? 'Applicable' : normalizedGroundWaterUsage === 'No' ? 'Not Applicable' : '',
+                  cgwaNocDocument: cgwaNocDocumentPath
+              };
+          }));
+          const legacyValues = getLegacyCtoAdditionalValues(preparedRows);
 
           await api.put(API_ENDPOINTS.CLIENT.UPDATE(effectiveId), {
-              'productionFacility.totalCapitalInvestmentLakhs': totalCapitalInvestmentLakhs,
-              'productionFacility.groundWaterUsage': normalizedGroundWaterUsage,
-              'productionFacility.cgwaNocRequirement': normalizedCgwaNocRequirement,
-              'productionFacility.cgwaNocDocument': cgwaNocDocumentPath,
+              'productionFacility.ctoAdditionalDetails': preparedRows.map(({ key, ...rest }) => rest),
+              'productionFacility.totalCapitalInvestmentLakhs': legacyValues.totalCapitalInvestmentLakhs,
+              'productionFacility.groundWaterUsage': legacyValues.groundWaterUsage,
+              'productionFacility.cgwaNocRequirement': legacyValues.cgwaNocRequirement,
+              'productionFacility.cgwaNocDocument': legacyValues.cgwaNocDocument,
           });
 
+          setCtoAdditionalDetailRows(preparedRows);
           setFormData((prev) => ({
               ...prev,
-              totalCapitalInvestmentLakhs: String(totalCapitalInvestmentLakhs || ''),
-              groundWaterUsage: normalizedGroundWaterUsage,
-              cgwaNocRequirement: normalizedCgwaNocRequirement,
-              cgwaNocDocument: cgwaNocDocumentPath || null,
+              totalCapitalInvestmentLakhs: String(legacyValues.totalCapitalInvestmentLakhs || ''),
+              groundWaterUsage: legacyValues.groundWaterUsage,
+              cgwaNocRequirement: legacyValues.cgwaNocRequirement,
+              cgwaNocDocument: legacyValues.cgwaNocDocument || null,
           }));
 
           messageApi.success('Saved successfully!');
@@ -877,10 +913,74 @@ const AddClientContent = () => {
       return t;
   };
 
+  const getNormalizedCtoAdditionalRows = (rows = ctoAdditionalDetailRows) =>
+      (Array.isArray(rows) ? rows : []).map((row) => {
+          const normalizedGroundWaterUsage =
+              row?.groundWaterUsage === 'Yes' ? 'Yes' : row?.groundWaterUsage === 'No' ? 'No' : '';
+          const capitalLakhsParsed = parseFloat(String(row?.totalCapitalInvestmentLakhs ?? '').trim());
+          return {
+              plantName: (row?.plantName || '').toString().trim(),
+              totalCapitalInvestmentLakhs: Number.isFinite(capitalLakhsParsed) ? capitalLakhsParsed : 0,
+              groundWaterUsage: normalizedGroundWaterUsage,
+              cgwaNocRequirement: normalizedGroundWaterUsage === 'Yes' ? 'Applicable' : normalizedGroundWaterUsage === 'No' ? 'Not Applicable' : '',
+              cgwaNocDocument: row?.cgwaNocDocument || ''
+          };
+      });
+
+  const getLegacyCtoAdditionalValues = (rows = ctoAdditionalDetailRows) => {
+      const firstRow = getNormalizedCtoAdditionalRows(rows)[0] || {};
+      return {
+          totalCapitalInvestmentLakhs: firstRow.totalCapitalInvestmentLakhs || 0,
+          groundWaterUsage: firstRow.groundWaterUsage || '',
+          cgwaNocRequirement: firstRow.cgwaNocRequirement || '',
+          cgwaNocDocument: typeof firstRow.cgwaNocDocument === 'string' ? firstRow.cgwaNocDocument : ''
+      };
+  };
+
+  const addCtoAdditionalDetailRow = (plantName = '') => {
+      setCtoAdditionalDetailRows((prev) => [
+          ...(Array.isArray(prev) ? prev : []),
+          {
+              key: Date.now() + Math.random(),
+              plantName,
+              totalCapitalInvestmentLakhs: '',
+              groundWaterUsage: '',
+              cgwaNocRequirement: '',
+              cgwaNocDocument: null
+          }
+      ]);
+  };
+
+  const handleCtoAdditionalDetailChange = (rowIndex, field, value) => {
+      setCtoAdditionalDetailRows((prev) => {
+          const copy = Array.isArray(prev) ? [...prev] : [];
+          const curr = { ...(copy[rowIndex] || {}) };
+          curr[field] = value;
+          if (field === 'groundWaterUsage') {
+              if (value === 'Yes') {
+                  curr.cgwaNocRequirement = 'Applicable';
+              } else if (value === 'No') {
+                  curr.cgwaNocRequirement = 'Not Applicable';
+                  curr.cgwaNocDocument = null;
+              } else {
+                  curr.cgwaNocRequirement = '';
+                  curr.cgwaNocDocument = null;
+              }
+          }
+          if (!curr.key) curr.key = Date.now() + Math.random();
+          copy[rowIndex] = curr;
+          return copy;
+      });
+  };
+
+  const deleteCtoAdditionalDetailRow = (rowIndex) => {
+      setCtoAdditionalDetailRows((prev) => (Array.isArray(prev) ? prev.filter((_, i) => i !== rowIndex) : []));
+  };
+
   const addWaterRegulationRow = () => {
       setWaterRegulationsRows((prev) => [
           ...(Array.isArray(prev) ? prev : []),
-          { key: Date.now() + Math.random(), description: '', permittedQuantity: '', uom: '' }
+          { key: Date.now() + Math.random(), plantName: '', description: '', permittedQuantity: '', uom: '' }
       ]);
   };
 
@@ -902,7 +1002,7 @@ const AddClientContent = () => {
   const addAirRegulationRow = () => {
       setAirRegulationsRows((prev) => [
           ...(Array.isArray(prev) ? prev : []),
-          { key: Date.now() + Math.random(), parameter: '', permittedLimit: '', uom: '' }
+          { key: Date.now() + Math.random(), plantName: '', parameter: '', permittedLimit: '', uom: '' }
       ]);
   };
 
@@ -924,7 +1024,7 @@ const AddClientContent = () => {
   const addHazardousWasteRegulationRow = () => {
       setHazardousWasteRegulationsRows((prev) => [
           ...(Array.isArray(prev) ? prev : []),
-          { key: Date.now() + Math.random(), nameOfHazardousWaste: '', facilityModeOfDisposal: '', quantityMtYr: '', uom: '' }
+          { key: Date.now() + Math.random(), plantName: '', nameOfHazardousWaste: '', facilityModeOfDisposal: '', quantityMtYr: '', uom: '' }
       ]);
   };
 
@@ -958,6 +1058,7 @@ const AddClientContent = () => {
       const hasHazardousWaste = cleanedRegs.includes('Hazardous Waste');
       const waterRows = hasWater
           ? (Array.isArray(waterRegulationsRows) ? waterRegulationsRows : []).map((r) => ({
+                plantName: (r?.plantName || '').toString(),
                 description: (r?.description || '').toString(),
                 permittedQuantity: (r?.permittedQuantity || '').toString(),
                 uom: (r?.uom || '').toString()
@@ -965,6 +1066,7 @@ const AddClientContent = () => {
           : [];
       const airRows = hasAir
           ? (Array.isArray(airRegulationsRows) ? airRegulationsRows : []).map((r) => ({
+                plantName: (r?.plantName || '').toString(),
                 parameter: (r?.parameter || '').toString(),
                 permittedLimit: (r?.permittedLimit || '').toString(),
                 uom: (r?.uom || '').toString()
@@ -972,6 +1074,7 @@ const AddClientContent = () => {
           : [];
       const hazardousWasteRows = hasHazardousWaste
           ? (Array.isArray(hazardousWasteRegulationsRows) ? hazardousWasteRegulationsRows : []).map((r) => ({
+                plantName: (r?.plantName || '').toString(),
                 nameOfHazardousWaste: (r?.nameOfHazardousWaste || '').toString(),
                 facilityModeOfDisposal: (r?.facilityModeOfDisposal || '').toString(),
                 quantityMtYr: (r?.quantityMtYr || '').toString(),
@@ -1222,12 +1325,8 @@ const AddClientContent = () => {
     setLoading(true);
 
     try {
-        const normalizedGroundWaterUsage =
-            formData.groundWaterUsage === 'Yes' ? 'Yes' : formData.groundWaterUsage === 'No' ? 'No' : '';
-        const normalizedCgwaNocRequirement =
-            normalizedGroundWaterUsage === 'Yes' ? 'Applicable' : normalizedGroundWaterUsage === 'No' ? 'Not Applicable' : '';
-        const capitalLakhsParsed = parseFloat(String(formData.totalCapitalInvestmentLakhs ?? '').trim());
-        const totalCapitalInvestmentLakhs = Number.isFinite(capitalLakhsParsed) ? capitalLakhsParsed : 0;
+        const normalizedCtoAdditionalRows = getNormalizedCtoAdditionalRows();
+        const legacyCtoAdditionalValues = getLegacyCtoAdditionalValues(normalizedCtoAdditionalRows);
 
         const registeredAddressString = [
             formData.roAddress1, formData.roAddress2, formData.roAddress3,
@@ -1340,13 +1439,18 @@ const AddClientContent = () => {
                 state: isPwp ? (formData.facilityState || '') : '',
                 address: cteDetailRows[0]?.plantAddress || '',
                 plantLocationNumber: formData.plantLocationNumber,
-                totalCapitalInvestmentLakhs,
-                groundWaterUsage: normalizedGroundWaterUsage,
-                cgwaNocRequirement: normalizedCgwaNocRequirement,
-                cgwaNocDocument: typeof formData.cgwaNocDocument === 'string' ? formData.cgwaNocDocument : '',
+                totalCapitalInvestmentLakhs: legacyCtoAdditionalValues.totalCapitalInvestmentLakhs,
+                groundWaterUsage: legacyCtoAdditionalValues.groundWaterUsage,
+                cgwaNocRequirement: legacyCtoAdditionalValues.cgwaNocRequirement,
+                cgwaNocDocument: legacyCtoAdditionalValues.cgwaNocDocument,
+                ctoAdditionalDetails: normalizedCtoAdditionalRows.map((row) => ({
+                    ...row,
+                    cgwaNocDocument: typeof row.cgwaNocDocument === 'string' ? row.cgwaNocDocument : ''
+                })),
                 regulationsCoveredUnderCto: normalizedCtoRegs,
                 waterRegulations: normalizedCtoRegs.includes('Water')
                     ? (Array.isArray(waterRegulationsRows) ? waterRegulationsRows : []).map(r => ({
+                        plantName: (r?.plantName || '').toString(),
                         description: (r?.description || '').toString(),
                         permittedQuantity: r?.permittedQuantity ? Number(r.permittedQuantity) : 0,
                         uom: (r?.uom || '').toString()
@@ -1354,6 +1458,7 @@ const AddClientContent = () => {
                     : [],
                 airRegulations: normalizedCtoRegs.includes('Air')
                     ? (Array.isArray(airRegulationsRows) ? airRegulationsRows : []).map(r => ({
+                        plantName: (r?.plantName || '').toString(),
                         parameter: (r?.parameter || '').toString(),
                         permittedLimit: r?.permittedLimit ? Number(r.permittedLimit) : 0,
                         uom: (r?.uom || '').toString()
@@ -1361,6 +1466,7 @@ const AddClientContent = () => {
                     : [],
                 hazardousWasteRegulations: normalizedCtoRegs.includes('Hazardous Waste')
                     ? (Array.isArray(hazardousWasteRegulationsRows) ? hazardousWasteRegulationsRows : []).map(r => ({
+                        plantName: (r?.plantName || '').toString(),
                         nameOfHazardousWaste: (r?.nameOfHazardousWaste || '').toString(),
                         facilityModeOfDisposal: (r?.facilityModeOfDisposal || '').toString(),
                         quantityMtYr: r?.quantityMtYr ? Number(r.quantityMtYr) : 0,
@@ -1563,18 +1669,31 @@ const AddClientContent = () => {
                 };
             }));
 
-            let cgwaNocDocumentPath = '';
-            if (normalizedGroundWaterUsage === 'Yes') {
-                if (formData.cgwaNocDocument && formData.cgwaNocDocument instanceof File) {
-                    cgwaNocDocumentPath = await uploadRowDoc(
-                        formData.cgwaNocDocument,
-                        'CGWA',
-                        `CGWA_NOC_${formData.clientName || id}`
-                    );
-                } else if (typeof formData.cgwaNocDocument === 'string') {
-                    cgwaNocDocumentPath = formData.cgwaNocDocument;
+            const updatedCtoAdditionalRows = await Promise.all((Array.isArray(ctoAdditionalDetailRows) ? ctoAdditionalDetailRows : []).map(async (row, index) => {
+                const normalizedGroundWaterUsage =
+                    row?.groundWaterUsage === 'Yes' ? 'Yes' : row?.groundWaterUsage === 'No' ? 'No' : '';
+                let cgwaNocDocumentPath = '';
+                if (normalizedGroundWaterUsage === 'Yes') {
+                    if (row?.cgwaNocDocument && row.cgwaNocDocument instanceof File) {
+                        cgwaNocDocumentPath = await uploadRowDoc(
+                            row.cgwaNocDocument,
+                            'CGWA',
+                            `CGWA_NOC_${row.plantName || index + 1}`
+                        );
+                    } else if (typeof row?.cgwaNocDocument === 'string') {
+                        cgwaNocDocumentPath = row.cgwaNocDocument;
+                    }
                 }
-            }
+                const capitalLakhsParsed = parseFloat(String(row?.totalCapitalInvestmentLakhs ?? '').trim());
+                return {
+                    plantName: (row?.plantName || '').toString().trim(),
+                    totalCapitalInvestmentLakhs: Number.isFinite(capitalLakhsParsed) ? capitalLakhsParsed : 0,
+                    groundWaterUsage: normalizedGroundWaterUsage,
+                    cgwaNocRequirement: normalizedGroundWaterUsage === 'Yes' ? 'Applicable' : normalizedGroundWaterUsage === 'No' ? 'Not Applicable' : '',
+                    cgwaNocDocument: cgwaNocDocumentPath
+                };
+            }));
+            const legacyCtoAdditionalValues2 = getLegacyCtoAdditionalValues(updatedCtoAdditionalRows);
 
             // Persist updated lists with document file paths
             const normalizedCtoRegs2 = (Array.isArray(regulationsCoveredUnderCto) ? regulationsCoveredUnderCto : [])
@@ -1593,13 +1712,15 @@ const AddClientContent = () => {
                 productionFacility: {
                     address: cteDetailRows[0]?.plantAddress || '',
                     plantLocationNumber: formData.plantLocationNumber,
-                    totalCapitalInvestmentLakhs,
-                    groundWaterUsage: normalizedGroundWaterUsage,
-                    cgwaNocRequirement: normalizedCgwaNocRequirement,
-                    cgwaNocDocument: cgwaNocDocumentPath,
+                    totalCapitalInvestmentLakhs: legacyCtoAdditionalValues2.totalCapitalInvestmentLakhs,
+                    groundWaterUsage: legacyCtoAdditionalValues2.groundWaterUsage,
+                    cgwaNocRequirement: legacyCtoAdditionalValues2.cgwaNocRequirement,
+                    cgwaNocDocument: legacyCtoAdditionalValues2.cgwaNocDocument,
+                    ctoAdditionalDetails: updatedCtoAdditionalRows,
                     regulationsCoveredUnderCto: normalizedCtoRegs2,
                     waterRegulations: normalizedCtoRegs2.includes('Water')
                         ? (Array.isArray(waterRegulationsRows) ? waterRegulationsRows : []).map(r => ({
+                            plantName: (r?.plantName || '').toString(),
                             description: (r?.description || '').toString(),
                             permittedQuantity: (r?.permittedQuantity || '').toString(),
                             uom: (r?.uom || '').toString()
@@ -1607,6 +1728,7 @@ const AddClientContent = () => {
                         : [],
                     airRegulations: normalizedCtoRegs2.includes('Air')
                         ? (Array.isArray(airRegulationsRows) ? airRegulationsRows : []).map(r => ({
+                            plantName: (r?.plantName || '').toString(),
                             parameter: (r?.parameter || '').toString(),
                             permittedLimit: (r?.permittedLimit || '').toString(),
                             uom: (r?.uom || '').toString()
@@ -1614,6 +1736,7 @@ const AddClientContent = () => {
                         : [],
                     hazardousWasteRegulations: normalizedCtoRegs2.includes('Hazardous Waste')
                         ? (Array.isArray(hazardousWasteRegulationsRows) ? hazardousWasteRegulationsRows : []).map(r => ({
+                            plantName: (r?.plantName || '').toString(),
                             nameOfHazardousWaste: (r?.nameOfHazardousWaste || '').toString(),
                             facilityModeOfDisposal: (r?.facilityModeOfDisposal || '').toString(),
                             quantityMtYr: (r?.quantityMtYr || '').toString(),
@@ -3901,6 +4024,10 @@ const AddClientContent = () => {
                             API_URL={API_URL}
                             isViewMode={isViewMode}
                             loading={loading}
+                            ctoAdditionalDetailRows={ctoAdditionalDetailRows}
+                            addCtoAdditionalDetailRow={addCtoAdditionalDetailRow}
+                            handleCtoAdditionalDetailChange={handleCtoAdditionalDetailChange}
+                            deleteCtoAdditionalDetailRow={deleteCtoAdditionalDetailRow}
                             handleSaveCgwaDetails={handleSaveCgwaDetails}
                             regulationsCoveredUnderCto={regulationsCoveredUnderCto}
                             setRegulationsCoveredUnderCto={setRegulationsCoveredUnderCto}

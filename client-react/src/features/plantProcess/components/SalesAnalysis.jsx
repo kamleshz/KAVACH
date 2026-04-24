@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Button, Table, message, Upload } from 'antd';
 import { UploadOutlined, DeleteOutlined, SaveOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
-import api from '../../services/api';
-import { API_ENDPOINTS } from '../../services/apiEndpoints';
-import { useClientContext } from '../../context/ClientContext';
+import api from '../../../services/api';
+import { API_ENDPOINTS } from '../../../services/apiEndpoints';
+import { useClientContext } from '../../../context/ClientContext';
 
 const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, showTargetsOnTop = false, hideSalesSection = false, hideTargetSection = false }) => {
     const { formData } = useClientContext();

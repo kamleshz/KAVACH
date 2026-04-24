@@ -1,0 +1,13 @@
+[
+  "runPlasticAnalysis",
+  "getPlasticAnalysis",
+  "saveSalesAnalysis",
+  "getSalesAnalysis",
+  "savePurchaseAnalysis",
+  "getPurchaseAnalysis",
+  "saveAnalysisResult",
+  "calculatePrePost",
+  "getNextFinancialYear",
+  "generateAuditorInsights",
+  "generatePlasticComplianceReport"
+]

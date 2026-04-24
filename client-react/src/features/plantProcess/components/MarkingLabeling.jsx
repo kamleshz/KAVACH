@@ -2,8 +2,8 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Table, Modal, Upload } from 'antd';
 import { FaSave } from 'react-icons/fa';
 import { PlusOutlined } from '@ant-design/icons';
-import useSkuCompliance from '../../hooks/useSkuCompliance';
-import { POLYMER_TYPES } from '../../constants/complianceConstants';
+import useSkuCompliance from '../../../hooks/useSkuCompliance';
+import { POLYMER_TYPES } from '../../../constants/complianceConstants';
 
 const getBase64 = (file) =>
   new Promise((resolve, reject) => {

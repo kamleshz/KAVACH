@@ -38,6 +38,10 @@ const CteCtoCca = ({
     API_URL,
     isViewMode,
     loading,
+    ctoAdditionalDetailRows,
+    addCtoAdditionalDetailRow,
+    handleCtoAdditionalDetailChange,
+    deleteCtoAdditionalDetailRow,
     handleSaveCgwaDetails,
     regulationsCoveredUnderCto,
     setRegulationsCoveredUnderCto,
@@ -59,11 +63,15 @@ const CteCtoCca = ({
     setAirRegulationsRows,
     setHazardousWasteRegulationsRows
 }) => {
-    const { formData, handleChange, handleFileChange } = useClientContext();
+    const { formData, handleChange } = useClientContext();
     
     const [viewerOpen, setViewerOpen] = useState(false);
     const [viewerUrl, setViewerUrl] = useState('');
     const [viewerName, setViewerName] = useState('');
+    const [selectedAdditionalPlant, setSelectedAdditionalPlant] = useState('');
+    const [selectedWaterPlant, setSelectedWaterPlant] = useState('');
+    const [selectedAirPlant, setSelectedAirPlant] = useState('');
+    const [selectedHazardousPlant, setSelectedHazardousPlant] = useState('');
 
     const handleViewDocument = (url, name) => {
         setViewerUrl(url);
@@ -77,6 +85,19 @@ const CteCtoCca = ({
                 .map((r) => (r?.productName || '').toString().trim())
                 .filter(Boolean)
         )
+    );
+    const ctoPlantOptions = Array.from(
+        new Set(
+            (Array.isArray(ctoDetailRows) ? ctoDetailRows : [])
+                .map((row) => (row?.plantName || '').toString().trim())
+                .filter(Boolean)
+        )
+    );
+    const additionalSelectedPlants = (Array.isArray(ctoAdditionalDetailRows) ? ctoAdditionalDetailRows : [])
+        .map((row) => (row?.plantName || '').toString().trim().toLowerCase())
+        .filter(Boolean);
+    const availableAdditionalPlantOptions = ctoPlantOptions.filter(
+        (plant) => !additionalSelectedPlants.includes(plant.toLowerCase())
     );
 
     const showFacilities =
@@ -1117,101 +1138,152 @@ const CteCtoCca = ({
                         </div>
 
                         <div className="border border-gray-200 rounded-xl p-4 bg-white">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
-                                        Total Capital Investment in Laks
-                                    </label>
-                                    <input
-                                        type="number"
-                                        name="totalCapitalInvestmentLakhs"
-                                        value={formData.totalCapitalInvestmentLakhs}
-                                        onChange={handleChange}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow"
-                                        placeholder="Enter amount"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
-                                        Usage of Ground / Bore Well Water
-                                    </label>
-                                    <select
-                                        name="groundWaterUsage"
-                                        value={formData.groundWaterUsage}
-                                        onChange={handleChange}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow bg-white"
-                                    >
-                                        <option value="">Select</option>
-                                        <option value="Yes">Yes</option>
-                                        <option value="No">No</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
-                                        CGWA NOC Requirement
-                                    </label>
-                                    <select
-                                        value={formData.cgwaNocRequirement}
-                                        disabled
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700"
-                                    >
-                                        <option value="">Select</option>
-                                        <option value="Applicable">Applicable</option>
-                                        <option value="Not Applicable">Not Applicable</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {formData.groundWaterUsage === 'Yes' && (
-                                <div className="mt-4">
-                                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
-                                        CGWA NOC Document
-                                    </label>
-                                    <div className="flex flex-col gap-2">
-                                        <input
-                                            type="file"
-                                            name="cgwaNocDocument"
-                                            onChange={handleFileChange}
-                                            className="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 transition-colors"
+                            {!isViewMode && (
+                                <div className="mb-4 flex items-end gap-3">
+                                    <div className="flex-1 max-w-xs">
+                                        <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
+                                            Select Plant Name
+                                        </label>
+                                        <Select
+                                            value={selectedAdditionalPlant || undefined}
+                                            onChange={setSelectedAdditionalPlant}
+                                            placeholder="Select Plant Name"
+                                            options={availableAdditionalPlantOptions.map((plant) => ({ value: plant, label: plant }))}
+                                            className="w-full"
+                                            disabled={!availableAdditionalPlantOptions.length}
                                         />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const plantName = selectedAdditionalPlant || availableAdditionalPlantOptions[0] || '';
+                                            if (!plantName) return;
+                                            addCtoAdditionalDetailRow(plantName);
+                                            setSelectedAdditionalPlant('');
+                                        }}
+                                        disabled={!availableAdditionalPlantOptions.length}
+                                        className="flex items-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded hover:bg-primary-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <PlusOutlined className="mr-1.5" />
+                                        Add Row
+                                    </button>
+                                </div>
+                            )}
 
-                                        {formData.cgwaNocDocument && (
-                                            <div className="flex items-center gap-2 text-green-600 bg-green-50 px-2 py-1 rounded-md">
-                                                <FaCheckCircle className="text-xs" />
-                                                <span className="text-xs font-medium truncate max-w-[220px]">
-                                                    {typeof formData.cgwaNocDocument === 'string'
-                                                        ? (formData.cgwaNocDocument.split('/').pop() || 'Uploaded')
-                                                        : (formData.cgwaNocDocument?.name || 'Uploaded')}
-                                                </span>
-                                                {typeof formData.cgwaNocDocument === 'string' ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleViewDocument((formData.cgwaNocDocument.startsWith('http://') || formData.cgwaNocDocument.startsWith('https://'))
-                                                            ? formData.cgwaNocDocument
-                                                            : new URL(formData.cgwaNocDocument, API_URL).toString(), 'CGWA NOC Document')}
-                                                        className="text-xs text-primary-700 underline ml-2 bg-transparent border-0 p-0 cursor-pointer"
-                                                    >
-                                                        View
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const url = URL.createObjectURL(formData.cgwaNocDocument);
-                                                            handleViewDocument(url, formData.cgwaNocDocument.name);
-                                                        }}
-                                                        className="text-xs text-primary-700 underline ml-2"
-                                                    >
-                                                        View
-                                                    </button>
-                                                )}
+                            <div className="space-y-4">
+                                {(ctoAdditionalDetailRows.length ? ctoAdditionalDetailRows : []).map((row, idx) => (
+                                    <div key={row.key || idx} className="border border-gray-200 rounded-xl p-4 bg-gray-50">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div>
+                                                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Plant Name</p>
+                                                <p className="mt-1 text-sm font-semibold text-gray-900">{row.plantName || '-'}</p>
+                                            </div>
+                                            {!isViewMode && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => deleteCtoAdditionalDetailRow(idx)}
+                                                    className="h-8 w-8 rounded-lg bg-red-50 text-red-500 inline-flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all duration-200 shadow-sm"
+                                                    title="Delete Row"
+                                                >
+                                                    <FaTrashAlt />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
+                                                    Total Capital Investment in Laks
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    value={row.totalCapitalInvestmentLakhs || ''}
+                                                    onChange={(e) => handleCtoAdditionalDetailChange(idx, 'totalCapitalInvestmentLakhs', e.target.value)}
+                                                    disabled={isViewMode}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow disabled:bg-gray-100 disabled:text-gray-600"
+                                                    placeholder="Enter amount"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
+                                                    Usage of Ground / Bore Well Water
+                                                </label>
+                                                <select
+                                                    value={row.groundWaterUsage || ''}
+                                                    onChange={(e) => handleCtoAdditionalDetailChange(idx, 'groundWaterUsage', e.target.value)}
+                                                    disabled={isViewMode}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow bg-white disabled:bg-gray-100 disabled:text-gray-600"
+                                                >
+                                                    <option value="">Select</option>
+                                                    <option value="Yes">Yes</option>
+                                                    <option value="No">No</option>
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
+                                                    CGWA NOC Requirement
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={row.cgwaNocRequirement || ''}
+                                                    disabled
+                                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-100 text-gray-700"
+                                                    placeholder="Auto"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {row.groundWaterUsage === 'Yes' && (
+                                            <div className="mt-4">
+                                                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
+                                                    CGWA NOC Document
+                                                </label>
+                                                <div className="flex flex-col gap-2">
+                                                    {!isViewMode && (
+                                                        <input
+                                                            type="file"
+                                                            onChange={(e) => handleCtoAdditionalDetailChange(idx, 'cgwaNocDocument', e.target.files[0])}
+                                                            className="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 transition-colors"
+                                                        />
+                                                    )}
+
+                                                    {row.cgwaNocDocument && (
+                                                        <div className="flex items-center gap-2 text-green-600 bg-green-50 px-2 py-1 rounded-md">
+                                                            <FaCheckCircle className="text-xs" />
+                                                            <span className="text-xs font-medium truncate max-w-[220px]">
+                                                                {typeof row.cgwaNocDocument === 'string'
+                                                                    ? (row.cgwaNocDocument.split('/').pop() || 'Uploaded')
+                                                                    : (row.cgwaNocDocument?.name || 'Uploaded')}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (typeof row.cgwaNocDocument === 'string') {
+                                                                        handleViewDocument(
+                                                                            (row.cgwaNocDocument.startsWith('http://') || row.cgwaNocDocument.startsWith('https://'))
+                                                                                ? row.cgwaNocDocument
+                                                                                : new URL(row.cgwaNocDocument, API_URL).toString(),
+                                                                            'CGWA NOC Document'
+                                                                        );
+                                                                    } else {
+                                                                        const url = URL.createObjectURL(row.cgwaNocDocument);
+                                                                        handleViewDocument(url, row.cgwaNocDocument.name);
+                                                                    }
+                                                                }}
+                                                                className="text-xs text-primary-700 underline ml-2"
+                                                            >
+                                                                View
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                            )}
+                                ))}
+                            </div>
 
                             {!isViewMode && (
                                 <div className="mt-4 flex justify-end">
@@ -1286,14 +1358,31 @@ const CteCtoCca = ({
                                     <div className="flex items-center justify-between mb-3">
                                         <h5 className="font-bold text-sm text-gray-700">Water</h5>
                                         {!isViewMode && (
-                                            <button
-                                                type="button"
-                                                onClick={addWaterRegulationRow}
-                                                className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors shadow-sm"
-                                            >
-                                                <PlusOutlined className="mr-1.5" />
-                                                Add Row
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <Select
+                                                    value={selectedWaterPlant || undefined}
+                                                    onChange={setSelectedWaterPlant}
+                                                    placeholder="Select Plant Name"
+                                                    options={ctoPlantOptions.map((plant) => ({ value: plant, label: plant }))}
+                                                    className="min-w-[220px]"
+                                                    disabled={!ctoPlantOptions.length}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const plantName = selectedWaterPlant || ctoPlantOptions[0] || '';
+                                                        setWaterRegulationsRows((prev) => [
+                                                            ...(Array.isArray(prev) ? prev : []),
+                                                            { key: Date.now() + Math.random(), plantName, description: '', permittedQuantity: '', uom: '' }
+                                                        ]);
+                                                    }}
+                                                    disabled={!ctoPlantOptions.length}
+                                                    className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <PlusOutlined className="mr-1.5" />
+                                                    Add Row
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
 
@@ -1302,6 +1391,9 @@ const CteCtoCca = ({
                                             <thead className="bg-green-100">
                                                 <tr>
                                                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200 w-24">SR NO</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200 min-w-[220px]">
+                                                        Plant Name
+                                                    </th>
                                                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200 min-w-[320px]">
                                                         Description (water consumption / waste)
                                                     </th>
@@ -1319,9 +1411,22 @@ const CteCtoCca = ({
                                                 </tr>
                                             </thead>
                                             <tbody className="bg-white divide-y divide-gray-200">
-                                                {(waterRegulationsRows.length ? waterRegulationsRows : [{ key: 'empty', description: '', permittedQuantity: '' }]).map((row, idx) => (
+                                                {(waterRegulationsRows.length ? waterRegulationsRows : [{ key: 'empty', plantName: '', description: '', permittedQuantity: '' }]).map((row, idx) => (
                                                     <tr key={row.key || idx} className="hover:bg-gray-50 transition-colors duration-150">
                                                         <td className="px-4 py-3 font-bold text-gray-800">{idx + 1}</td>
+                                                        <td className="px-4 py-3">
+                                                            {isViewMode ? (
+                                                                <span className="block px-2 py-1 text-sm text-gray-600">{row.plantName || '-'}</span>
+                                                            ) : (
+                                                                <Select
+                                                                    value={row.plantName || undefined}
+                                                                    onChange={(value) => updateWaterRegulationRow(idx, 'plantName', value)}
+                                                                    placeholder="Select Plant Name"
+                                                                    options={ctoPlantOptions.map((plant) => ({ value: plant, label: plant }))}
+                                                                    className="w-full"
+                                                                />
+                                                            )}
+                                                        </td>
                                                         <td className="px-4 py-3">
                                                             {isViewMode ? (
                                                                 <span className="block px-2 py-1 text-sm text-gray-600">{row.description || '-'}</span>
@@ -1386,14 +1491,31 @@ const CteCtoCca = ({
                                     <div className="flex items-center justify-between mb-3">
                                         <h5 className="font-bold text-sm text-gray-700">Air</h5>
                                         {!isViewMode && (
-                                            <button
-                                                type="button"
-                                                onClick={addAirRegulationRow}
-                                                className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors shadow-sm"
-                                            >
-                                                <PlusOutlined className="mr-1.5" />
-                                                Add Row
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <Select
+                                                    value={selectedAirPlant || undefined}
+                                                    onChange={setSelectedAirPlant}
+                                                    placeholder="Select Plant Name"
+                                                    options={ctoPlantOptions.map((plant) => ({ value: plant, label: plant }))}
+                                                    className="min-w-[220px]"
+                                                    disabled={!ctoPlantOptions.length}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const plantName = selectedAirPlant || ctoPlantOptions[0] || '';
+                                                        setAirRegulationsRows((prev) => [
+                                                            ...(Array.isArray(prev) ? prev : []),
+                                                            { key: Date.now() + Math.random(), plantName, parameter: '', permittedLimit: '', uom: '' }
+                                                        ]);
+                                                    }}
+                                                    disabled={!ctoPlantOptions.length}
+                                                    className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <PlusOutlined className="mr-1.5" />
+                                                    Add Row
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
 
@@ -1402,6 +1524,9 @@ const CteCtoCca = ({
                                             <thead className="bg-green-100">
                                                 <tr>
                                                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200 w-24">SR NO</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200 min-w-[220px]">
+                                                        Plant Name
+                                                    </th>
                                                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200 min-w-[320px]">
                                                         Parameters
                                                     </th>
@@ -1419,9 +1544,22 @@ const CteCtoCca = ({
                                                 </tr>
                                             </thead>
                                             <tbody className="bg-white divide-y divide-gray-200">
-                                                {(airRegulationsRows.length ? airRegulationsRows : [{ key: 'empty', parameter: '', permittedLimit: '' }]).map((row, idx) => (
+                                                {(airRegulationsRows.length ? airRegulationsRows : [{ key: 'empty', plantName: '', parameter: '', permittedLimit: '' }]).map((row, idx) => (
                                                     <tr key={row.key || idx} className="hover:bg-gray-50 transition-colors duration-150">
                                                         <td className="px-4 py-3 font-bold text-gray-800">{idx + 1}</td>
+                                                        <td className="px-4 py-3">
+                                                            {isViewMode ? (
+                                                                <span className="block px-2 py-1 text-sm text-gray-600">{row.plantName || '-'}</span>
+                                                            ) : (
+                                                                <Select
+                                                                    value={row.plantName || undefined}
+                                                                    onChange={(value) => updateAirRegulationRow(idx, 'plantName', value)}
+                                                                    placeholder="Select Plant Name"
+                                                                    options={ctoPlantOptions.map((plant) => ({ value: plant, label: plant }))}
+                                                                    className="w-full"
+                                                                />
+                                                            )}
+                                                        </td>
                                                         <td className="px-4 py-3">
                                                             {isViewMode ? (
                                                                 <span className="block px-2 py-1 text-sm text-gray-600">{row.parameter || '-'}</span>
@@ -1486,14 +1624,31 @@ const CteCtoCca = ({
                                     <div className="flex items-center justify-between mb-3">
                                         <h5 className="font-bold text-sm text-gray-700">Hazardous Waste</h5>
                                         {!isViewMode && (
-                                            <button
-                                                type="button"
-                                                onClick={addHazardousWasteRegulationRow}
-                                                className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors shadow-sm"
-                                            >
-                                                <PlusOutlined className="mr-1.5" />
-                                                Add Row
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <Select
+                                                    value={selectedHazardousPlant || undefined}
+                                                    onChange={setSelectedHazardousPlant}
+                                                    placeholder="Select Plant Name"
+                                                    options={ctoPlantOptions.map((plant) => ({ value: plant, label: plant }))}
+                                                    className="min-w-[220px]"
+                                                    disabled={!ctoPlantOptions.length}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const plantName = selectedHazardousPlant || ctoPlantOptions[0] || '';
+                                                        setHazardousWasteRegulationsRows((prev) => [
+                                                            ...(Array.isArray(prev) ? prev : []),
+                                                            { key: Date.now() + Math.random(), plantName, nameOfHazardousWaste: '', facilityModeOfDisposal: '', quantityMtYr: '', uom: '' }
+                                                        ]);
+                                                    }}
+                                                    disabled={!ctoPlantOptions.length}
+                                                    className="flex items-center px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded hover:bg-primary-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <PlusOutlined className="mr-1.5" />
+                                                    Add Row
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
 
@@ -1502,6 +1657,9 @@ const CteCtoCca = ({
                                             <thead className="bg-green-100">
                                                 <tr>
                                                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200 w-24">SR NO</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200 min-w-[220px]">
+                                                        Plant Name
+                                                    </th>
                                                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200 min-w-[260px]">
                                                         Name of Hazardous Waste
                                                     </th>
@@ -1522,9 +1680,22 @@ const CteCtoCca = ({
                                                 </tr>
                                             </thead>
                                             <tbody className="bg-white divide-y divide-gray-200">
-                                                {(hazardousWasteRegulationsRows.length ? hazardousWasteRegulationsRows : [{ key: 'empty', nameOfHazardousWaste: '', facilityModeOfDisposal: '', quantityMtYr: '' }]).map((row, idx) => (
+                                                {(hazardousWasteRegulationsRows.length ? hazardousWasteRegulationsRows : [{ key: 'empty', plantName: '', nameOfHazardousWaste: '', facilityModeOfDisposal: '', quantityMtYr: '' }]).map((row, idx) => (
                                                     <tr key={row.key || idx} className="hover:bg-gray-50 transition-colors duration-150">
                                                         <td className="px-4 py-3 font-bold text-gray-800">{idx + 1}</td>
+                                                        <td className="px-4 py-3">
+                                                            {isViewMode ? (
+                                                                <span className="block px-2 py-1 text-sm text-gray-600">{row.plantName || '-'}</span>
+                                                            ) : (
+                                                                <Select
+                                                                    value={row.plantName || undefined}
+                                                                    onChange={(value) => updateHazardousWasteRegulationRow(idx, 'plantName', value)}
+                                                                    placeholder="Select Plant Name"
+                                                                    options={ctoPlantOptions.map((plant) => ({ value: plant, label: plant }))}
+                                                                    className="w-full"
+                                                                />
+                                                            )}
+                                                        </td>
                                                         <td className="px-4 py-3">
                                                             {isViewMode ? (
                                                                 <span className="block px-2 py-1 text-sm text-gray-600">{row.nameOfHazardousWaste || '-'}</span>
@@ -1642,6 +1813,10 @@ CteCtoCca.propTypes = {
     API_URL: PropTypes.string,
     isViewMode: PropTypes.bool,
     loading: PropTypes.bool,
+    ctoAdditionalDetailRows: PropTypes.array,
+    addCtoAdditionalDetailRow: PropTypes.func,
+    handleCtoAdditionalDetailChange: PropTypes.func,
+    deleteCtoAdditionalDetailRow: PropTypes.func,
     handleSaveCgwaDetails: PropTypes.func,
     regulationsCoveredUnderCto: PropTypes.array,
     setRegulationsCoveredUnderCto: PropTypes.func,

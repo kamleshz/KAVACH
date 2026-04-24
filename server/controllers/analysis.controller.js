@@ -196,3 +196,32 @@ export const generatePlasticComplianceReportController = async (req, res) => {
         });
     }
 };
+
+export const generatePlasticSummaryReportController = async (req, res) => {
+    try {
+        const { clientId } = req.params;
+        const { type, itemId } = req.query;
+        const userId = req.userId;
+
+        if (!clientId || !type || !itemId) {
+            return res.status(400).json({ message: "Missing required parameters: clientId, type, itemId" });
+        }
+
+        const pdfBuffer = await AnalysisService.generatePlasticSummaryReport(clientId, type, itemId, userId);
+
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="Plastic_Summary_Report_${clientId}.pdf"`,
+            'Content-Length': pdfBuffer.length
+        });
+
+        res.send(pdfBuffer);
+    } catch (error) {
+        console.error("Generate Summary Report Error:", error);
+        console.error(error.stack);
+        res.status(500).json({
+            message: error.message || "Error generating summary report",
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+};

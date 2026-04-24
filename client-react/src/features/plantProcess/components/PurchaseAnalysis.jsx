@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Button, Table, message, Upload } from 'antd';
 import { UploadOutlined, DeleteOutlined, SaveOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
-import api from '../../services/api';
-import { API_ENDPOINTS } from '../../services/apiEndpoints';
+import api from '../../../services/api';
+import { API_ENDPOINTS } from '../../../services/apiEndpoints';
 
 const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
     // rawRows: keeps the detailed data if needed for backend save

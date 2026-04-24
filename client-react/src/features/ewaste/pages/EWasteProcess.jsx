@@ -6,7 +6,7 @@ import { FaCheckDouble, FaBoxes, FaBullhorn, FaCheck, FaArrowLeft, FaClipboardCh
 import api from '../../../services/api';
 import { API_ENDPOINTS } from '../../../services/apiEndpoints';
 import useAuth from '../../../hooks/useAuth';
-import ConsentVerification from '../../../components/PlantProcessSteps/ConsentVerification';
+import ConsentVerification from '../../../features/plantProcess/components/ConsentVerification';
 import EWasteCategoriesCompliance from '../components/EWasteCategoriesCompliance';
 import EWasteROHSCompliance from '../components/EWasteROHSCompliance';
 import EWasteStorage from '../components/EWasteStorage';

@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 import { WASTE_TYPES, ENTITY_TYPES, CLIENT_STATUS, VALIDATION_STATUS } from "../constants.js";
-import documentSchema from "./schemas/document.schema.js";
-import msmeDetailsSchema from "./schemas/msme.schema.js";
-import productionFacilitySchema from "./schemas/productionFacility.schema.js";
+import documentSchema from "./document.schema.js";
+import msmeDetailsSchema from "./msme.schema.js";
+import productionFacilitySchema from "./productionFacility.schema.js";
 
 const clientSchema = new mongoose.Schema({
     clientName: {

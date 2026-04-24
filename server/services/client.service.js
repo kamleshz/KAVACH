@@ -443,6 +443,35 @@ class ClientService {
                 );
             }
 
+            // Sync componentDescription across other ProductComplianceModel tables for same componentCode/systemCode
+            if (typeof sanitized.componentDescription === 'string' && sanitized.componentCode) {
+                const componentCode = String(sanitized.componentCode || '').trim();
+                const systemCode = String(sanitized.systemCode || '').trim();
+                const componentDescription = sanitized.componentDescription;
+
+                if (componentCode) {
+                    const arrayFilters = [
+                        systemCode ? { "sc.componentCode": componentCode, "sc.systemCode": systemCode } : { "sc.componentCode": componentCode },
+                        systemCode ? { "cd.componentCode": componentCode, "cd.systemCode": systemCode } : { "cd.componentCode": componentCode },
+                        systemCode ? { "pd.componentCode": componentCode, "pd.systemCode": systemCode } : { "pd.componentCode": componentCode },
+                        systemCode ? { "rq.componentCode": componentCode, "rq.systemCode": systemCode } : { "rq.componentCode": componentCode }
+                    ];
+
+                    await ProductComplianceModel.updateOne(
+                        { client: clientId, type, itemId },
+                        {
+                            $set: {
+                                "supplierCompliance.$[sc].componentDescription": componentDescription,
+                                "componentDetails.$[cd].componentDescription": componentDescription,
+                                "procurementDetails.$[pd].componentDescription": componentDescription,
+                                "recycledQuantityUsed.$[rq].componentDescription": componentDescription
+                            }
+                        },
+                        { arrayFilters }
+                    );
+                }
+            }
+
             const refreshedDoc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
             const afterRow = refreshedDoc?.rows?.[idx] || {};
             const allFields = ['generate', 'systemCode', 'packagingType', 'clientName', 'clientState', 'industryCategory', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage', 'thickness', 'auditorRemarks', 'clientRemarks', 'componentComplianceStatus', 'managerRemarks'];

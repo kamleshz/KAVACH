@@ -12,6 +12,7 @@ const ClientConnectDetail = () => {
   const clientName = location.state?.clientName;
   const [reportContext, setReportContext] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingSummary, setDownloadingSummary] = useState(false);
 
   const handleDownloadReport = async () => {
     if (!reportContext) return;
@@ -39,6 +40,35 @@ const ClientConnectDetail = () => {
       console.error('Report download failed:', error);
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleDownloadSummaryReport = async () => {
+    if (!reportContext) return;
+    const { client, type, itemId } = reportContext;
+    const wasteType = (client?.wasteType || '').toLowerCase();
+    if (!wasteType.includes('plastic') || !type || !itemId) return;
+
+    try {
+      setDownloadingSummary(true);
+      const response = await api.get(
+        API_ENDPOINTS.ANALYSIS.SUMMARY_REPORT(id) + `?type=${type}&itemId=${itemId}`,
+        { responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `Plastic_Summary_Report_${client.clientName || id}.pdf`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error('Summary report download failed:', error);
+    } finally {
+      setDownloadingSummary(false);
     }
   };
 
@@ -70,15 +100,26 @@ const ClientConnectDetail = () => {
             )}
             <div className="ml-auto">
               {reportContext && (reportContext.client?.wasteType || '').toLowerCase().includes('plastic') && (
-                <button
-                  type="button"
-                  onClick={handleDownloadReport}
-                  disabled={downloading}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary-200 bg-white text-primary-700 text-xs font-semibold hover:bg-primary-50 disabled:opacity-60"
-                >
-                  <FaFilePdf className="text-sm" />
-                  <span>{downloading ? 'Preparing Report...' : 'Download Complete Report'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadSummaryReport}
+                    disabled={downloadingSummary}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-200 bg-white text-amber-700 text-xs font-semibold hover:bg-amber-50 disabled:opacity-60"
+                  >
+                    <FaFilePdf className="text-sm" />
+                    <span>{downloadingSummary ? 'Preparing Summary...' : 'Download Summary Report'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadReport}
+                    disabled={downloading}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary-200 bg-white text-primary-700 text-xs font-semibold hover:bg-primary-50 disabled:opacity-60"
+                  >
+                    <FaFilePdf className="text-sm" />
+                    <span>{downloading ? 'Preparing Report...' : 'Download Complete Report'}</span>
+                  </button>
+                </div>
               )}
             </div>
           </div>

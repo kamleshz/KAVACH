@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Upload, Button, Table, message, Card } from 'antd';
 import { UploadOutlined, BarChartOutlined, TableOutlined } from '@ant-design/icons';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import api from '../../services/api';
-import { API_ENDPOINTS } from '../../services/apiEndpoints';
-import { useClientContext } from '../../context/ClientContext';
+import api from '../../../services/api';
+import { API_ENDPOINTS } from '../../../services/apiEndpoints';
+import { useClientContext } from '../../../context/ClientContext';
 
 const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId, entityType, showTargetsOnly = false, hideTargets = false }) => {
     const [salesFile, setSalesFile] = useState(null);

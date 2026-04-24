@@ -10,10 +10,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
   Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
-import Analysis from '../PlantProcessSteps/Analysis';
-import SalesAnalysis from '../PlantProcessSteps/SalesAnalysis';
-import PurchaseAnalysis from '../PlantProcessSteps/PurchaseAnalysis';
-import SummaryReport from '../PlantProcessSteps/SummaryReport';
+import Analysis from '../../features/plantProcess/components/Analysis';
+import SalesAnalysis from '../../features/plantProcess/components/SalesAnalysis';
+import PurchaseAnalysis from '../../features/plantProcess/components/PurchaseAnalysis';
+import SummaryReport from '../../features/plantProcess/components/SummaryReport';
 import api from '../../services/api';
 import { API_ENDPOINTS } from '../../services/apiEndpoints';
 import useAuth from '../../hooks/useAuth';

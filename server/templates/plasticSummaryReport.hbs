@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Plastic Summary Report</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 10mm;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            color: #1f2937;
+            margin: 0;
+            font-size: 11px;
+            line-height: 1.45;
+            background: #fff;
+        }
+        h1, h2, h3, h4, h5, h6, .report-title-main, .section-title, .cover-title, th {
+            font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+        }
+        .page-break {
+            page-break-before: always;
+            break-before: page;
+        }
+        .cover-page {
+            min-height: 186mm;
+            padding: 16px 18px 10px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            page-break-inside: avoid;
+            background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 68%);
+        }
+        .cover-header {
+            border: 2px solid #86efac;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.9);
+            padding: 18px 22px;
+            text-align: center;
+            position: relative;
+        }
+        .cover-logo {
+            position: absolute;
+            top: 10px;
+            right: 16px;
+            width: 155px;
+            max-height: 64px;
+            object-fit: contain;
+            object-position: right center;
+        }
+        .cover-title {
+            font-size: 28px;
+            font-weight: 800;
+            color: #166534;
+            margin: 0 0 8px 0;
+            letter-spacing: 0.5px;
+        }
+        .cover-subtitle {
+            font-size: 12px;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 1.8px;
+            font-weight: 700;
+        }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 14px;
+        }
+        .meta-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 10px 14px;
+            background: #fff;
+        }
+        .meta-label {
+            font-size: 9px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+        .meta-value {
+            font-size: 14px;
+            color: #111827;
+            font-weight: 700;
+        }
+        .toc-box {
+            margin-top: 16px;
+            border: 1px solid #86efac;
+            border-radius: 14px;
+            padding: 14px 18px;
+            background: #fff;
+        }
+        .toc-heading {
+            font-size: 15px;
+            color: #166534;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        .toc-item {
+            padding: 5px 0;
+            border-bottom: 1px dashed #bbf7d0;
+            color: #374151;
+            font-size: 11px;
+        }
+        .toc-item:last-child {
+            border-bottom: none;
+        }
+        .footer-note {
+            display: flex;
+            justify-content: space-between;
+            color: #64748b;
+            font-size: 9px;
+            margin-top: 8px;
+        }
+        .report-page {
+            padding: 10px 4px 0;
+        }
+        .report-header {
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+            border: 1px solid #86efac;
+            border-bottom: 3px solid #16a34a;
+            border-radius: 14px;
+            padding: 20px 24px;
+            margin-bottom: 18px;
+            position: relative;
+        }
+        .header-logo {
+            position: absolute;
+            top: 10px;
+            right: 18px;
+            width: 140px;
+            max-height: 56px;
+            object-fit: contain;
+            object-position: right center;
+        }
+        .report-title-main {
+            font-size: 26px;
+            font-weight: 800;
+            color: #166534;
+            margin: 0 0 6px 0;
+        }
+        .report-subtitle {
+            font-size: 12px;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 1.8px;
+            font-weight: 700;
+        }
+        .section {
+            margin-bottom: 18px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 800;
+            color: #166534;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #86efac;
+        }
+        .subheading {
+            font-size: 13px;
+            font-weight: 800;
+            color: #166534;
+            margin: 4px 0 10px;
+        }
+        .grid-2, .grid-3 {
+            display: grid;
+            gap: 14px;
+        }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            background: #fff;
+            padding: 14px 16px;
+        }
+        .card-label {
+            font-size: 10px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .card-value {
+            font-size: 13px;
+            color: #111827;
+            font-weight: 700;
+            white-space: pre-wrap;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+        }
+        th {
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #86efac;
+            padding: 9px 8px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            font-weight: 800;
+            text-align: center;
+        }
+        td {
+            border: 1px solid #e5e7eb;
+            padding: 8px;
+            font-size: 10px;
+            vertical-align: top;
+            text-align: center;
+        }
+        .left { text-align: left; }
+        .muted {
+            color: #6b7280;
+        }
+        .industry-group td {
+            background: #f0fdf4;
+            color: #15803d;
+            font-weight: 800;
+            font-size: 12px;
+            padding: 6px 8px;
+        }
+        .sku-code {
+            font-weight: 700;
+            text-decoration: underline;
+            margin-bottom: 2px;
+        }
+        .sku-description {
+            font-weight: 600;
+        }
+        .status-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 9px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+        .status-pill.compliant { background: #dcfce7; color: #166534; }
+        .status-pill.non-compliant { background: #fee2e2; color: #991b1b; }
+        .status-pill.partial { background: #ffedd5; color: #9a3412; }
+        .status-pill.pending { background: #f3f4f6; color: #374151; }
+        .plant-box {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 14px;
+            page-break-inside: avoid;
+        }
+        .plant-title {
+            background: #f0fdf4;
+            color: #166534;
+            padding: 10px 14px;
+            font-weight: 800;
+            border-bottom: 1px solid #86efac;
+        }
+        .plant-body {
+            padding: 12px;
+        }
+        .target-card {
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+        .target-title {
+            background: linear-gradient(135deg, #f0fdf4, #ffffff);
+            color: #166534;
+            padding: 10px 14px;
+            font-weight: 800;
+            border-bottom: 1px solid #86efac;
+        }
+    </style>
+</head>
+<body>
+    <div class="cover-page">
+        <div>
+            <div class="cover-header">
+                {{#if logoBase64}}
+                <img src="{{logoBase64}}" alt="AnantTattva Logo" class="cover-logo" />
+                {{/if}}
+                <h1 class="cover-title">Plastic Summary Report</h1>
+                <div class="cover-subtitle">Client Overview and Summary Compliance Review</div>
+                <div class="meta-grid">
+                    <div class="meta-card">
+                        <div class="meta-label">Client Name</div>
+                        <div class="meta-value">{{basicInfo.clientName}}</div>
+                    </div>
+                    <div class="meta-card">
+                        <div class="meta-label">Generated On</div>
+                        <div class="meta-value">{{generatedDate}}</div>
+                    </div>
+                    <div class="meta-card">
+                        <div class="meta-label">Entity Type</div>
+                        <div class="meta-value">{{basicInfo.entityType}}</div>
+                    </div>
+                    <div class="meta-card">
+                        <div class="meta-label">Waste Type</div>
+                        <div class="meta-value">{{basicInfo.wasteType}}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="toc-box">
+                <div class="toc-heading">Index</div>
+                <div class="toc-item">1. Client Information</div>
+                <div class="toc-item">2. Address Details</div>
+                <div class="toc-item">3. MSME Details</div>
+                <div class="toc-item">4. Company Documents</div>
+                <div class="toc-item">5. CTE &amp; CTO Details</div>
+                <div class="toc-item">6. Industry Category Summary</div>
+                <div class="toc-item">7. Summary Report of Industry, SKU Wise</div>
+                <div class="toc-item">8. Annual Summary</div>
+                <div class="toc-item">9. EPR Target Calculation</div>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            <span>AnantTattva EPR Kavach System</span>
+            <span>Summary Report</span>
+        </div>
+    </div>
+
+    <div class="page-break"></div>
+    <div class="report-page">
+        <div class="report-header">
+            {{#if logoBase64}}
+            <img src="{{logoBase64}}" alt="AnantTattva Logo" class="header-logo" />
+            {{/if}}
+            <div class="report-title-main">{{basicInfo.clientName}}</div>
+            <div class="report-subtitle">Client Summary Information</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">1. Client Information</div>
+            <div class="grid-2">
+                <table>
+                    <tr><th style="width: 34%;">Client Name</th><td class="left">{{basicInfo.clientName}}</td></tr>
+                    <tr><th>Trade Name</th><td class="left">{{basicInfo.tradeName}}</td></tr>
+                    <tr><th>Group Name</th><td class="left">{{basicInfo.groupName}}</td></tr>
+                    <tr><th>Entity Type</th><td class="left">{{basicInfo.entityType}}</td></tr>
+                </table>
+                <table>
+                    <tr><th style="width: 34%;">Authorised Person</th><td class="left">{{basicInfo.authPerson.name}}</td></tr>
+                    <tr><th>Designation</th><td class="left">{{basicInfo.authPerson.designation}}</td></tr>
+                    <tr><th>Contact</th><td class="left">{{basicInfo.authPerson.number}}</td></tr>
+                    <tr><th>Email</th><td class="left">{{basicInfo.authPerson.email}}</td></tr>
+                    <tr><th>Coordinating Person</th><td class="left">{{basicInfo.coordPerson.name}}</td></tr>
+                    <tr><th>Coord. Contact</th><td class="left">{{basicInfo.coordPerson.number}} / {{basicInfo.coordPerson.email}}</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">2. Address Details</div>
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-label">Registered Address</div>
+                    <div class="card-value">{{addressDetails.registered}}</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">Communication Address</div>
+                    <div class="card-value">{{addressDetails.communication}}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">3. MSME Details</div>
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-label">Status</div>
+                    <div class="card-value">{{msmeDetails.status}}</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">MSME Number</div>
+                    <div class="card-value">{{msmeDetails.number}}</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">Enterprise Type</div>
+                    <div class="card-value">{{msmeDetails.type}}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-break"></div>
+    <div class="report-page">
+        <div class="report-header">
+            {{#if logoBase64}}
+            <img src="{{logoBase64}}" alt="AnantTattva Logo" class="header-logo" />
+            {{/if}}
+            <div class="report-title-main">Documents and Consent Details</div>
+            <div class="report-subtitle">Company Documents, CTE and CTO</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">4. Company Documents</div>
+            {{#if companyDocuments.length}}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Document Type</th>
+                        <th>Certificate Number</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each companyDocuments}}
+                    <tr>
+                        <td class="left">{{this.type}}</td>
+                        <td>{{this.number}}</td>
+                        <td>{{this.date}}</td>
+                        <td>{{this.status}}</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="card muted">No required documents uploaded.</div>
+            {{/if}}
+        </div>
+
+        <div class="section">
+            <div class="section-title">5. CTE &amp; CTO Details</div>
+            {{#if plants.length}}
+                {{#each plants}}
+                <div class="plant-box">
+                    <div class="plant-title">Plant Unit: {{this.name}}</div>
+                    <div class="plant-body">
+                        {{#if this.cte.length}}
+                        <div class="subheading">CTE Details</div>
+                        <table style="margin-bottom: 12px;">
+                            <thead>
+                                <tr>
+                                    <th>Consent No</th>
+                                    <th>Issue Date</th>
+                                    <th>Valid Upto</th>
+                                    <th>Location</th>
+                                    <th>Address</th>
+                                    <th>Remark</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{#each this.cte}}
+                                <tr>
+                                    <td>{{this.consentNo}}</td>
+                                    <td>{{this.issueDate}}</td>
+                                    <td>{{this.validUpto}}</td>
+                                    <td>{{this.location}}</td>
+                                    <td class="left">{{this.address}}</td>
+                                    <td class="left">{{this.remark}}</td>
+                                </tr>
+                                {{/each}}
+                            </tbody>
+                        </table>
+                        {{/if}}
+
+                        {{#if this.cto.length}}
+                        <div class="subheading">CTO Details</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Industry</th>
+                                    <th>Category</th>
+                                    <th>Order No</th>
+                                    <th>Issue Date</th>
+                                    <th>Valid Upto</th>
+                                    <th>Location</th>
+                                    <th>Remark</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{#each this.cto}}
+                                <tr>
+                                    <td>{{this.type}}</td>
+                                    <td class="left">{{this.industryType}}</td>
+                                    <td>{{this.category}}</td>
+                                    <td>{{this.orderNo}}</td>
+                                    <td>{{this.issueDate}}</td>
+                                    <td>{{this.validUpto}}</td>
+                                    <td>{{this.location}}</td>
+                                    <td class="left">{{this.remark}}</td>
+                                </tr>
+                                {{/each}}
+                            </tbody>
+                        </table>
+                        {{/if}}
+                    </div>
+                </div>
+                {{/each}}
+            {{else}}
+            <div class="card muted">No plant details available.</div>
+            {{/if}}
+        </div>
+    </div>
+
+    <div class="page-break"></div>
+    <div class="report-page">
+        <div class="report-header">
+            {{#if logoBase64}}
+            <img src="{{logoBase64}}" alt="AnantTattva Logo" class="header-logo" />
+            {{/if}}
+            <div class="report-title-main">Summary Report of Industry, SKU Wise</div>
+            <div class="report-subtitle">Industry Summary and SKU Summary</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">6. Industry Category Summary</div>
+            {{#if industryCategorySummaryReport.length}}
+            <table>
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="width: 22%;">Industry Category</th>
+                        <th rowspan="2" style="width: 10%;">Total SKU</th>
+                        <th colspan="2" style="width: 22%;">Compliance Status</th>
+                        <th colspan="2" style="width: 22%;">Marking and Labeling</th>
+                    </tr>
+                    <tr>
+                        <th>Compliant</th>
+                        <th>Non Compliant</th>
+                        <th>Compliant</th>
+                        <th>Non Compliant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each industryCategorySummaryReport}}
+                    <tr>
+                        <td>{{this.name}}</td>
+                        <td>{{this.totalSku}}</td>
+                        <td>{{this.complianceCompliant}}</td>
+                        <td>{{this.complianceNonCompliant}}</td>
+                        <td>{{this.markingCompliant}}</td>
+                        <td>{{this.markingNonCompliant}}</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="card muted">No industry summary data available.</div>
+            {{/if}}
+        </div>
+
+        <div class="section">
+            <div class="section-title">7. Summary Report of Industry, SKU Wise</div>
+            {{#if industrySkuSummaryReport.length}}
+            <table>
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="width: 22%;">Industry Wise SKU</th>
+                        <th rowspan="2" style="width: 12%;">Compliance Status</th>
+                        <th rowspan="2" style="width: 14%;">Marking and Labeling Status</th>
+                        <th colspan="2" style="width: 16%;">Supplier Status</th>
+                        <th rowspan="2">Remarks</th>
+                    </tr>
+                    <tr>
+                        <th>Registered</th>
+                        <th>Unregistered</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each industrySkuSummaryReport}}
+                    <tr class="industry-group">
+                        <td colspan="6">{{this.name}}</td>
+                    </tr>
+                    {{#each this.rows}}
+                    <tr>
+                        <td>
+                            <div class="sku-code">{{this.skuCode}}</div>
+                            <div class="sku-description">{{this.skuDescription}}</div>
+                        </td>
+                        <td>
+                            <span class="status-pill {{#if (eq this.complianceStatus 'Compliant')}}compliant{{else if (eq this.complianceStatus 'Non-Compliant')}}non-compliant{{else if (eq this.complianceStatus 'Partial Compliant')}}partial{{else if (eq this.complianceStatus 'Partially Compliant')}}partial{{else}}pending{{/if}}">
+                                {{this.complianceStatus}}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="status-pill {{#if (eq this.markingLabelingStatus 'Compliant')}}compliant{{else if (eq this.markingLabelingStatus 'Non-Compliant')}}non-compliant{{else if (eq this.markingLabelingStatus 'Partial Compliant')}}partial{{else if (eq this.markingLabelingStatus 'Partially Compliant')}}partial{{else}}pending{{/if}}">
+                                {{this.markingLabelingStatus}}
+                            </span>
+                        </td>
+                        <td>{{this.supplierRegisteredCount}}</td>
+                        <td>{{this.supplierUnregisteredCount}}</td>
+                        <td class="left" style="white-space: pre-wrap;">{{this.remarks}}</td>
+                    </tr>
+                    {{/each}}
+                    {{/each}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="card muted">No SKU summary data available.</div>
+            {{/if}}
+        </div>
+    </div>
+
+    <div class="page-break"></div>
+    <div class="report-page">
+        <div class="report-header">
+            {{#if logoBase64}}
+            <img src="{{logoBase64}}" alt="AnantTattva Logo" class="header-logo" />
+            {{/if}}
+            <div class="report-title-main">Target Summary</div>
+            <div class="report-subtitle">Annual Summary and EPR Target Calculation</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">8. Annual Summary</div>
+            {{#if annualTargetSummaryReport.length}}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Procurement (Tons)</th>
+                        <th>Sales (Tons)</th>
+                        <th>Export (Tons)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each annualTargetSummaryReport}}
+                    <tr>
+                        <td>{{this.category}}</td>
+                        <td>{{this.procurementTons}}</td>
+                        <td>{{this.salesTons}}</td>
+                        <td>{{this.exportTons}}</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+            {{else}}
+            <div class="card muted">No annual summary data available.</div>
+            {{/if}}
+        </div>
+
+        <div class="section">
+            <div class="section-title">9. EPR Target Calculation</div>
+            {{#if targetTables.length}}
+                {{#each targetTables}}
+                <div class="target-card">
+                    <div class="target-title">{{this.title}}</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                {{#each this.columns}}
+                                <th>{{this}}</th>
+                                {{/each}}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each this.data}}
+                            <tr>
+                                {{#each ../columns}}
+                                <td>{{lookup .. this}}</td>
+                                {{/each}}
+                            </tr>
+                            {{/each}}
+                        </tbody>
+                    </table>
+                </div>
+                {{/each}}
+            {{else}}
+            <div class="card muted">No EPR target calculation available.</div>
+            {{/if}}
+        </div>
+    </div>
+</body>
+</html>

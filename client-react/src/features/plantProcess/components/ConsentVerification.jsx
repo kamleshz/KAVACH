@@ -20,9 +20,9 @@ import {
     LoadingOutlined,
     ArrowRightOutlined
 } from '@ant-design/icons';
-import DocumentViewerModal from '../DocumentViewerModal';
-import api from '../../services/api';
-import { formatNumber } from '../../utils/numberUtils';
+import DocumentViewerModal from '../../../components/DocumentViewerModal';
+import api from '../../../services/api';
+import { formatNumber } from '../../../utils/numberUtils';
 
 const ConsentVerification = ({
     item,
@@ -56,6 +56,21 @@ const ConsentVerification = ({
         setViewerName(docName || docType);
         setViewerOpen(true);
     };
+
+    const ctoAdditionalRows = Array.isArray(client?.productionFacility?.ctoAdditionalDetails) && client.productionFacility.ctoAdditionalDetails.length
+        ? client.productionFacility.ctoAdditionalDetails
+        : ((client?.productionFacility?.totalCapitalInvestmentLakhs !== undefined ||
+            client?.productionFacility?.groundWaterUsage ||
+            client?.productionFacility?.cgwaNocRequirement ||
+            client?.productionFacility?.cgwaNocDocument)
+            ? [{
+                plantName: client?.productionFacility?.ctoDetailsList?.[0]?.plantName || '',
+                totalCapitalInvestmentLakhs: client?.productionFacility?.totalCapitalInvestmentLakhs,
+                groundWaterUsage: client?.productionFacility?.groundWaterUsage,
+                cgwaNocRequirement: client?.productionFacility?.cgwaNocRequirement,
+                cgwaNocDocument: client?.productionFacility?.cgwaNocDocument
+            }]
+            : []);
 
     return (
         <div className="space-y-8">
@@ -355,35 +370,45 @@ const ConsentVerification = ({
                         </h2>
                     </div>
                     <div className="p-6 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total Capital Investment (Lakhs)</div>
-                                <div className="mt-2 text-sm font-semibold text-gray-900">{client?.productionFacility?.totalCapitalInvestmentLakhs ?? '-'}</div>
-                            </div>
-                            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Ground/Bore Well Water Usage</div>
-                                <div className="mt-2 text-sm font-semibold text-gray-900">{client?.productionFacility?.groundWaterUsage || '-'}</div>
-                            </div>
-                            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">CGWA NOC Requirement</div>
-                                <div className="mt-2 text-sm font-semibold text-gray-900">{client?.productionFacility?.cgwaNocRequirement || '-'}</div>
-                            </div>
-                            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">CGWA NOC Document</div>
-                                <div className="mt-2">
-                                    {client?.productionFacility?.cgwaNocDocument ? (
-                                        <button
-                                            onClick={() => handleViewDocument(client.productionFacility.cgwaNocDocument, 'CGWA', 'CGWA NOC')}
-                                            className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                                        >
-                                            <EyeOutlined className="mr-1" /> View
-                                        </button>
-                                    ) : (
-                                        <span className="text-gray-400 text-xs italic">No Doc</span>
-                                    )}
+                        {ctoAdditionalRows.length > 0 ? ctoAdditionalRows.map((row, idx) => (
+                            <div key={row._id || row.plantName || idx} className="border border-gray-200 rounded-xl p-4 bg-gray-50">
+                                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Plant Name</div>
+                                        <div className="mt-2 text-sm font-semibold text-gray-900">{row?.plantName || '-'}</div>
+                                    </div>
+                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total Capital Investment (Lakhs)</div>
+                                        <div className="mt-2 text-sm font-semibold text-gray-900">{row?.totalCapitalInvestmentLakhs ?? '-'}</div>
+                                    </div>
+                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Ground/Bore Well Water Usage</div>
+                                        <div className="mt-2 text-sm font-semibold text-gray-900">{row?.groundWaterUsage || '-'}</div>
+                                    </div>
+                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">CGWA NOC Requirement</div>
+                                        <div className="mt-2 text-sm font-semibold text-gray-900">{row?.cgwaNocRequirement || '-'}</div>
+                                    </div>
+                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">CGWA NOC Document</div>
+                                        <div className="mt-2">
+                                            {row?.cgwaNocDocument ? (
+                                                <button
+                                                    onClick={() => handleViewDocument(row.cgwaNocDocument, 'CGWA', `CGWA NOC_${row?.plantName || idx + 1}`)}
+                                                    className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                                                >
+                                                    <EyeOutlined className="mr-1" /> View
+                                                </button>
+                                            ) : (
+                                                <span className="text-gray-400 text-xs italic">No Doc</span>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )) : (
+                            <div className="text-sm text-gray-400 italic">No additional details added.</div>
+                        )}
 
                         <div>
                             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
@@ -411,6 +436,7 @@ const ConsentVerification = ({
                                         <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
                                             <tr>
                                                 <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                                <th className="p-3 font-semibold border-b w-48">Plant Name</th>
                                                 <th className="p-3 font-semibold border-b">Description (water consumption / waste)</th>
                                                 <th className="p-3 font-semibold border-b w-48">Permitted quantity</th>
                                                 <th className="p-3 font-semibold border-b w-24">UOM</th>
@@ -420,6 +446,7 @@ const ConsentVerification = ({
                                             {(Array.isArray(client?.productionFacility?.waterRegulations) && client.productionFacility.waterRegulations.length ? client.productionFacility.waterRegulations : [{}]).map((row, idx) => (
                                                 <tr key={idx} className="hover:bg-gray-50">
                                                     <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                                    <td className="p-3 text-gray-700">{row?.plantName || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.description || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.permittedQuantity || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.uom || '-'}</td>
@@ -436,6 +463,7 @@ const ConsentVerification = ({
                                         <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
                                             <tr>
                                                 <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                                <th className="p-3 font-semibold border-b w-48">Plant Name</th>
                                                 <th className="p-3 font-semibold border-b">Parameters</th>
                                                 <th className="p-3 font-semibold border-b w-80">Permissible annual / daily limit</th>
                                                 <th className="p-3 font-semibold border-b w-24">UOM</th>
@@ -445,6 +473,7 @@ const ConsentVerification = ({
                                             {(Array.isArray(client?.productionFacility?.airRegulations) && client.productionFacility.airRegulations.length ? client.productionFacility.airRegulations : [{}]).map((row, idx) => (
                                                 <tr key={idx} className="hover:bg-gray-50">
                                                     <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                                    <td className="p-3 text-gray-700">{row?.plantName || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.parameter || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.permittedLimit || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.uom || '-'}</td>
@@ -464,6 +493,7 @@ const ConsentVerification = ({
                                         <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
                                             <tr>
                                                 <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                                <th className="p-3 font-semibold border-b w-48">Plant Name</th>
                                                 <th className="p-3 font-semibold border-b">Name of Hazardous Waste</th>
                                                 <th className="p-3 font-semibold border-b">Facility &amp; Mode of Disposal</th>
                                                 <th className="p-3 font-semibold border-b w-40">Quantity MT/YR</th>
@@ -474,6 +504,7 @@ const ConsentVerification = ({
                                             {(Array.isArray(client?.productionFacility?.hazardousWasteRegulations) && client.productionFacility.hazardousWasteRegulations.length ? client.productionFacility.hazardousWasteRegulations : [{}]).map((row, idx) => (
                                                 <tr key={idx} className="hover:bg-gray-50">
                                                     <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                                    <td className="p-3 text-gray-700">{row?.plantName || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.nameOfHazardousWaste || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.facilityModeOfDisposal || '-'}</td>
                                                     <td className="p-3 text-gray-700">{row?.quantityMtYr || '-'}</td>

@@ -1,170 +1,50 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Table, Modal, Button, Tag, Tooltip, Input, Select, Upload, Popconfirm, Card } from 'antd';
-import { UploadOutlined, HistoryOutlined, FileExcelOutlined, SaveOutlined, DeleteOutlined, CheckOutlined, LoadingOutlined, ArrowLeftOutlined, ExclamationCircleFilled, CheckCircleFilled, CloseOutlined } from '@ant-design/icons';
+import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
-import api from '../services/api';
-import { API_ENDPOINTS } from '../services/apiEndpoints';
-import useAuth from '../hooks/useAuth';
-import Pagination from '../components/Pagination';
-import ConsentVerification from '../features/plantProcess/components/ConsentVerification';
-import ProductCompliance from '../features/plantProcess/components/ProductCompliance';
-import SingleUsePlastic from '../features/plantProcess/components/SingleUsePlastic';
-import SummaryReport from '../features/plantProcess/components/SummaryReport';
-import { 
-  PACKAGING_TYPES, 
-  POLYMER_TYPES, 
-  CATEGORIES, 
-  CATEGORY_II_TYPE_OPTIONS, 
-  CONTAINER_CAPACITIES, 
-  LAYER_TYPES 
-} from '../constants/complianceConstants';
+import api from '../../../services/api';
+import { API_ENDPOINTS } from '../../../services/apiEndpoints';
+import useAuth from '../../../hooks/useAuth';
+import { usePlantProcessHistory } from './usePlantProcessHistory';
+import {
+  PACKAGING_TYPES,
+  POLYMER_TYPES,
+  CATEGORIES,
+  CATEGORY_II_TYPE_OPTIONS,
+  CONTAINER_CAPACITIES,
+  LAYER_TYPES
+} from '../../../constants/complianceConstants';
 
-const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItemId, onBack, onFinish }) => {
-  const params = useParams();
-  const clientId = propClientId || params.clientId;
-  const type = propType || params.type;
-  const itemId = propItemId || params.itemId;
-  const navigate = useNavigate();
-  const { user, isManager } = useAuth();
-  const resolvedUserName = useMemo(() => user?.name || user?.username || user?.email || 'Current User', [user]);
-  const historyStorageKey = useMemo(() => {
-    if (!clientId || !type || !itemId) return null;
-    return `eprkavach:plantprocess:history:${clientId}:${type}:${itemId}`;
-  }, [clientId, type, itemId]);
-  const legacyHistoryStorageKey = useMemo(() => {
-    const userKey = user?.id || user?._id || user?.email || 'anonymous';
-    if (!clientId || !type || !itemId) return null;
-    return `eprkavach:plantprocess:history:${clientId}:${type}:${itemId}:${userKey}`;
-  }, [clientId, type, itemId, user]);
-  const [persistedHistory, setPersistedHistory] = useState([]);
-  useEffect(() => {
-    if (!historyStorageKey) return;
-    try {
-      const rawShared = localStorage.getItem(historyStorageKey);
-      const parsedShared = rawShared ? JSON.parse(rawShared) : [];
-      if (Array.isArray(parsedShared) && parsedShared.length) {
-        setPersistedHistory(parsedShared);
-        return;
-      }
-
-      if (!legacyHistoryStorageKey) {
-        setPersistedHistory([]);
-        return;
-      }
-
-      const rawLegacy = localStorage.getItem(legacyHistoryStorageKey);
-      const parsedLegacy = rawLegacy ? JSON.parse(rawLegacy) : [];
-      if (Array.isArray(parsedLegacy) && parsedLegacy.length) {
-        setPersistedHistory(parsedLegacy);
-        try {
-          localStorage.setItem(historyStorageKey, JSON.stringify(parsedLegacy));
-        } catch (_) {
-          void 0;
+export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackArg, onFinishArg) => {
+  const { clientId, type, itemId, onBack, onFinish } =
+    typeof argsOrClientId === 'object' && argsOrClientId !== null
+      ? {
+          clientId: argsOrClientId.clientId,
+          type: argsOrClientId.type,
+          itemId: argsOrClientId.itemId,
+          onBack: argsOrClientId.onBack,
+          onFinish: argsOrClientId.onFinish
         }
-        return;
-      }
+      : {
+          clientId: argsOrClientId,
+          type: typeArg,
+          itemId: itemIdArg,
+          onBack: onBackArg,
+          onFinish: onFinishArg
+        };
+    const params = useParams();
+    const navigate = useNavigate();
+    const { user, isManager } = useAuth();
 
-      setPersistedHistory([]);
-    } catch (_) {
-      setPersistedHistory([]);
-    }
-  }, [historyStorageKey, legacyHistoryStorageKey]);
-  const appendPersistedHistory = (entries) => {
-    if (!historyStorageKey || !Array.isArray(entries) || entries.length === 0) return;
-    setPersistedHistory(prev => {
-      const next = [...entries, ...prev].slice(0, 2000);
-      try {
-        localStorage.setItem(historyStorageKey, JSON.stringify(next));
-      } catch (_) {
-        void 0;
-      }
-      if (legacyHistoryStorageKey) {
-        try {
-          localStorage.setItem(legacyHistoryStorageKey, JSON.stringify(next));
-        } catch (_) {
-          void 0;
-        }
-      }
-      return next;
-    });
-  };
-  
-  const [dbHistory, setDbHistory] = useState([]);
-  const [dbHistoryLoaded, setDbHistoryLoaded] = useState(false);
-
-  const fetchHistory = useCallback((signal) => {
-    if (!clientId || !type || !itemId) return;
-    api.get(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE_HISTORY(clientId), { params: { type, itemId }, signal })
-      .then((res) => {
-        const rows = res.data?.data || [];
-        setDbHistory(Array.isArray(rows) ? rows : []);
-        setDbHistoryLoaded(true);
-      })
-      .catch((error) => {
-        if (error.code === 'ERR_CANCELED') return;
-        setDbHistory([]);
-        setDbHistoryLoaded(true);
-      });
-  }, [clientId, type, itemId]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchHistory(controller.signal);
-    return () => controller.abort();
-  }, [fetchHistory]);
-
-  const normalizedDbHistory = useMemo(() => {
-    if (!Array.isArray(dbHistory)) return [];
-    return dbHistory.map((entry, idx) => {
-      const userText =
-        entry?.user?.name ||
-        entry?.user?.email ||
-        entry?.userName ||
-        entry?.user ||
-        '';
-      return {
-        ...entry,
-        user: userText,
-        id: entry.id || `db-${entry.table || 'unknown'}-${entry.row || idx}-${entry.field || 'unknown'}-${idx}`
-      };
-    });
-  }, [dbHistory]);
-
-  useEffect(() => {
-    if (!clientId || !type || !itemId) return;
-    if (!dbHistoryLoaded) return;
-    if (!Array.isArray(persistedHistory) || persistedHistory.length === 0) return;
-    
-    // Check if these entries are already in DB to avoid duplicates
-    // But since we are importing "offline" history, we assume they are new if we are here.
-    // However, to be safe, we only import if DB history is empty OR if we really want to merge.
-    // Current logic was: if normalizedDbHistory.length return.
-    // That means if we have ANY DB history, we ignore local history.
-    // This is good for preventing duplicates but bad if I made changes offline and then refreshed.
-    // BUT: The user issue is "same entry Show".
-    // If we have DB history, we should NOT import local history blindly.
-    
-    if (normalizedDbHistory.length > 0) {
-        // If we have DB history, let's clear local history to prevent confusion/duplication
-        // because we prioritize DB history now.
-        setPersistedHistory([]);
-        try { localStorage.removeItem(historyStorageKey); } catch (_) {}
-        if (legacyHistoryStorageKey) try { localStorage.removeItem(legacyHistoryStorageKey); } catch (_) {}
-        return;
-    }
-
-    api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE_HISTORY_IMPORT(clientId), {
-      type,
-      itemId,
-      entries: persistedHistory
-    }).then(() => {
-        // Clear local history after successful import
-        setPersistedHistory([]);
-        try { localStorage.removeItem(historyStorageKey); } catch (_) {}
-        if (legacyHistoryStorageKey) try { localStorage.removeItem(legacyHistoryStorageKey); } catch (_) {}
-    }).catch(() => {});
-  }, [clientId, type, itemId, dbHistoryLoaded, normalizedDbHistory.length, persistedHistory, historyStorageKey, legacyHistoryStorageKey]);
+  const {
+    resolvedUserName,
+    historyStorageKey,
+    legacyHistoryStorageKey,
+    persistedHistory,
+    appendPersistedHistory,
+    dbHistoryLoaded,
+    normalizedDbHistory
+  } = usePlantProcessHistory({ clientId, type, itemId, user });
 
   const [client, setClient] = useState(null);
   const isProducer = client?.entityType === 'Producer';
@@ -320,6 +200,15 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     return Array.from(map.entries()).map(([code, description]) => ({ code, description }));
   }, [productRows]);
 
+  const normalizeSystemCodeKey = (value) => (value || '').toString().replace(/\s+/g, '').toLowerCase();
+  const extractComponentCodeFromSystemCode = (value) => {
+    const raw = (value || '').toString();
+    if (!raw) return '';
+    const parts = raw.split('|').map((part) => part.trim()).filter(Boolean);
+    if (parts.length >= 2) return parts[1];
+    return '';
+  };
+
   const systemCodeOptions = useMemo(() => {
     const uniqueMap = new Map();
     productRows.forEach(r => {
@@ -340,8 +229,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         category: ''
       };
       if (!existing.skuCode && r.skuCode) existing.skuCode = r.skuCode;
-      if (!existing.componentCode && r.componentCode) existing.componentCode = r.componentCode;
-      if (!existing.componentDescription && r.componentDescription) existing.componentDescription = r.componentDescription;
+      if (r.componentCode) existing.componentCode = r.componentCode;
+      if (r.componentDescription) existing.componentDescription = r.componentDescription;
       if (!existing.supplierName && r.supplierName) existing.supplierName = r.supplierName;
       if (!existing.supplierState && r.supplierState) existing.supplierState = r.supplierState;
       if (!existing.supplierType && r.supplierType) existing.supplierType = r.supplierType;
@@ -365,8 +254,8 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         category: ''
       };
       if (!existing.skuCode && r.skuCode) existing.skuCode = r.skuCode;
-      if (!existing.componentCode && r.componentCode) existing.componentCode = r.componentCode;
-      if (!existing.componentDescription && r.componentDescription) existing.componentDescription = r.componentDescription;
+      if (r.componentCode) existing.componentCode = r.componentCode;
+      if (r.componentDescription) existing.componentDescription = r.componentDescription;
       if (!existing.supplierName && r.supplierName) existing.supplierName = r.supplierName;
       if (!existing.supplierState && r.supplierState) existing.supplierState = r.supplierState;
       if (r.polymerType) existing.polymerType = r.polymerType;
@@ -1555,15 +1444,16 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     const handleSupplierBulkSave = async () => {
         setIsSupplierBulkSaving(true);
         try {
-            const validatedRows = supplierRows.map(row => {
+            const validatedRows = supplierRows.map((row) => {
+                const hydrated = hydrateSupplierRowFromSystemCode(row);
                 const missing = [];
-                if (!row.componentCode) missing.push('Component Code');
-                if (!row.supplierName) missing.push('Supplier Name');
+                if (!hydrated.componentCode) missing.push('Component Code');
+                if (!hydrated.supplierName) missing.push('Supplier Name');
                 
                 if (missing.length > 0) {
-                    return { ...row, _validationError: `Missing: ${missing.join(', ')}` };
+                    return { ...hydrated, _validationError: `Missing: ${missing.join(', ')}` };
                 }
-                return { ...row, _validationError: null };
+                return { ...hydrated, _validationError: null };
             });
 
             const validRows = validatedRows.filter(r => !r._validationError);
@@ -1866,6 +1756,37 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         console.log("Saving row (JSON):", payload.row);
         await api.post(API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(clientId), payload);
       }
+
+      const syncComponentDescription = (componentCode, systemCode, componentDescription) => {
+        const cc = (componentCode || '').toString().trim();
+        const sc = (systemCode || '').toString().trim();
+        const desc = (componentDescription || '').toString();
+        if (!cc || !desc.trim()) return;
+
+        const matches = (r) => {
+          const rSc = (r?.systemCode || '').toString().trim();
+          const rCc = (r?.componentCode || '').toString().trim();
+          if (sc && rSc) return rSc === sc;
+          return rCc === cc;
+        };
+
+        const apply = (rows) => (Array.isArray(rows) ? rows.map((r) => (matches(r) ? { ...r, componentDescription: desc } : r)) : rows);
+
+        setSupplierRows(apply);
+        setLastSavedSupplierRows(apply);
+        setComponentRows(apply);
+        setLastSavedComponentRows(apply);
+        setMonthlyRows(apply);
+        setLastSavedMonthlyRows(apply);
+        setRecycledRows(apply);
+        setLastSavedRecycledRows(apply);
+      };
+
+      syncComponentDescription(
+        savedRowForHistory.componentCode,
+        savedRowForHistory.systemCode,
+        savedRowForHistory.componentDescription
+      );
 
       const fields = ['generate', 'systemCode', 'packagingType', 'clientName', 'clientState', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage'];
       const entryBaseId = `${Date.now()}-${Math.random()}`;
@@ -3579,32 +3500,73 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     });
   };
 
+  const hydrateSupplierRowFromSystemCode = (row) => {
+    const systemCode = (row?.systemCode || '').toString().trim();
+    if (!systemCode) return row;
+
+    const selectedOption = systemCodeOptions.find(
+      (opt) => normalizeSystemCodeKey(opt.code) === normalizeSystemCodeKey(systemCode)
+    );
+    const optionData = selectedOption?.data || {};
+    const parsedComponentCode = extractComponentCodeFromSystemCode(systemCode);
+    const componentFallback = componentRows.find(
+      (r) => (r?.componentCode || '').toString().trim() === parsedComponentCode
+    ) || productRows.find(
+      (r) => (r?.componentCode || '').toString().trim() === parsedComponentCode
+    );
+
+    return {
+      ...row,
+      componentCode: optionData.componentCode || parsedComponentCode || row.componentCode || '',
+      componentDescription: optionData.componentDescription || componentFallback?.componentDescription || row.componentDescription || '',
+      supplierName: optionData.supplierName || componentFallback?.supplierName || row.supplierName || '',
+      supplierState: optionData.supplierState || row.supplierState || '',
+      supplierType: optionData.supplierType || componentFallback?.supplierType || row.supplierType || ''
+    };
+  };
+
+  const hydrateSupplierRowsFromSystemCode = (rows) => {
+    if (!Array.isArray(rows)) return [];
+    return rows.map((row) => hydrateSupplierRowFromSystemCode(row));
+  };
+
   const handleSystemCodeSelect = (index, sysCode) => {
     if (sysCode) {
-      const isDuplicate = supplierRows.some((r, i) => i !== index && (r.systemCode || '').trim() === (sysCode || '').trim());
+      const selectedKey = normalizeSystemCodeKey(sysCode);
+      const isDuplicate = supplierRows.some((r, i) => i !== index && normalizeSystemCodeKey(r.systemCode) === selectedKey);
       if (isDuplicate) {
         notify('error', 'System Code Already Used');
         return;
       }
     }
 
-    // Find the first matching product row
-    const match = productRows.find(r => (r.systemCode || '').trim() === (sysCode || '').trim());
-    
     setSupplierRows(prev => {
       const copy = [...prev];
-      copy[index] = {
-        ...copy[index],
-        systemCode: sysCode,
-        componentCode: match?.componentCode || '',
-        componentDescription: match?.componentDescription || '',
-        supplierName: match?.supplierName || '',
-        supplierState: match?.supplierState || '',
-        supplierType: match?.supplierType || ''
-      };
+      const base = { ...copy[index], systemCode: sysCode };
+      copy[index] = hydrateSupplierRowFromSystemCode(base);
       return copy;
     });
   };
+
+  // Keep Supplier Compliance rows in sync with latest Product Compliance mapping after load/refresh.
+  useEffect(() => {
+    setSupplierRows((prev) => {
+      if (!Array.isArray(prev) || prev.length === 0) return prev;
+      let changed = false;
+      const normalized = prev.map((row) => {
+        const hydrated = hydrateSupplierRowFromSystemCode(row);
+        const same =
+          (hydrated.componentCode || '') === (row.componentCode || '') &&
+          (hydrated.componentDescription || '') === (row.componentDescription || '') &&
+          (hydrated.supplierName || '') === (row.supplierName || '') &&
+          (hydrated.supplierState || '') === (row.supplierState || '') &&
+          (hydrated.supplierType || '') === (row.supplierType || '');
+        if (!same) changed = true;
+        return same ? row : hydrated;
+      });
+      return changed ? normalized : prev;
+    });
+  }, [systemCodeOptions, supplierRows.length]);
 
   const handleSupplierCodeSelect = (index, code) => {
     const opt = componentOptions.find(o => o.code === code);
@@ -3652,15 +3614,21 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
     setSavingSupplierRow(idx);
     try {
       const beforeRow = lastSavedSupplierRows[idx] || {};
+      const hydratedRow = hydrateSupplierRowFromSystemCode(supplierRows[idx] || {});
+      setSupplierRows((prev) => {
+        const copy = [...prev];
+        copy[idx] = hydratedRow;
+        return copy;
+      });
       const payload = {
         type,
         itemId,
         rowIndex: idx,
-        row: { ...supplierRows[idx] }
+        row: { ...hydratedRow }
       };
       await api.post(API_ENDPOINTS.CLIENT.PRODUCT_SUPPLIER_COMPLIANCE(clientId), payload);
 
-      const row = supplierRows[idx] || {};
+      const row = hydratedRow;
       const fields = ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierType', 'supplierStatus', 'applicationType', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo', 'fssaiValidUpto'];
       const entryBaseId = `${Date.now()}-${Math.random()}`;
       const historyEntries = [];
@@ -3684,7 +3652,7 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
       setDbHistory(prev => [...prev, ...historyEntries]);
       setLastSavedSupplierRows(prev => {
         const copy = [...prev];
-        copy[idx] = supplierRows[idx];
+        copy[idx] = row;
         return copy;
       });
       notify('success', 'Supplier compliance saved successfully');
@@ -3806,12 +3774,16 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
           return raw;
         };
         if (rows.length) {
-          const normalized = rows.map((r) => ({ ...r, foodGrade: normalizeFoodGrade(r?.foodGrade) }));
+          const normalized = hydrateSupplierRowsFromSystemCode(
+            rows.map((r) => ({ ...r, foodGrade: normalizeFoodGrade(r?.foodGrade) }))
+          );
           setSupplierRows(normalized);
           setLastSavedSupplierRows(normalized);
           setInitialSupplierRows(normalized);
         } else if (item && Array.isArray(item.productSupplierCompliance) && item.productSupplierCompliance.length) {
-          const normalized = item.productSupplierCompliance.map((r) => ({ ...r, foodGrade: normalizeFoodGrade(r?.foodGrade) }));
+          const normalized = hydrateSupplierRowsFromSystemCode(
+            item.productSupplierCompliance.map((r) => ({ ...r, foodGrade: normalizeFoodGrade(r?.foodGrade) }))
+          );
           setSupplierRows(normalized);
           setLastSavedSupplierRows(normalized);
           setInitialSupplierRows(normalized);
@@ -3826,7 +3798,9 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
             if (lower === 'no' || lower === 'non food' || lower === 'non-food' || lower === 'nonfood') return 'Non Food';
             return raw;
           };
-          const normalized = item.productSupplierCompliance.map((r) => ({ ...r, foodGrade: normalizeFoodGrade(r?.foodGrade) }));
+          const normalized = hydrateSupplierRowsFromSystemCode(
+            item.productSupplierCompliance.map((r) => ({ ...r, foodGrade: normalizeFoodGrade(r?.foodGrade) }))
+          );
           setSupplierRows(normalized);
           setLastSavedSupplierRows(normalized);
           setInitialSupplierRows(normalized);
@@ -3855,7 +3829,16 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
         const res = await api.get(API_ENDPOINTS.CLIENT.MONTHLY_PROCUREMENT(clientId), {
           params: { type, itemId }
         });
-        const rows = res.data?.data || [];
+        const rows = (res.data?.data || []).map((row) => {
+          const next = { ...row };
+          const rQty = parseFloat(next.recycledQty) || 0;
+          const rRate = parseFloat(next.recycledRate) || 0;
+          if (rQty && rRate) next.recycledQrtAmount = (rQty * rRate).toFixed(3);
+          const vQty = parseFloat(next.virginQty) || 0;
+          const vRate = parseFloat(next.virginRate) || 0;
+          if (vQty && vRate) next.virginQtyAmount = (vQty * vRate).toFixed(3);
+          return next;
+        });
         if (rows.length) {
           setMonthlyRows(rows);
           setLastSavedMonthlyRows(rows);
@@ -4614,318 +4597,499 @@ const PlantProcess = ({ clientId: propClientId, type: propType, itemId: propItem
                     {steps.map((step, index) => {
                         const isCurrent = index === currentStepIndex;
                         const isCompleted = completedSteps.includes(step.id);
-                        
-                        return (
-                            <div key={step.id} className="flex-1 flex items-center relative group">
-                                <button
-                                    onClick={() => setActiveTab(step.id)}
-                                    className={`flex-1 flex items-center px-6 py-4 transition-colors relative ${
-                                        isCurrent ? 'bg-white' : 'hover:bg-gray-50'
-                                    }`}
-                                >
-                                    <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border-2 text-sm font-bold transition-colors ${
-                                        isCompleted 
-                                            ? 'bg-green-600 border-green-600 text-white' 
-                                            : isCurrent 
-                                                ? 'border-primary-600 text-primary-600 bg-white' 
-                                                : 'border-gray-300 text-gray-500 bg-white'
-                                    }`}>
-                                        {isCompleted ? (
-                                            <CheckOutlined />
-                                        ) : (
-                                            <span>{String(index + 1).padStart(2, '0')}</span>
-                                        )}
-                                    </div>
-                                    <div className="ml-4 text-left">
-                                        <p className={`text-sm font-bold ${
-                                            isCompleted ? 'text-green-700' : isCurrent ? 'text-primary-700' : 'text-gray-500'
-                                        }`}>
-                                            {step.label}
-                                        </p>
-                                        <p className="text-xs text-gray-500 mt-0.5">
-                                            {step.description}
-                                        </p>
-                                    </div>
-                                    
-                                    {/* Active Bottom Border */}
-                                    {isCurrent && (
-                                        <div className="absolute bottom-0 left-0 w-full h-1 bg-primary-600"></div>
-                                    )}
-                                </button>
-                                
-                                {/* Chevron Separator (hidden for last item) */}
-                                {index < steps.length - 1 && (
-                                    <div className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 text-gray-300">
-                                        <svg className="h-8 w-8" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
 
-        {activeTab === 'verification' && (
-            <ConsentVerification
-                item={item}
-                relatedItems={relatedItems}
-                verificationStates={verificationStates}
-                updateVerificationState={updateVerificationState}
-                handleVerify={handleVerify}
-                isStepReadOnly={isStepReadOnly}
-                verifying={verifying}
-                rejecting={rejecting}
-                navigate={navigate}
-                setShowHistoryModal={setShowHistoryModal}
-                type={type}
-                client={client}
-                isSaving={isSaving}
-                handleNext={handleNext}
-            />
-        )}
-        {activeTab === 'tab2' && (
-            <ProductCompliance
-                subSteps={subSteps}
-                completedSubSteps={completedSubSteps}
-                subTab={subTab}
-                setSubTab={setSubTab}
-                isManager={isManager}
-                fileInputRef={fileInputRef}
-                handleExcelUpload={handleExcelUpload}
-                handleProductTemplateDownload={handleProductTemplateDownload}
-                handleProductExport={handleProductExport}
-                handleProductDeleteAll={handleProductDeleteAll}
-                handleBulkSave={handleBulkSave}
-                isBulkSaving={isBulkSaving}
-                productRows={productRows}
-                addRow={addRow}
-                handleRowChange={handleRowChange}
-                handleGenerateChange={handleGenerateChange}
-                handleProductComponentCodeChange={handleProductComponentCodeChange}
-                handleGenerateSupplierCodeChange={handleGenerateSupplierCodeChange}
-                formatProductFieldValue={formatProductFieldValue}
-                resolveUrl={resolveUrl}
-                handleFileChange={handleFileChange}
-                saveRow={saveRow}
-                cancelRow={cancelRow}
-                removeRow={removeRow}
-                savingRow={savingRow}
-                currentPage={currentPage}
-                itemsPerPage={itemsPerPage}
-                setCurrentPage={setCurrentPage}
-                setItemsPerPage={setItemsPerPage}
-                fileInputSupplierRef={fileInputSupplierRef}
-                handleSupplierExcelUpload={handleSupplierExcelUpload}
-                handleSupplierTemplateDownload={handleSupplierTemplateDownload}
-                handleSupplierExport={handleSupplierExport}
-                handleSupplierDeleteAll={handleSupplierDeleteAll}
-                handleSupplierBulkSave={handleSupplierBulkSave}
-                isSupplierBulkSaving={isSupplierBulkSaving}
-                supplierRows={supplierRows}
-                addSupplierRow={addSupplierRow}
-                systemCodeOptions={systemCodeOptions}
-                handleSystemCodeSelect={handleSystemCodeSelect}
-                handleSupplierCodeSelect={handleSupplierCodeSelect}
-                componentOptions={componentOptions}
-                handleSupplierChange={handleSupplierChange}
-                saveSupplierRow={saveSupplierRow}
-                cancelSupplierRow={cancelSupplierRow}
-                removeSupplierRow={removeSupplierRow}
-                savingSupplierRow={savingSupplierRow}
-                supplierPage={supplierPage}
-                supplierItemsPerPage={supplierItemsPerPage}
-                setSupplierPage={setSupplierPage}
-                setSupplierItemsPerPage={setSupplierItemsPerPage}
-                fileInputComponentRef={fileInputComponentRef}
-                handleComponentExcelUpload={handleComponentExcelUpload}
-                handleComponentTemplateDownload={handleComponentTemplateDownload}
-                handleComponentExport={handleComponentExport}
-                handleComponentBulkSave={handleComponentBulkSave}
-                handleComponentDeleteAll={handleComponentDeleteAll}
-                isComponentBulkSaving={isComponentBulkSaving}
-                componentRows={componentRows}
-                addComponentRow={addComponentRow}
-                handleComponentChange={handleComponentChange}
-                saveComponentRow={saveComponentRow}
-                cancelComponentRow={cancelComponentRow}
-                removeComponentRow={removeComponentRow}
-                savingComponentRow={savingComponentRow}
-                componentPage={componentPage}
-                componentItemsPerPage={componentItemsPerPage}
-                setComponentPage={setComponentPage}
-                setComponentItemsPerPage={setComponentItemsPerPage}
-                handleMonthlyExcelUpload={handleMonthlyExcelUpload}
-                handleMonthlyTemplateDownload={handleMonthlyTemplateDownload}
-                handleMonthlyExport={handleMonthlyExport}
-                monthlyRows={monthlyRows}
-                setMonthlyRows={setMonthlyRows}
-                lastSavedMonthlyRows={lastSavedMonthlyRows}
-                setLastSavedMonthlyRows={setLastSavedMonthlyRows}
-                notify={notify}
-                clientId={clientId}
-                type={type}
-                itemId={itemId}
-                client={client}
-                monthlyPage={monthlyPage}
-                monthlyItemsPerPage={monthlyItemsPerPage}
-                setMonthlyPage={setMonthlyPage}
-                setMonthlyItemsPerPage={setMonthlyItemsPerPage}
-                indexOfFirstRow={indexOfFirstRow}
-                currentRows={currentRows}
-                lastSavedRows={lastSavedRows}
-                lastSavedSupplierRows={lastSavedSupplierRows}
-                lastSavedComponentRows={lastSavedComponentRows}
-                lastSavedRecycledRows={lastSavedRecycledRows}
-                isProductFieldChanged={isProductFieldChanged}
-                indexOfFirstSupplierRow={indexOfFirstSupplierRow}
-                currentSupplierRows={currentSupplierRows}
-                indexOfFirstComponentRow={indexOfFirstComponentRow}
-                currentComponentRows={currentComponentRows}
-                indexOfFirstMonthlyRow={indexOfFirstMonthlyRow}
-                indexOfLastMonthlyRow={indexOfLastMonthlyRow}
-                changeSummaryData={changeSummaryData}
-                handleNext={handleNext}
-                isSaving={isSaving}
-                handleRecycledExcelUpload={handleRecycledExcelUpload}
-                handleRecycledTemplateDownload={handleRecycledTemplateDownload}
-                handleRecycledExport={handleRecycledExport}
-                handleRecycledBulkSave={handleRecycledBulkSave}
-                handleRecycledDeleteAll={handleRecycledDeleteAll}
-                addRecycledRow={addRecycledRow}
-                recycledRows={recycledRows}
-                setRecycledRows={setRecycledRows}
-                recycledPage={recycledPage}
-                setRecycledPage={setRecycledPage}
-                recycledItemsPerPage={recycledItemsPerPage}
-                setRecycledItemsPerPage={setRecycledItemsPerPage}
-                indexOfFirstRecycledRow={indexOfFirstRecycledRow}
-                currentRecycledRows={currentRecycledRows}
-                saveRecycledRow={saveRecycledRow}
-                cancelRecycledRow={cancelRecycledRow}
-                removeRecycledRow={removeRecycledRow}
-                savingRecycledRow={savingRecycledRow}
-                categorySummary={categorySummary}
-            />
-        )}
-        {activeTab === 'procurement' && (
-            <SingleUsePlastic
-                procurementData={procurementData}
-                handleProcurementUpload={handleProcurementUpload}
-                isUploadingProcurement={isUploadingProcurement}
-                isStepReadOnly={isStepReadOnly}
-                handleNext={handleNext}
-                isSaving={isSaving}
-                supChecklistData={supChecklistData}
-                onSaveSupChecklist={saveSupChecklist}
-            />
-        )}
-        {activeTab === 'tab5' && (
-            <SummaryReport
-                clientId={clientId}
-                type={type}
-                itemId={itemId}
-                handleNext={handleNext}
-                isSaving={isSaving}
-                productRows={productRows}
-                monthlyRows={monthlyRows}
-                recycledRows={recycledRows}
-                resolveUrl={resolveUrl}
-                supplierRows={supplierRows}
-                componentRows={componentRows}
-                handleSummaryChange={handleSummaryChange}
-                handleComponentSummaryChange={handleComponentSummaryChange}
-                handleSummaryFileChange={handleSummaryFileChange}
-                handleComponentSummaryFileChange={handleComponentSummaryFileChange}
-                handleComponentSave={handleComponentSave}
-                savingRow={savingRow}
-                isProducer={isProducer}
-            />
-        )}
-
-      {/* History Modal */}
-      <Modal
-        title={
-            <div className="flex items-center gap-2 text-xl font-bold text-gray-800">
-                <HistoryOutlined className="text-primary-600" /> Change History
-            </div>
-        }
-        open={showHistoryModal}
-        onCancel={() => setShowHistoryModal(false)}
-        footer={[
-            <Button key="close" onClick={() => setShowHistoryModal(false)} type="primary">
-                Close
-            </Button>
-        ]}
-        width={1000}
-        centered
-        className="rounded-xl"
-        styles={{ body: { padding: '20px' } }}
-      >
-        {historyModalData.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-                <HistoryOutlined className="text-4xl mb-3 text-gray-300" />
-                <p>No changes recorded.</p>
-            </div>
-        ) : (
-            <Table
-                dataSource={historyModalData}
-                pagination={{ pageSize: 10 }}
-                rowKey="id"
-                size="small"
-                scroll={{ x: 'max-content' }}
-                columns={[
-                    { title: 'Table', dataIndex: 'table', key: 'table', align: 'left', width: 120 },
-                    { title: 'Row', dataIndex: 'row', key: 'row', align: 'center', width: 80, render: (text) => `Row ${text}` },
-                    { title: 'Field', dataIndex: 'field', key: 'field', align: 'left', width: 150 },
-                    { 
-                        title: 'Previous', 
-                        dataIndex: 'prev', 
-                        key: 'prev', 
-                        align: 'left',
-                        width: 250,
-                        render: (text) => <div className="max-w-[250px] break-all whitespace-pre-wrap line-through text-gray-500 text-xs decoration-red-400">{text}</div>
-                    },
-                    { 
-                        title: 'Current', 
-                        dataIndex: 'curr', 
-                        key: 'curr', 
-                        align: 'left',
-                        width: 250,
-                        render: (text) => <div className="max-w-[250px] break-all whitespace-pre-wrap font-bold text-primary-700 text-xs">{text}</div>
-                    },
-                    { 
-                        title: 'User', 
-                        dataIndex: 'user', 
-                        key: 'user', 
-                        align: 'left',
-                        width: 150,
-                        render: (user) => (
-                            <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold shrink-0">
-                                    {(user || 'U')[0].toUpperCase()}
-                                </div>
-                                <span className="truncate max-w-[100px]">{user}</span>
-                            </div>
-                        )
-                    },
-                    { 
-                        title: 'Date', 
-                        dataIndex: 'at', 
-                        key: 'at', 
-                        align: 'center',
-                        width: 150,
-                        render: (date) => date ? <span className="text-xs text-gray-500">{new Date(date).toLocaleString()}</span> : '-'
-                    }
-                ]}
-            />
-        )}
-      </Modal>
-      </div>
-    </div>
-  );
+    return {
+        persistedHistory,
+        dbHistory,
+        dbHistoryLoaded,
+        client,
+        item,
+        loading,
+        error,
+        activeTab,
+        subTab,
+        notifications,
+        productRows,
+        lastSavedRows,
+        initialProductRows,
+        skuRows,
+        lastSavedSkuRows,
+        initialSkuRows,
+        currentPage,
+        itemsPerPage,
+        skuPage,
+        skuItemsPerPage,
+        componentRows,
+        isBulkSaving,
+        isSupplierBulkSaving,
+        isComponentBulkSaving,
+        savingRow,
+        isSkuBulkSaving,
+        savingSkuRow,
+        componentPage,
+        componentItemsPerPage,
+        lastSavedComponentRows,
+        initialComponentRows,
+        savingComponentRow,
+        supplierRows,
+        supplierPage,
+        supplierItemsPerPage,
+        lastSavedSupplierRows,
+        initialSupplierRows,
+        savingSupplierRow,
+        recycledRows,
+        recycledPage,
+        recycledItemsPerPage,
+        lastSavedRecycledRows,
+        initialRecycledRows,
+        savingRecycledRow,
+        monthlyRows,
+        monthlyPage,
+        monthlyItemsPerPage,
+        lastSavedMonthlyRows,
+        initialMonthlyRows,
+        savingMonthlyRow,
+        verificationStates,
+        verifying,
+        rejecting,
+        completedSteps,
+        isSaving,
+        completedSubSteps,
+        procurementData,
+        isUploadingProcurement,
+        supChecklistData,
+        relatedItems,
+        isChangeSummaryExpanded,
+        showHistoryModal,
+        setPersistedHistory,
+        setDbHistory,
+        setDbHistoryLoaded,
+        setClient,
+        setItem,
+        setLoading,
+        setError,
+        setActiveTab,
+        setSubTab,
+        setNotifications,
+        setProductRows,
+        setLastSavedRows,
+        setInitialProductRows,
+        setSkuRows,
+        setLastSavedSkuRows,
+        setInitialSkuRows,
+        setCurrentPage,
+        setItemsPerPage,
+        setSkuPage,
+        setSkuItemsPerPage,
+        setComponentRows,
+        setIsBulkSaving,
+        setIsSupplierBulkSaving,
+        setIsComponentBulkSaving,
+        setSavingRow,
+        setIsSkuBulkSaving,
+        setSavingSkuRow,
+        setComponentPage,
+        setComponentItemsPerPage,
+        setLastSavedComponentRows,
+        setInitialComponentRows,
+        setSavingComponentRow,
+        setSupplierRows,
+        setSupplierPage,
+        setSupplierItemsPerPage,
+        setLastSavedSupplierRows,
+        setInitialSupplierRows,
+        setSavingSupplierRow,
+        setRecycledRows,
+        setRecycledPage,
+        setRecycledItemsPerPage,
+        setLastSavedRecycledRows,
+        setInitialRecycledRows,
+        setSavingRecycledRow,
+        setMonthlyRows,
+        setMonthlyPage,
+        setMonthlyItemsPerPage,
+        setLastSavedMonthlyRows,
+        setInitialMonthlyRows,
+        setSavingMonthlyRow,
+        setVerificationStates,
+        setVerifying,
+        setRejecting,
+        setCompletedSteps,
+        setIsSaving,
+        setCompletedSubSteps,
+        setProcurementData,
+        setIsUploadingProcurement,
+        setSupChecklistData,
+        setRelatedItems,
+        setIsChangeSummaryExpanded,
+        setShowHistoryModal,
+        appendPersistedHistory,
+        notify,
+        dismissNotification,
+        getCompanyShortName,
+        getPlantCode,
+        getSupplierShortName,
+        getStateShortName,
+        getSupplierCodePrefix,
+        generateNextSupplierCode,
+        ensureSupplierCodeWithState,
+        handleRowChange,
+        handleFileChange,
+        handleProductComponentCodeChange,
+        generateComponentCode,
+        generateSystemCode,
+        handleGenerateChange,
+        handleGenerateSupplierCodeChange,
+        generateComponentCodeForBulk,
+        generateSupplierCodeForBulk,
+        handleProductDeleteAll,
+        handleSupplierDeleteAll,
+        handleSummaryChange,
+        handleComponentSummaryChange,
+        handleSummaryFileChange,
+        handleComponentSummaryFileChange,
+        handleProductExport,
+        handleProductTemplateDownload,
+        colToLetter,
+        getColRef,
+        handleSupplierExport,
+        handleSupplierTemplateDownload,
+        colLetter,
+        headerIndex,
+        handleExcelUpload,
+        getValue,
+        handleBulkSave,
+        handleSupplierExcelUpload,
+        normalizeFoodGrade,
+        applicationType,
+        handleSupplierBulkSave,
+        addRow,
+        removeRow,
+        getComparableProductValue,
+        formatProductFieldValue,
+        isProductFieldChanged,
+        isSkuFieldChanged,
+        handleSkuCodeSelect,
+        saveRow,
+        cancelRow,
+        handleComponentSave,
+        addSkuRow,
+        removeSkuRow,
+        handleSkuRowChange,
+        handleSkuFileChange,
+        saveSkuRow,
+        cancelSkuRow,
+        handleSkuBulkSave,
+        handleSkuDeleteAll,
+        handleSkuExport,
+        handleSkuTemplateDownload,
+        handleSkuExcelUpload,
+        handleComponentChange,
+        addComponentRow,
+        removeComponentRow,
+        saveComponentRow,
+        resolvedRow,
+        cancelComponentRow,
+        isComponentRowEmpty,
+        getComponentRowValidationError,
+        withComponentValidation,
+        handleComponentBulkSave,
+        handleComponentDeleteAll,
+        handleComponentExport,
+        handleComponentTemplateDownload,
+        handleComponentExcelUpload,
+        handleRecycledChange,
+        handleRecycledPercentBlur,
+        addRecycledRow,
+        removeRecycledRow,
+        handleRecycledBulkSave,
+        handleRecycledDeleteAll,
+        handleRecycledExcelUpload,
+        handleRecycledExport,
+        handleRecycledTemplateDownload,
+        handleMonthlyExcelUpload,
+        handleMonthlyExport,
+        handleMonthlyTemplateDownload,
+        handleRecycledCodeSelect,
+        saveRecycledRow,
+        cancelRecycledRow,
+        handleSupplierChange,
+        handleSystemCodeSelect,
+        handleSupplierCodeSelect,
+        addSupplierRow,
+        removeSupplierRow,
+        saveSupplierRow,
+        cancelSupplierRow,
+        fetchCompliance,
+        fetchSkuCompliance,
+        fetchComponentDetails,
+        fetchSupplierCompliance,
+        fetchRecycledQuantityUsed,
+        fetchMonthlyProcurement,
+        updateVerificationState,
+        handleProcurementUpload,
+        getCurrentStepIndex,
+        normalize,
+        saveProgress,
+        handleSaveSummary,
+        handleNext,
+        isStepReadOnly,
+        getChangeSummary,
+        fetchClientDetails,
+        findItem,
+        handleVerify,
+        resolveUrl,
+        fileInputSupplierRef,
+        fileInputRef,
+        fileInputSkuRef,
+        fileInputComponentRef,
+        resolvedUserName,
+        historyStorageKey,
+        legacyHistoryStorageKey,
+        normalizedDbHistory,
+        componentOptions,
+        systemCodeOptions,
+        skuOptions,
+        categorySummary,
+        combinedHistory,
+        fetchHistory,
+        fetchSupChecklist,
+        saveSupChecklist,
+        fetchProcurement,
+        clientId,
+        type,
+        itemId,
+        userKey,
+        rawShared,
+        parsedShared,
+        rawLegacy,
+        parsedLegacy,
+        next,
+        rows,
+        controller,
+        userText,
+        isProducer,
+        id,
+        entry,
+        parts,
+        s,
+        supplierShortName,
+        companyShortName,
+        supplierStateShort,
+        code,
+        numPart,
+        num,
+        nextNum,
+        supplierName,
+        prefix,
+        currentCode,
+        supplierNameLower,
+        stateShort,
+        match,
+        nameLower,
+        totalPages,
+        packagingTypes,
+        polymerTypes,
+        categories,
+        categoryIITypeOptions,
+        containerCapacities,
+        layerTypes,
+        map,
+        uniqueMap,
+        existing,
+        hasImage,
+        existingHasImage,
+        copy,
+        updatedRow,
+        sku,
+        desc,
+        existingMatch,
+        plantCode,
+        compMatch,
+        descFromComponent,
+        supplierFromComponent,
+        nextNumStr,
+        needsUpdate,
+        updatedRows,
+        row,
+        newCode,
+        sampleRow,
+        payload,
+        res,
+        rowKey,
+        exportData,
+        data,
+        ws,
+        wb,
+        headers,
+        m,
+        idx,
+        col,
+        generateRef,
+        supplierTypeRef,
+        supplierCategoryRef,
+        generateSupplierRef,
+        statusCol,
+        foodCol,
+        appCol,
+        file,
+        reader,
+        bstr,
+        wsname,
+        newRows,
+        rowKeys,
+        possibleGenerateValue,
+        supplierShort,
+        companyShort,
+        sysPrefix,
+        systemCode,
+        newRow,
+        rowsForValidation,
+        validatedRows,
+        missing,
+        normalizedRows,
+        supplierCode,
+        validRows,
+        invalidRows,
+        savedRows,
+        raw,
+        lower,
+        supplierStatus,
+        rawApplicationType,
+        foodGrade,
+        eprCertificateNumber,
+        fssaiLicNo,
+        fssaiValidUpto,
+        newSystemCode,
+        str,
+        prevValue,
+        selectedOption,
+        rowToCheck,
+        codeToCheck,
+        isDuplicate,
+        otherCode,
+        sameSku,
+        sameDesc,
+        skuToCheck,
+        descToCheck,
+        existingCode,
+        supplierCodeNormalized,
+        supplierCodeToCheck,
+        supplierNameToCheck,
+        isSupplierDuplicate,
+        otherName,
+        beforeRow,
+        hasFiles,
+        fd,
+        rowJson,
+        saved,
+        fields,
+        entryBaseId,
+        historyEntries,
+        prevVal,
+        currVal,
+        selected,
+        pt,
+        cp,
+        keys,
+        rowsToSave,
+        errorCount,
+        hasRpetMismatch,
+        recycled,
+        hasMismatch,
+        layerCol,
+        polymerCodeCol,
+        validations,
+        newRowsRaw,
+        rr,
+        sc,
+        base,
+        merged,
+        cat,
+        acMt,
+        usedMt,
+        prev,
+        ac,
+        uom,
+        ppwKg,
+        pctRaw,
+        pctFraction,
+        headerMap,
+        rowData,
+        date,
+        d,
+        y,
+        dateVal,
+        dateObj,
+        supplierMatch,
+        qty,
+        wt,
+        rRate,
+        rQtyVal,
+        monthlyMtVal,
+        vRate,
+        vQtyVal,
+        opt,
+        categoryFromComponent,
+        savedRowForHistory,
+        prodMatch,
+        supplierFromProduct,
+        supplierTypeFromProduct,
+        existingRowsSameCode,
+        registeredExisting,
+        supplierFromExisting,
+        fallbackRows,
+        normalized,
+        steps,
+        subSteps,
+        formData,
+        currentStepIndex,
+        parsed,
+        currentPlantName,
+        allCte,
+        allCto,
+        matches,
+        fileUploads,
+        uniqueUploads,
+        uploadPromises,
+        results,
+        currentIndex,
+        role,
+        changes,
+        initialRow,
+        initialVal,
+        currentVal,
+        liveChangeSummaryData,
+        da,
+        db,
+        historyModalData,
+        changeSummaryData,
+        response,
+        state,
+        remark,
+        isAbs,
+        indexOfLastRow,
+        indexOfFirstRow,
+        currentRows,
+        indexOfLastSkuRow,
+        indexOfFirstSkuRow,
+        currentSkuRows,
+        totalSkuPages,
+        indexOfLastComponentRow,
+        indexOfFirstComponentRow,
+        currentComponentRows,
+        totalComponentPages,
+        indexOfLastSupplierRow,
+        indexOfFirstSupplierRow,
+        currentSupplierRows,
+        totalSupplierPages,
+        indexOfLastRecycledRow,
+        indexOfFirstRecycledRow,
+        currentRecycledRows,
+        indexOfLastMonthlyRow,
+        indexOfFirstMonthlyRow,
+        totalRecycledPages,
+        isCurrent,
+        isCompleted
+    };
 };
-
-export default PlantProcess;

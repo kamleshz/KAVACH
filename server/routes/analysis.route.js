@@ -1,5 +1,5 @@
 import express from 'express';
-import { analyzePlasticPrePost, getPlasticAnalysisController, saveSalesAnalysisController, getSalesAnalysisController, savePurchaseAnalysisController, getPurchaseAnalysisController, generatePlasticComplianceReportController } from '../controllers/analysis.controller.js';
+import { analyzePlasticPrePost, getPlasticAnalysisController, saveSalesAnalysisController, getSalesAnalysisController, savePurchaseAnalysisController, getPurchaseAnalysisController, generatePlasticComplianceReportController, generatePlasticSummaryReportController } from '../controllers/analysis.controller.js';
 import { upload } from '../middleware/upload.js';
 import { auth } from '../middleware/auth.js';
 
@@ -39,5 +39,6 @@ router.get('/purchase-analysis/:clientId', auth, getPurchaseAnalysisController);
 
 // Route to generate Plastic Compliance Report PDF
 router.get('/plastic-compliance-report/:clientId', auth, generatePlasticComplianceReportController);
+router.get('/plastic-summary-report/:clientId', auth, generatePlasticSummaryReportController);
 
 export default router;

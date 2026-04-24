@@ -2,8 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Table, Image, Tabs, message } from 'antd';
 import { UploadOutlined, CheckOutlined, LoadingOutlined, SaveOutlined, DownloadOutlined } from '@ant-design/icons';
 import MarkingLabeling from './MarkingLabeling';
-import api from '../../services/api';
-import { API_ENDPOINTS } from '../../services/apiEndpoints';
+import api from '../../../services/api';
+import { API_ENDPOINTS } from '../../../services/apiEndpoints';
 
 const SummaryReport = ({
     clientId,

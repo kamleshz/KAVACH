@@ -175,7 +175,8 @@ const KPIDashboard = ({ mode = 'admin' }) => {
           return (
             <div
               key={type}
-              className="bg-white rounded-xl border-2 p-5 hover:shadow-md transition-all group"
+              onClick={() => navigate(`/dashboard/clients?wasteType=${type}`)}
+              className="bg-white rounded-xl border-2 p-5 hover:shadow-md transition-all group cursor-pointer"
               style={{ borderColor: count > 0 ? cfg.border : '#e5e7eb' }}
             >
               <div className="flex items-center gap-3 mb-3">

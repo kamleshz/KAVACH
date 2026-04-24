@@ -709,11 +709,75 @@ export const getProductSupplierComplianceController = async (req, res) => {
         const { clientId } = req.params;
         const { type, itemId } = req.query;
         const doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
+        const normalizeSystemCode = (value) => (value || '').toString().replace(/\s+/g, '').toLowerCase();
+        const extractComponentCode = (value) => {
+            const raw = (value || '').toString();
+            if (!raw) return '';
+            const parts = raw.split('|').map((part) => part.trim()).filter(Boolean);
+            return parts.length >= 2 ? parts[1] : '';
+        };
+
+        const systemCodeMap = new Map();
+        (doc?.rows || []).forEach((row) => {
+            const key = normalizeSystemCode(row?.systemCode);
+            if (!key) return;
+            systemCodeMap.set(key, {
+                componentCode: row?.componentCode || '',
+                componentDescription: row?.componentDescription || '',
+                supplierName: row?.supplierName || '',
+                supplierState: row?.supplierState || '',
+                supplierType: row?.supplierType || ''
+            });
+        });
+        (doc?.componentDetails || []).forEach((row) => {
+            const key = normalizeSystemCode(row?.systemCode);
+            if (!key) return;
+            const existing = systemCodeMap.get(key) || {};
+            systemCodeMap.set(key, {
+                ...existing,
+                componentCode: row?.componentCode || existing.componentCode || '',
+                componentDescription: row?.componentDescription || existing.componentDescription || '',
+                supplierName: row?.supplierName || existing.supplierName || ''
+            });
+        });
+
+        let changed = false;
+        const normalizedSupplierRows = (doc?.supplierCompliance || []).map((row) => {
+            const key = normalizeSystemCode(row?.systemCode);
+            const mapped = systemCodeMap.get(key) || {};
+            const parsedComponentCode = extractComponentCode(row?.systemCode);
+            const nextRow = {
+                ...row.toObject?.() || row,
+                componentCode: mapped.componentCode || parsedComponentCode || row?.componentCode || '',
+                componentDescription: mapped.componentDescription || row?.componentDescription || '',
+                supplierName: mapped.supplierName || row?.supplierName || '',
+                supplierState: mapped.supplierState || row?.supplierState || '',
+                supplierType: mapped.supplierType || row?.supplierType || ''
+            };
+
+            if (
+                (nextRow.componentCode || '') !== (row?.componentCode || '') ||
+                (nextRow.componentDescription || '') !== (row?.componentDescription || '') ||
+                (nextRow.supplierName || '') !== (row?.supplierName || '') ||
+                (nextRow.supplierState || '') !== (row?.supplierState || '') ||
+                (nextRow.supplierType || '') !== (row?.supplierType || '')
+            ) {
+                changed = true;
+            }
+            return nextRow;
+        });
+
+        if (doc && changed) {
+            doc.supplierCompliance = normalizedSupplierRows;
+            doc.markModified('supplierCompliance');
+            await doc.save();
+        }
+
         return res.status(200).json({
             message: "Supplier compliance fetched",
             error: false,
             success: true,
-            data: doc?.supplierCompliance || []
+            data: normalizedSupplierRows
         });
     } catch (error) {
         return res.status(500).json({

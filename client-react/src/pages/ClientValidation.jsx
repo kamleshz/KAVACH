@@ -1482,34 +1482,59 @@ Date: ___________________`;
                                                     <VerifyButton id="cto_additional_details" label="OK" />
                                                 </div>
 
-                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total Capital Investment (Lakhs)</div>
-                                                        <div className="mt-2 text-sm font-semibold text-gray-900">{pf.totalCapitalInvestmentLakhs ?? '-'}</div>
-                                                    </div>
-                                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Ground/Bore Well Water Usage</div>
-                                                        <div className="mt-2 text-sm font-semibold text-gray-900">{pf.groundWaterUsage || '-'}</div>
-                                                    </div>
-                                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">CGWA NOC Requirement</div>
-                                                        <div className="mt-2 text-sm font-semibold text-gray-900">{pf.cgwaNocRequirement || '-'}</div>
-                                                    </div>
-                                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">CGWA NOC Document</div>
-                                                        <div className="mt-2">
-                                                            {pf.cgwaNocDocument ? (
-                                                                <button
-                                                                    onClick={() => handleViewDocument(pf.cgwaNocDocument, 'CGWA', 'CGWA NOC')}
-                                                                    className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                                                                >
-                                                                    <FaEye className="mr-1" /> View
-                                                                </button>
-                                                            ) : (
-                                                                <span className="text-gray-400 text-xs italic">No Doc</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
+                                                <div className="space-y-4">
+                                                    {(() => {
+                                                        const rows = Array.isArray(pf.ctoAdditionalDetails) && pf.ctoAdditionalDetails.length
+                                                            ? pf.ctoAdditionalDetails
+                                                            : ((pf.totalCapitalInvestmentLakhs !== undefined || pf.groundWaterUsage || pf.cgwaNocRequirement || pf.cgwaNocDocument)
+                                                                ? [{
+                                                                    plantName: pf.ctoDetailsList?.[0]?.plantName || '',
+                                                                    totalCapitalInvestmentLakhs: pf.totalCapitalInvestmentLakhs,
+                                                                    groundWaterUsage: pf.groundWaterUsage,
+                                                                    cgwaNocRequirement: pf.cgwaNocRequirement,
+                                                                    cgwaNocDocument: pf.cgwaNocDocument
+                                                                }]
+                                                                : []);
+                                                        return rows.length ? rows.map((row, idx) => (
+                                                            <div key={row._id || row.plantName || idx} className="border border-gray-200 rounded-xl p-4 bg-gray-50">
+                                                                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                                                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Plant Name</div>
+                                                                        <div className="mt-2 text-sm font-semibold text-gray-900">{row.plantName || '-'}</div>
+                                                                    </div>
+                                                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total Capital Investment (Lakhs)</div>
+                                                                        <div className="mt-2 text-sm font-semibold text-gray-900">{row.totalCapitalInvestmentLakhs ?? '-'}</div>
+                                                                    </div>
+                                                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Ground/Bore Well Water Usage</div>
+                                                                        <div className="mt-2 text-sm font-semibold text-gray-900">{row.groundWaterUsage || '-'}</div>
+                                                                    </div>
+                                                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">CGWA NOC Requirement</div>
+                                                                        <div className="mt-2 text-sm font-semibold text-gray-900">{row.cgwaNocRequirement || '-'}</div>
+                                                                    </div>
+                                                                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                                                        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">CGWA NOC Document</div>
+                                                                        <div className="mt-2">
+                                                                            {row.cgwaNocDocument ? (
+                                                                                <button
+                                                                                    onClick={() => handleViewDocument(row.cgwaNocDocument, 'CGWA', `CGWA NOC_${row.plantName || idx + 1}`)}
+                                                                                    className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                                                                                >
+                                                                                    <FaEye className="mr-1" /> View
+                                                                                </button>
+                                                                            ) : (
+                                                                                <span className="text-gray-400 text-xs italic">No Doc</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )) : (
+                                                            <div className="text-sm text-gray-400 italic">No additional details added.</div>
+                                                        );
+                                                    })()}
                                                 </div>
 
                                                 <div>
@@ -1612,6 +1637,7 @@ Date: ___________________`;
                                                                 <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
                                                                     <tr>
                                                                         <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                                                        <th className="p-3 font-semibold border-b w-48">Plant Name</th>
                                                                         <th className="p-3 font-semibold border-b">Description (water consumption / waste)</th>
                                                                         <th className="p-3 font-semibold border-b w-48">Permitted quantity</th>
                                                                         <th className="p-3 font-semibold border-b w-24">UOM</th>
@@ -1621,6 +1647,7 @@ Date: ___________________`;
                                                                     {(waterRegs.length ? waterRegs : [{}]).map((row, idx) => (
                                                                         <tr key={idx} className="hover:bg-gray-50">
                                                                             <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                                                            <td className="p-3 text-gray-700">{row.plantName || '-'}</td>
                                                                             <td className="p-3 text-gray-700">{row.description || '-'}</td>
                                                                             <td className="p-3 text-gray-700">{row.permittedQuantity || '-'}</td>
                                                                             <td className="p-3 text-gray-700">{row.uom || '-'}</td>
@@ -1643,6 +1670,7 @@ Date: ___________________`;
                                                                 <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
                                                                     <tr>
                                                                         <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                                                        <th className="p-3 font-semibold border-b w-48">Plant Name</th>
                                                                         <th className="p-3 font-semibold border-b">Parameters</th>
                                                                         <th className="p-3 font-semibold border-b w-80">Permissible annual / daily limit</th>
                                                                         <th className="p-3 font-semibold border-b w-24">UOM</th>
@@ -1652,6 +1680,7 @@ Date: ___________________`;
                                                                     {(airRegs.length ? airRegs : [{}]).map((row, idx) => (
                                                                         <tr key={idx} className="hover:bg-gray-50">
                                                                             <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                                                            <td className="p-3 text-gray-700">{row.plantName || '-'}</td>
                                                                             <td className="p-3 text-gray-700">{row.parameter || '-'}</td>
                                                                             <td className="p-3 text-gray-700">{row.permittedLimit || '-'}</td>
                                                                             <td className="p-3 text-gray-700">{row.uom || '-'}</td>
@@ -1674,6 +1703,7 @@ Date: ___________________`;
                                                                 <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
                                                                     <tr>
                                                                         <th className="p-3 font-semibold border-b w-20">SR No</th>
+                                                                        <th className="p-3 font-semibold border-b w-48">Plant Name</th>
                                                                         <th className="p-3 font-semibold border-b">Name of Hazardous Waste</th>
                                                                         <th className="p-3 font-semibold border-b">Facility &amp; Mode of Disposal</th>
                                                                         <th className="p-3 font-semibold border-b w-40">Quantity MT/YR</th>
@@ -1684,6 +1714,7 @@ Date: ___________________`;
                                                                     {(hazardousRegs.length ? hazardousRegs : [{}]).map((row, idx) => (
                                                                         <tr key={idx} className="hover:bg-gray-50">
                                                                             <td className="p-3 font-bold text-gray-800">{idx + 1}</td>
+                                                                            <td className="p-3 text-gray-700">{row.plantName || '-'}</td>
                                                                             <td className="p-3 text-gray-700">{row.nameOfHazardousWaste || '-'}</td>
                                                                             <td className="p-3 text-gray-700">{row.facilityModeOfDisposal || '-'}</td>
                                                                             <td className="p-3 text-gray-700">{row.quantityMtYr || '-'}</td>

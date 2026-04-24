@@ -39,21 +39,39 @@ const productionFacilitySchema = new mongoose.Schema({
         type: String,
         default: ""
     },
+    ctoAdditionalDetails: [{
+        plantName: { type: String, default: "" },
+        totalCapitalInvestmentLakhs: { type: Number, default: 0 },
+        groundWaterUsage: {
+            type: String,
+            enum: ['', 'Yes', 'No'],
+            default: ""
+        },
+        cgwaNocRequirement: {
+            type: String,
+            enum: ['', 'Applicable', 'Not Applicable'],
+            default: ""
+        },
+        cgwaNocDocument: { type: String, default: "" }
+    }],
     regulationsCoveredUnderCto: {
         type: [String],
         default: []
     },
     waterRegulations: [{
+        plantName: { type: String, default: "" },
         description: { type: String, default: "" },
         permittedQuantity: { type: Number, default: 0 },
         uom: { type: String, default: "" }
     }],
     airRegulations: [{
+        plantName: { type: String, default: "" },
         parameter: { type: String, default: "" },
         permittedLimit: { type: Number, default: 0 },
         uom: { type: String, default: "" }
     }],
     hazardousWasteRegulations: [{
+        plantName: { type: String, default: "" },
         nameOfHazardousWaste: { type: String, default: "" },
         facilityModeOfDisposal: { type: String, default: "" },
         quantityMtYr: { type: Number, default: 0 },

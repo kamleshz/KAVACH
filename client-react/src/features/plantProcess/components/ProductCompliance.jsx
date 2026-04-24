@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Table, Button, Tooltip, Upload, Popconfirm, Select, Input, Card, Tag, Modal } from 'antd';
 import { SaveOutlined, DeleteOutlined, CheckCircleFilled, FileExcelOutlined, LoadingOutlined, PlusOutlined, FileImageOutlined, UploadOutlined, UndoOutlined, CodeSandboxOutlined, DownloadOutlined, SyncOutlined, DownOutlined, RightOutlined, HistoryOutlined, ArrowRightOutlined, ExclamationCircleFilled } from '@ant-design/icons';
-import Pagination from '../Pagination';
-import api from '../../services/api';
-import { API_ENDPOINTS } from '../../services/apiEndpoints';
-import DocumentViewerModal from '../DocumentViewerModal';
-import BulkUploadControl from '../common/BulkUploadControl';
+import Pagination from '../../../components/Pagination';
+import api from '../../../services/api';
+import { API_ENDPOINTS } from '../../../services/apiEndpoints';
+import DocumentViewerModal from '../../../components/DocumentViewerModal';
+import BulkUploadControl from '../../../components/common/BulkUploadControl';
 
 import { 
   PACKAGING_TYPES, 
@@ -15,7 +15,7 @@ import {
   CONTAINER_CAPACITIES, 
   LAYER_TYPES,
   INDIA_STATES
-} from '../../constants/complianceConstants';
+} from '../../../constants/complianceConstants';
 
 const ProductCompliance = ({
     subSteps,
@@ -1138,6 +1138,7 @@ const ProductCompliance = ({
                                         { label: 'Component Description', width: 'min-w-[200px]' },
                                         { label: 'Name of Supplier', width: 'min-w-[150px]' },
                                         { label: 'Supplier Type', width: 'min-w-[150px]' },
+                                        { label: 'Supplier State', width: 'min-w-[140px]' },
                                         { label: 'Supplier Status', width: 'min-w-[120px]' },
                                         { label: 'Application Type', width: 'min-w-[140px]' },
                                         { label: 'Food Grade', width: 'min-w-[120px]' },
@@ -1237,6 +1238,19 @@ const ProductCompliance = ({
                                             )}
                                         </td>
                                         )}
+
+                                        <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                            {isManager ? (
+                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.supplierState || systemCodeOptions.find(opt => opt.code === row.systemCode)?.data?.supplierState || '-'}</div>
+                                            ) : (
+                                            <input 
+                                                className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
+                                                placeholder="Supplier State" 
+                                                value={row.supplierState || systemCodeOptions.find(opt => opt.code === row.systemCode)?.data?.supplierState || ''} 
+                                                readOnly
+                                            />
+                                            )}
+                                        </td>
 
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
@@ -2036,13 +2050,13 @@ const ProductCompliance = ({
                                             const pctFraction = pctRaw > 1 ? pctRaw / 100 : pctRaw;
                                             curr.recycledQty = curr.monthlyPurchaseMt * pctFraction;
                                             const rRate = parseFloat(curr.recycledRate) || 0;
-                                            curr.recycledQrtAmount = ((curr.recycledQty * 1000) * rRate).toFixed(3);
+                                            curr.recycledQrtAmount = (curr.recycledQty * rRate).toFixed(3);
                                             const monthlyMt = parseFloat(curr.monthlyPurchaseMt) || 0;
                                             const recQty = parseFloat(curr.recycledQty) || 0;
                                             curr.virginQty = (monthlyMt - recQty).toFixed(3);
                                             const vQty = parseFloat(curr.virginQty) || 0;
                                             const vRate = parseFloat(curr.virginRate) || 0;
-                                            curr.virginQtyAmount = ((vQty * 1000) * vRate).toFixed(3);
+                                            curr.virginQtyAmount = (vQty * vRate).toFixed(3);
                                             copy[idx] = curr;
                                             return copy;
                                         });
@@ -2058,11 +2072,11 @@ const ProductCompliance = ({
                                             row.recycledQty = monthlyMt ? (monthlyMt * pctFraction).toFixed(3) : '';
                                             const rRate = parseFloat(row.recycledRate) || 0;
                                             const rQtyVal = parseFloat(row.recycledQty) || 0;
-                                            row.recycledQrtAmount = ((rQtyVal * 1000) * rRate).toFixed(3);
+                                            row.recycledQrtAmount = (rQtyVal * rRate).toFixed(3);
                                             row.virginQty = (monthlyMt - rQtyVal).toFixed(3);
                                             const vQty = parseFloat(row.virginQty) || 0;
                                             const vRate = parseFloat(row.virginRate) || 0;
-                                            row.virginQtyAmount = ((vQty * 1000) * vRate).toFixed(3);
+                                            row.virginQtyAmount = (vQty * vRate).toFixed(3);
                                             copy[idx] = row;
                                             return copy;
                                         });

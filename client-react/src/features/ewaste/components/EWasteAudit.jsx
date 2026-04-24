@@ -3,7 +3,7 @@ import { Tabs, Spin, Alert, Card, Button, List, Tag, Empty } from 'antd';
 import { FaClipboardCheck, FaCheckDouble, FaBoxes, FaLeaf, FaBullhorn, FaArrowLeft } from 'react-icons/fa';
 import api from '../../../services/api';
 import { API_ENDPOINTS } from '../../../services/apiEndpoints';
-import ConsentVerification from '../../../components/PlantProcessSteps/ConsentVerification';
+import ConsentVerification from '../../../features/plantProcess/components/ConsentVerification';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
