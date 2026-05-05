@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const validate = (schema) => (req, res, next) => {
   try {
@@ -10,14 +10,15 @@ export const validate = (schema) => (req, res, next) => {
     next();
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const issues = error.issues || error.errors || [];
       return res.status(400).json({
-        message: 'Validation Error',
+        message: "Validation Error",
         error: true,
         success: false,
-        errors: error.errors.map((e) => ({
-            field: e.path.join('.'),
-            message: e.message
-        }))
+        errors: issues.map((e) => ({
+          field: e.path.join("."),
+          message: e.message,
+        })),
       });
     }
     next(error);

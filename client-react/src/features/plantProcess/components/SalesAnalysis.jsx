@@ -1070,7 +1070,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                     )}
                 </div>
             )}
-            
+
             {/* EPR Target Calculation (Bottom Position - Default) */}
             {!hideTargetSection && !showTargetsOnTop && targetTables.length > 0 && (currentEntityType === 'Producer' || !currentEntityType) && (
                 <div className="p-5">

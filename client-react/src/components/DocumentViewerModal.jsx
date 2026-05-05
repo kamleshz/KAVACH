@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Modal, Button, Spin } from 'antd';
 import { DownloadOutlined, CloseOutlined, FilePdfOutlined, FileImageOutlined, FileWordOutlined, FileExcelOutlined, FileUnknownOutlined } from '@ant-design/icons';
+import { gsap } from 'gsap';
 
 const DocumentViewerModal = ({ isOpen, onClose, documentUrl, documentName }) => {
     const [loading, setLoading] = useState(true);
     const [fileType, setFileType] = useState('unknown');
+    const modalShellRef = useRef(null);
+    const modalBodyRef = useRef(null);
 
     useEffect(() => {
         if (documentUrl) {
@@ -39,6 +42,72 @@ const DocumentViewerModal = ({ isOpen, onClose, documentUrl, documentName }) => 
             }
         }
     }, [documentUrl, documentName]);
+
+    useLayoutEffect(() => {
+        if (!isOpen || typeof window === 'undefined') return undefined;
+
+        const prefersReducedMotion = window.matchMedia(
+            '(prefers-reduced-motion: reduce)',
+        ).matches;
+        if (prefersReducedMotion) return undefined;
+
+        const modalContent =
+            modalShellRef.current?.querySelector('.ant-modal-content') ||
+            modalShellRef.current;
+        const footerButtons = modalShellRef.current?.querySelectorAll(
+            '.ant-modal-footer .ant-btn',
+        );
+
+        if (!modalContent) return undefined;
+
+        const ctx = gsap.context(() => {
+            gsap.fromTo(
+                modalContent,
+                { autoAlpha: 0, y: 20, scale: 0.985 },
+                {
+                    autoAlpha: 1,
+                    y: 0,
+                    scale: 1,
+                    duration: 0.32,
+                    ease: 'power2.out',
+                    clearProps: 'opacity,transform',
+                },
+            );
+
+            if (modalBodyRef.current) {
+                gsap.fromTo(
+                    modalBodyRef.current,
+                    { autoAlpha: 0, y: 10 },
+                    {
+                        autoAlpha: 1,
+                        y: 0,
+                        duration: 0.36,
+                        delay: 0.06,
+                        ease: 'power2.out',
+                        clearProps: 'opacity,transform',
+                    },
+                );
+            }
+
+            if (footerButtons?.length) {
+                gsap.fromTo(
+                    footerButtons,
+                    { autoAlpha: 0, y: 8 },
+                    {
+                        autoAlpha: 1,
+                        y: 0,
+                        duration: 0.24,
+                        delay: 0.1,
+                        stagger: 0.05,
+                        ease: 'power2.out',
+                        clearProps: 'opacity,transform',
+                    },
+                );
+            }
+        }, modalShellRef);
+
+        return () => ctx.revert();
+    }, [isOpen, documentUrl, fileType]);
 
     const handleLoad = () => {
         setLoading(false);
@@ -80,12 +149,20 @@ const DocumentViewerModal = ({ isOpen, onClose, documentUrl, documentName }) => 
                 );
             case 'office':
                 return (
-                    <iframe
-                        src={`https://docs.google.com/gview?url=${encodeURIComponent(documentUrl)}&embedded=true`}
-                        title={documentName}
-                        className="w-full h-[75vh] border-0 rounded-lg shadow-sm"
-                        onLoad={handleLoad}
-                    />
+                    <div className="flex flex-col items-center justify-center h-[50vh] bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                        <FileWordOutlined className="text-6xl text-gray-400 mb-4" />
+                        <p className="text-lg text-gray-600 font-medium mb-2">Protected office files are download-only</p>
+                        <p className="text-gray-500 mb-6">Preview is disabled to avoid sending confidential documents to third-party viewers.</p>
+                        <Button 
+                            type="primary" 
+                            icon={<DownloadOutlined />} 
+                            href={documentUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                        >
+                            Download File
+                        </Button>
+                    </div>
                 );
             default:
                 return (
@@ -128,12 +205,13 @@ const DocumentViewerModal = ({ isOpen, onClose, documentUrl, documentName }) => 
             width={1000}
             centered
             className="document-viewer-modal"
+            modalRender={(modal) => <div ref={modalShellRef}>{modal}</div>}
             styles={{ body: { padding: 0 } }} // Updated from bodyStyle for newer AntD versions, keeping fallback if needed
         >
-            <div className="relative bg-gray-50 p-4 min-h-[400px]">
+            <div ref={modalBodyRef} className="relative bg-gray-50 p-4 min-h-[400px]">
                 {loading && fileType !== 'unknown' && (
                     <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
-                        <Spin size="large" tip="Loading document..." />
+                        <Spin size="large" />
                     </div>
                 )}
                 {renderContent()}

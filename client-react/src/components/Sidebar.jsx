@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Menu, ConfigProvider } from 'antd';
+import { gsap } from 'gsap';
 import {
   AppstoreOutlined,
   TeamOutlined,
@@ -25,7 +26,11 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, isSuperAdmin } = useAuth();
+  const roleName = typeof user?.role === 'string' ? user.role : user?.role?.name;
+  const isClientUser = roleName === 'CLIENT';
+  const linkedClientId = user?.linkedClient?._id;
   const [openKeys, setOpenKeys] = useState([]);
+  const sidebarRef = useRef(null);
 
   const onOpenChange = (keys) => {
     setOpenKeys(keys);
@@ -42,6 +47,26 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
 
   const items = isSuperAdmin
     ? baseItems
+    : isClientUser
+    ? [
+        {
+          key: '/dashboard',
+          icon: <AppstoreOutlined />,
+          label: 'Dashboard',
+          onClick: () => navigate('/dashboard'),
+        },
+        ...baseItems,
+        ...(linkedClientId
+          ? [
+              {
+                key: `/dashboard/client/${linkedClientId}`,
+                icon: <TeamOutlined />,
+                label: 'My Client',
+                onClick: () => navigate(`/dashboard/client/${linkedClientId}`),
+              },
+            ]
+          : []),
+      ]
     : [
         {
           key: '/dashboard',
@@ -135,9 +160,46 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
     }
   }, [isSuperAdmin, location.pathname]);
 
+  useLayoutEffect(() => {
+    if (!sidebarRef.current || typeof window === 'undefined') return undefined;
+
+    const prefersReducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches;
+    if (prefersReducedMotion) return undefined;
+
+    const ctx = gsap.context(() => {
+      const items = sidebarRef.current.querySelectorAll(
+        '[data-sidebar-animate]',
+      );
+      if (!items.length) return;
+
+      gsap.fromTo(
+        items,
+        { autoAlpha: 0, x: collapsed ? -6 : -14 },
+        {
+          autoAlpha: 1,
+          x: 0,
+          duration: 0.28,
+          stagger: 0.04,
+          ease: 'power2.out',
+          clearProps: 'opacity,transform',
+        },
+      );
+    }, sidebarRef);
+
+    return () => ctx.revert();
+  }, [collapsed, openKeys, location.pathname]);
+
   return (
-    <div className="flex h-full w-full flex-col bg-gradient-to-b from-orange-500 via-orange-600 to-orange-700">
-      <div className="flex items-center justify-between px-3 pt-3 pb-1">
+    <div
+      ref={sidebarRef}
+      className="flex h-full w-full flex-col bg-gradient-to-b from-orange-500 via-orange-600 to-orange-700"
+    >
+      <div
+        data-sidebar-animate
+        className="flex items-center justify-between px-3 pt-3 pb-1"
+      >
         {!collapsed && (
           <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-orange-50/90">
             Navigation
@@ -151,7 +213,7 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
           {collapsed ? <RightOutlined className="text-xs" /> : <LeftOutlined className="text-xs" />}
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div data-sidebar-animate className="flex-1 overflow-y-auto">
         <ConfigProvider
           theme={{
             token: {

@@ -43,6 +43,11 @@ const userSchema = new mongoose.Schema({
         enum : ["Active","Inactive","Suspended"],
         default : "Active"
     },
+    userType: {
+        type: String,
+        enum: ['INTERNAL', 'CLIENT'],
+        default: 'INTERNAL'
+    },
     forgot_password_otp : {
         type : String,
         default : null
@@ -55,6 +60,16 @@ const userSchema = new mongoose.Schema({
         type : mongoose.Schema.Types.ObjectId,
         ref : 'Role',
         required : false // Set to false initially to allow migration
+    },
+    linkedClientModel: {
+        type: String,
+        enum: ['Client', 'PWP'],
+        default: null
+    },
+    linkedClient: {
+        type: mongoose.Schema.Types.ObjectId,
+        refPath: 'linkedClientModel',
+        default: null
     },
     last_login_photo: {
         type: String, // Base64 string of the last login photo

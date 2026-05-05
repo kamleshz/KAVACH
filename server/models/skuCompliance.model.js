@@ -20,7 +20,10 @@ const skuComplianceSchema = new mongoose.Schema({
   complianceRemarks: [{ type: String }],
 }, { timestamps: true });
 
-skuComplianceSchema.index({ client: 1, skuCode: 1 });
+skuComplianceSchema.index(
+  { client: 1, skuCode: 1 },
+  { unique: true, name: 'uniq_sku_compliance_scope' }
+);
 
 const SkuCompliance = mongoose.model("SkuCompliance", skuComplianceSchema);
 

@@ -5,6 +5,8 @@ import { FaRecycle, FaBolt, FaBatteryFull, FaCarSide, FaOilCan, FaPlus, FaLink, 
 import api from '../services/api';
 import API_ENDPOINTS from '../services/apiEndpoints';
 import { WASTE_TYPES } from '../constants/wasteTypes';
+import GsapRevealGroup from '../components/GsapRevealGroup';
+import GsapCountUp from '../components/GsapCountUp';
 
 const WASTE_CONFIG = {
   [WASTE_TYPES.PLASTIC]: { color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', icon: FaRecycle, tag: 'orange' },
@@ -152,7 +154,7 @@ const KPIDashboard = ({ mode = 'admin' }) => {
   return (
     <div className="w-full">
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <GsapRevealGroup className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between" animateKey={`kpi-header-${clients.length}-${loading}`}>
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">KAVACH Audit Overview</h1>
           <p className="text-sm text-gray-500 mt-1">Clients by waste stream, state, and assignment</p>
@@ -165,10 +167,10 @@ const KPIDashboard = ({ mode = 'admin' }) => {
             <FaPlus className="text-xs" /> Add Client
           </button>
         </div>
-      </div>
+      </GsapRevealGroup>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+      <GsapRevealGroup className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6" animateKey={`kpi-stats-${clients.length}`}>
         {Object.entries(WASTE_CONFIG).map(([type, cfg]) => {
           const Icon = cfg.icon;
           const count = stats[type] || 0;
@@ -189,17 +191,22 @@ const KPIDashboard = ({ mode = 'admin' }) => {
                 <span className="text-sm font-bold text-gray-700">{type}</span>
               </div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-extrabold" style={{ color: count > 0 ? cfg.color : '#9ca3af' }}>{count}</span>
+                <GsapCountUp
+                  value={count}
+                  animateKey={`kpi-${type}-${count}`}
+                  className="text-3xl font-extrabold"
+                  style={{ color: count > 0 ? cfg.color : '#9ca3af' }}
+                />
                 <span className="text-sm text-gray-400 font-medium">Clients</span>
               </div>
             </div>
           );
         })}
-      </div>
+      </GsapRevealGroup>
 
       {/* Search & Filters */}
       {mode === 'admin' && (
-        <div className="mb-5 bg-white rounded-xl border border-gray-200 p-4">
+        <GsapRevealGroup className="mb-5 bg-white rounded-xl border border-gray-200 p-4" animateKey={`kpi-filters-${filteredClients.length}-${clients.length}`}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="relative flex-1 lg:max-w-md">
               <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
@@ -241,11 +248,11 @@ const KPIDashboard = ({ mode = 'admin' }) => {
               </div>
             </div>
           </div>
-        </div>
+        </GsapRevealGroup>
       )}
 
       {/* Client Table */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-extrabold [&_.ant-table-thead_th]:!text-gray-700">
+      <GsapRevealGroup className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden [&_.ant-table-thead_th]:!bg-orange-50 [&_.ant-table-thead_th]:!font-extrabold [&_.ant-table-thead_th]:!text-gray-700" animateKey={`kpi-table-${filteredClients.length}`}>
         <Tabs
           defaultActiveKey="All"
           className="px-4 pt-2"
@@ -270,7 +277,7 @@ const KPIDashboard = ({ mode = 'admin' }) => {
             })
           ]}
         />
-      </div>
+      </GsapRevealGroup>
     </div>
   );
 };

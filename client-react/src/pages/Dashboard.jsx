@@ -1,59 +1,40 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Spin } from 'antd';
-import { 
-  FaSignOutAlt, 
-  FaUsers, 
-  FaSpinner, 
-  FaCheckCircle 
-} from 'react-icons/fa';
-import useAuth from '../hooks/useAuth';
-import api from '../services/api';
-import { API_ENDPOINTS } from '../services/apiEndpoints';
+import { useNavigate } from "react-router-dom";
+import { Spin } from "antd";
+import {
+  FaSignOutAlt,
+  FaUsers,
+  FaSpinner,
+  FaCheckCircle,
+} from "react-icons/fa";
+import useAuth from "../hooks/useAuth";
+import { useDashboardStats } from "../hooks/queries/useDashboardStats";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    totalClients: 0,
-    inProgress: 0,
-    completed: 0
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await api.get(API_ENDPOINTS.CLIENT.STATS);
-        if (response.data?.success) {
-          const data = response.data.data;
-          setStats({
-            totalClients: data.totalClients || 0,
-            inProgress: data.statusBreakdown?.inProgress || 0,
-            completed: data.statusBreakdown?.completed || 0
-          });
-        }
-      } catch (error) {
-        console.error("Failed to fetch dashboard stats:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, []);
+  const { data, isLoading: loading } = useDashboardStats();
+  const stats = {
+    totalClients: data?.totalClients || 0,
+    inProgress: data?.statusBreakdown?.inProgress || 0,
+    completed: data?.statusBreakdown?.completed || 0,
+  };
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-md p-4">
         <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-primary-600">EPR Kavach Dashboard</h1>
-          <button onClick={handleLogout} className="btn-primary flex items-center">
+          <h1 className="text-2xl font-bold text-primary-600">
+            EPR Kavach Dashboard
+          </h1>
+          <button
+            onClick={handleLogout}
+            className="btn-primary flex items-center"
+          >
             <FaSignOutAlt className="mr-2" />
             Logout
           </button>
@@ -63,8 +44,10 @@ const Dashboard = () => {
       <div className="container mx-auto p-8">
         <div className="card">
           <h2 className="text-3xl font-bold mb-4">Welcome, {user?.name}!</h2>
-          <p className="text-gray-600">Dashboard with client management will be here</p>
-          
+          <p className="text-gray-600">
+            Dashboard with client management will be here
+          </p>
+
           {loading ? (
             <div className="flex justify-center items-center h-40">
               <Spin size="large" />

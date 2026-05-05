@@ -1,29 +1,38 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import api from '../services/api';
+import api, { clearAccessToken, setAccessToken } from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 
 export const checkAuth = createAsyncThunk('auth/checkAuth', async (_, { rejectWithValue }) => {
-  const token = localStorage.getItem('accessToken');
-  if (!token) return { user: null };
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const maxAttempts = 8;
 
-  try {
-    const response = await api.get(API_ENDPOINTS.AUTH.ME);
-    if (response.data?.success) {
-      return { user: response.data.data };
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await api.get(API_ENDPOINTS.AUTH.ME);
+      if (response.data?.success) {
+        return { user: response.data.data };
+      }
+      return { user: null };
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 503 && attempt < maxAttempts) {
+        await sleep(300 * attempt);
+        continue;
+      }
+      return rejectWithValue(error?.response?.data?.message || 'Authentication check failed');
     }
-    localStorage.removeItem('accessToken');
-    return { user: null };
-  } catch (error) {
-    localStorage.removeItem('accessToken');
-    return rejectWithValue(error?.response?.data?.message || 'Authentication check failed');
   }
+
+  return rejectWithValue('Authentication check failed');
 });
 
 export const verifyLoginOtp = createAsyncThunk('auth/verifyLoginOtp', async ({ email, otp, photo, location }, { rejectWithValue }) => {
   try {
     const response = await api.post(API_ENDPOINTS.AUTH.VERIFY_OTP, { email, otp, photo, location });
     if (response.data?.success) {
-      localStorage.setItem('accessToken', response.data.data.accessToken);
+      if (response.data?.data?.accessToken) {
+        setAccessToken(response.data.data.accessToken);
+      }
       return { user: response.data.data.user };
     }
     return rejectWithValue(response.data?.message || 'OTP verification failed');
@@ -45,7 +54,9 @@ export const login = createAsyncThunk('auth/login', async ({ email, password }, 
         if (response.data.data.requireOtp) {
             return { requireOtp: true, email: response.data.data.email };
         }
-      localStorage.setItem('accessToken', response.data.data.accessToken);
+      if (response.data?.data?.accessToken) {
+        setAccessToken(response.data.data.accessToken);
+      }
       return { user: response.data.data.user };
     }
     return rejectWithValue(response.data?.message || 'Login failed');
@@ -74,7 +85,7 @@ export const logout = createAsyncThunk('auth/logout', async () => {
     await api.post(API_ENDPOINTS.AUTH.LOGOUT);
   } catch {
   }
-  localStorage.removeItem('accessToken');
+  clearAccessToken();
   return { user: null };
 });
 

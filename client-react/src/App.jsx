@@ -6,6 +6,8 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import DashboardLayout from './layouts/DashboardLayout';
 import PrivateRoute from './components/PrivateRoute';
+import GsapPageTransition from './components/GsapPageTransition';
+import GsapToastEnhancer from './components/GsapToastEnhancer';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './index.css';
@@ -44,9 +46,18 @@ const DashboardIndexRedirect = () => {
 
   if (roleName === 'ADMIN') return <Navigate to="admin/kpi" replace />;
   if (roleName === 'SUPER ADMIN') return <Navigate to="client-connect" replace />;
+  if (roleName === 'CLIENT' && user?.linkedClient?._id) {
+    return <Navigate to={`client/${user.linkedClient._id}`} replace />;
+  }
 
   return <DashboardHome />;
 };
+
+const withPageTransition = (element, transitionKey, className = '') => (
+  <GsapPageTransition transitionKey={transitionKey} className={className}>
+    {element}
+  </GsapPageTransition>
+);
 
 function App() {
   const { checkAuth } = useAuth();
@@ -57,14 +68,28 @@ function App() {
 
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <GsapToastEnhancer />
       <ToastContainer position="top-right" autoClose={3000} />
       {/* 10 minutes = 600000 ms */}
       <IdleTimer timeout={600000} />
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route
+            path="/login"
+            element={withPageTransition(<Login />, 'login-page', 'min-h-screen')}
+          />
+          <Route
+            path="/register"
+            element={withPageTransition(<Register />, 'register-page', 'min-h-screen')}
+          />
+          <Route
+            path="/forgot-password"
+            element={withPageTransition(
+              <ForgotPassword />,
+              'forgot-password-page',
+              'min-h-screen',
+            )}
+          />
           <Route
             path="/dashboard"
             element={
@@ -77,7 +102,6 @@ function App() {
           <Route path="clients" element={<Clients />} />
           <Route path="client-connect" element={<ClientConnect />} />
           <Route path="client-connect/:id" element={<ClientConnectDetail />} />
-          <Route path="client-connect" element={<ClientConnect />} />
           <Route path="client/:id" element={<ClientDetail />} />
           <Route path="client/:id/edit" element={<AddClient />} />
           <Route path="client/:id/audit" element={<AddClient />} />

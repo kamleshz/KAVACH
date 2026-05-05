@@ -1,1026 +1,1895 @@
-import ClientModel from '../models/client.model.js';
-import PWPModel from '../models/pwp.model.js';
-import ProductComplianceModel from '../models/productCompliance.model.js';
-import NotificationModel from '../models/notification.model.js';
-import path from 'path';
-import { uploadToCloudinary } from '../utils/cloudinary.js';
-import fs from 'fs';
-import ApiError from '../utils/ApiError.js';
+import ClientModel from "../models/client.model.js";
+import PWPModel from "../models/pwp.model.js";
+import ProductComplianceModel from "../models/productCompliance.model.js";
+import SupplierCtoCheckModel from "../models/supplierCtoCheck.model.js";
+import MonthlyProcurementModel from "../models/monthlyProcurement.model.js";
+import NotificationModel from "../models/notification.model.js";
+import path from "path";
+import fs from "fs";
+import ApiError from "../utils/ApiError.js";
+import UploadService from "./upload.service.js";
+import HistoryService from "./history.service.js";
+import {
+  isAbsoluteUrl,
+  isCloudinaryAssetRef,
+  isLocalUploadPath,
+} from "../utils/fileSecurity.js";
+import {
+  buildSupplierStatusByName,
+  mergeSupplierCtoRows,
+  normalizeSupplierCtoRow,
+} from "../utils/supplierCto.js";
+
+const toDateOrNull = (value) => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const toChangeText = (value) => {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string") return value;
+  return String(value);
+};
+
+const humanizeField = (field) =>
+  field.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase());
 
 class ClientService {
+  /**
+   * Upload a document for a client
+   * @param {string} clientId
+   * @param {object} file - The file object from multer
+   * @param {object} metadata - { documentType, documentName, certificateNumber, certificateDate }
+   */
+  static async uploadDocument(clientId, file, metadata) {
+    const { documentType, documentName, certificateNumber, certificateDate } =
+      metadata;
 
-    /**
-     * Upload a document for a client
-     * @param {string} clientId 
-     * @param {object} file - The file object from multer
-     * @param {object} metadata - { documentType, documentName, certificateNumber, certificateDate }
-     */
-    static async uploadDocument(clientId, file, metadata) {
-        const { documentType, documentName, certificateNumber, certificateDate } = metadata;
+    // 1. Verify Client Exists
+    let Model = ClientModel;
+    let clientExists = await ClientModel.exists({ _id: clientId });
+    if (!clientExists) {
+      Model = PWPModel;
+      clientExists = await PWPModel.exists({ _id: clientId });
+    }
+    if (!clientExists) {
+      throw new ApiError(404, "Client not found");
+    }
 
-        // 1. Verify Client Exists
-        let Model = ClientModel;
-        let clientExists = await ClientModel.exists({ _id: clientId });
-        if (!clientExists) {
-            Model = PWPModel;
-            clientExists = await PWPModel.exists({ _id: clientId });
+    // 2. Prepare Upload
+    const singleInstanceTypes = [
+      "PAN",
+      "GST",
+      "CIN",
+      "Factory License",
+      "EPR Certificate",
+      "IEC Certificate",
+      "DIC/DCSSI Certificate",
+      "E-waste Registration",
+      "EEE Import Authorization",
+      "Signed Document",
+    ];
+
+    let fileUrl = "";
+    let keepLocalFile = false;
+    try {
+      const stableId = `doc_${clientId}_${documentType}`.replace(
+        /[^\w\-\/]+/g,
+        "_",
+      );
+      const uniqueId = `doc_${clientId}_${documentType}_${Date.now()}`.replace(
+        /[^\w\-\/]+/g,
+        "_",
+      );
+      const publicId = singleInstanceTypes.includes(documentType)
+        ? stableId
+        : uniqueId;
+
+      fileUrl = await UploadService.storeConfidentialAsset(file, {
+        folder: "eprkavach/documents",
+        filenameOverride: publicId,
+        originalFilename: file.originalname,
+      });
+    } catch (err) {
+      console.error("Cloudinary upload failed, falling back to local:", err);
+      // Fallback to local path
+      fileUrl = path.join("uploads", file.filename).replace(/\\/g, "/");
+      keepLocalFile = true;
+    } finally {
+      if (file.path && !keepLocalFile) {
+        fs.unlink(file.path, () => {});
+      }
+    }
+
+    // 3. Prepare Doc Entry
+    const newDoc = {
+      documentType,
+      documentName: documentName || documentType,
+      certificateNumber,
+      certificateDate: certificateDate || null,
+      filePath: fileUrl,
+      uploadedAt: new Date(),
+    };
+
+    let updatedClient;
+
+    // 4. Update Database
+    if (singleInstanceTypes.includes(documentType)) {
+      // Try to update existing subdocument
+      updatedClient = await Model.findOneAndUpdate(
+        { _id: clientId, "documents.documentType": documentType },
+        {
+          $set: {
+            "documents.$.documentName": newDoc.documentName,
+            "documents.$.certificateNumber": newDoc.certificateNumber,
+            "documents.$.certificateDate": newDoc.certificateDate,
+            "documents.$.filePath": newDoc.filePath,
+            "documents.$.uploadedAt": newDoc.uploadedAt,
+          },
+        },
+        { new: true },
+      );
+
+      if (!updatedClient) {
+        // If not found, push new
+        updatedClient = await Model.findByIdAndUpdate(
+          clientId,
+          { $push: { documents: newDoc } },
+          { new: true },
+        );
+      }
+    } else {
+      // Always push for multiple-instance types
+      updatedClient = await Model.findByIdAndUpdate(
+        clientId,
+        { $push: { documents: newDoc } },
+        { new: true },
+      );
+    }
+
+    return {
+      client: updatedClient,
+      filePath: fileUrl,
+      newDoc,
+    };
+  }
+  /**
+   * Find a client or PWP by ID
+   * @param {string} clientId
+   * @returns {Promise<import('mongoose').Document>}
+   * @throws {Error} if not found
+   */
+  static async findClientOrPwp(clientId) {
+    let client = await ClientModel.findById(clientId);
+    if (!client) {
+      client = await PWPModel.findById(clientId);
+    }
+    if (!client) {
+      throw new ApiError(404, "Client not found");
+    }
+    return client;
+  }
+
+  /**
+   * Delete a document for a client
+   * @param {string} clientId
+   * @param {string} docId
+   */
+  static async deleteDocument(clientId, docId) {
+    // 1. Verify Client Exists
+    let Model = ClientModel;
+    let clientExists = await ClientModel.exists({ _id: clientId });
+    if (!clientExists) {
+      Model = PWPModel;
+      clientExists = await PWPModel.exists({ _id: clientId });
+    }
+    if (!clientExists) {
+      throw new ApiError(404, "Client not found");
+    }
+
+    // 2. Find Document
+    const clientWithDoc = await Model.findOne(
+      { _id: clientId, "documents._id": docId },
+      { "documents.$": 1 },
+    );
+
+    if (
+      !clientWithDoc ||
+      !clientWithDoc.documents ||
+      clientWithDoc.documents.length === 0
+    ) {
+      throw new ApiError(404, "Document not found");
+    }
+
+    const target = clientWithDoc.documents[0];
+    const filePath = typeof target.filePath === "string" ? target.filePath : "";
+
+    // 3. Remove from Database
+    await Model.findByIdAndUpdate(clientId, {
+      $pull: { documents: { _id: docId } },
+    });
+
+    // 4. Clean up Local File (if applicable)
+    const normalized = (filePath || "").replace(/\\/g, "/");
+    const rel = normalized.startsWith("/") ? normalized.slice(1) : normalized;
+
+    if (
+      !isCloudinaryAssetRef(filePath) &&
+      !isAbsoluteUrl(filePath) &&
+      isLocalUploadPath(rel)
+    ) {
+      const abs = path.join(process.cwd(), rel);
+      fs.unlink(abs, () => {});
+    }
+
+    return true;
+  }
+
+  /**
+   * Save Product Supplier Compliance
+   * @param {string} clientId
+   * @param {string} type
+   * @param {string} itemId
+   * @param {Array|object} rows
+   * @param {number} rowIndex
+   * @param {object} row
+   * @param {string} userId
+   * @param {object} emitter
+   */
+  static async saveSupplierCompliance(
+    clientId,
+    type,
+    itemId,
+    rows,
+    rowIndex,
+    row,
+    userId,
+    emitter,
+    plantName,
+  ) {
+    const clientExists = await this.findClientOrPwp(clientId);
+
+    const listKey = type === "CTE" ? "cteDetailsList" : "ctoDetailsList";
+    const itemFound = clientExists.productionFacility[listKey].id(itemId);
+    if (!itemFound) {
+      throw new ApiError(404, `${type} detail not found`);
+    }
+
+    const sanitize = (r) => {
+      const rawFoodGrade = (r.foodGrade ?? r.foodgrade ?? "") || "";
+      const foodGradeText = (rawFoodGrade ?? "").toString().trim();
+      const foodGradeLower = foodGradeText.toLowerCase();
+      let foodGrade = foodGradeText;
+      if (foodGradeLower === "yes" || foodGradeLower === "food")
+        foodGrade = "Food";
+      else if (
+        foodGradeLower === "no" ||
+        foodGradeLower === "non food" ||
+        foodGradeLower === "non-food" ||
+        foodGradeLower === "nonfood"
+      )
+        foodGrade = "Non Food";
+
+      return {
+        systemCode: r.systemCode || "",
+        componentCode: r.componentCode || "",
+        componentDescription: r.componentDescription || "",
+        supplierName: r.supplierName || "",
+        supplierState: r.supplierState || "",
+        supplierType: r.supplierType || "",
+        supplierStatus: r.supplierStatus || "",
+        applicationType: r.applicationType || "",
+        foodGrade,
+        eprCertificateNumber: r.eprCertificateNumber || "",
+        fssaiLicNo: r.fssaiLicNo || "",
+        fssaiValidUpto: toDateOrNull(r.fssaiValidUpto),
+        ctoPlantNo: r.ctoPlantNo || "",
+        ctoPlantName: r.ctoPlantName || "",
+        ctoStartDate: toDateOrNull(r.ctoStartDate),
+        ctoValidUpto: toDateOrNull(r.ctoValidUpto),
+        ctoCcaDocument:
+          typeof r.ctoCcaDocument === "string" ? r.ctoCcaDocument : "",
+      };
+    };
+
+    let doc = await ProductComplianceModel.findOne({
+      client: clientId,
+      type,
+      itemId,
+    });
+    if (!doc) {
+      doc = new ProductComplianceModel({
+        client: clientId,
+        type,
+        itemId,
+        rows: [],
+        componentDetails: [],
+        supplierCompliance: [],
+      });
+    }
+    if (typeof plantName !== "undefined") doc.plantName = plantName || "";
+    const historyEntries = [];
+
+    const pushDiffs = (tableName, rowNumber, beforeRow, afterRow, fields) => {
+      const at = new Date();
+      fields.forEach((field) => {
+        const prevVal = toChangeText(beforeRow?.[field]);
+        const currVal = toChangeText(afterRow?.[field]);
+        if (prevVal !== currVal) {
+          historyEntries.push({
+            table: tableName,
+            row: rowNumber,
+            field: humanizeField(field),
+            prev: prevVal || "-",
+            curr: currVal || "-",
+            user: userId || null,
+            userName: "",
+            at,
+          });
         }
-        if (!clientExists) {
-            throw new ApiError(404, "Client not found");
-        }
+      });
+    };
 
-        // 2. Prepare Upload
-        const singleInstanceTypes = [
-            'PAN', 'GST', 'CIN', 'Factory License', 'EPR Certificate',
-            'IEC Certificate', 'DIC/DCSSI Certificate', 'E-waste Registration',
-            'EEE Import Authorization', 'Signed Document'
-        ];
-
-        let fileUrl = '';
-        let keepLocalFile = false;
+    if (typeof rowIndex !== "undefined" && row !== undefined) {
+      let single = row;
+      if (typeof single === "string") {
         try {
-            const ext = path.extname(file.originalname).toLowerCase();
-            const isDoc = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'].includes(ext);
-            const stableId = `doc_${clientId}_${documentType}`.replace(/[^\w\-\/]+/g, '_');
-            const uniqueId = `doc_${clientId}_${documentType}_${Date.now()}`.replace(/[^\w\-\/]+/g, '_');
-            const publicId = singleInstanceTypes.includes(documentType) ? stableId : uniqueId;
-            
-            // Use shared utility
-            fileUrl = await uploadToCloudinary(file.path, 'eprkavach/documents', publicId, isDoc);
-        } catch (err) {
-            console.error("Cloudinary upload failed, falling back to local:", err);
-            // Fallback to local path
-            fileUrl = path.join('uploads', file.filename).replace(/\\/g, '/');
-            keepLocalFile = true;
-        } finally {
-            if (file.path && !keepLocalFile) {
-                fs.unlink(file.path, () => {});
-            }
+          single = JSON.parse(single);
+        } catch (_) {
+          single = {};
         }
-
-        // 3. Prepare Doc Entry
-        const newDoc = {
-            documentType,
-            documentName: documentName || documentType,
-            certificateNumber,
-            certificateDate: certificateDate || null,
-            filePath: fileUrl,
-            uploadedAt: new Date()
-        };
-
-        let updatedClient;
-
-        // 4. Update Database
-        if (singleInstanceTypes.includes(documentType)) {
-            // Try to update existing subdocument
-            updatedClient = await Model.findOneAndUpdate(
-                { _id: clientId, "documents.documentType": documentType },
-                { 
-                    $set: { 
-                        "documents.$.documentName": newDoc.documentName,
-                        "documents.$.certificateNumber": newDoc.certificateNumber,
-                        "documents.$.certificateDate": newDoc.certificateDate,
-                        "documents.$.filePath": newDoc.filePath,
-                        "documents.$.uploadedAt": newDoc.uploadedAt
-                    }
-                },
-                { new: true }
-            );
-
-            if (!updatedClient) {
-                // If not found, push new
-                 updatedClient = await Model.findByIdAndUpdate(
-                    clientId,
-                    { $push: { documents: newDoc } },
-                    { new: true }
-                );
-            }
-        } else {
-            // Always push for multiple-instance types
-            updatedClient = await Model.findByIdAndUpdate(
-                clientId,
-                { $push: { documents: newDoc } },
-                { new: true }
-            );
-        }
-
-        return {
-            client: updatedClient,
-            filePath: fileUrl,
-            newDoc
-        };
-    }
-    /**
-     * Find a client or PWP by ID
-     * @param {string} clientId 
-     * @returns {Promise<import('mongoose').Document>}
-     * @throws {Error} if not found
-     */
-    static async findClientOrPwp(clientId) {
-        let client = await ClientModel.findById(clientId);
-        if (!client) {
-            client = await PWPModel.findById(clientId);
-        }
-        if (!client) {
-            throw new ApiError(404, "Client not found");
-        }
-        return client;
-    }
-
-    /**
-     * Delete a document for a client
-     * @param {string} clientId 
-     * @param {string} docId 
-     */
-    static async deleteDocument(clientId, docId) {
-        // 1. Verify Client Exists
-        let Model = ClientModel;
-        let clientExists = await ClientModel.exists({ _id: clientId });
-        if (!clientExists) {
-            Model = PWPModel;
-            clientExists = await PWPModel.exists({ _id: clientId });
-        }
-        if (!clientExists) {
-            throw new ApiError(404, "Client not found");
-        }
-
-        // 2. Find Document
-        const clientWithDoc = await Model.findOne({ _id: clientId, "documents._id": docId }, { "documents.$": 1 });
-        
-        if (!clientWithDoc || !clientWithDoc.documents || clientWithDoc.documents.length === 0) {
-            throw new ApiError(404, "Document not found");
-        }
-
-        const target = clientWithDoc.documents[0];
-        const filePath = typeof target.filePath === 'string' ? target.filePath : '';
-
-        // 3. Remove from Database
-        await Model.findByIdAndUpdate(clientId, { $pull: { documents: { _id: docId } } });
-
-        // 4. Clean up Local File (if applicable)
-        const normalized = (filePath || '').replace(/\\/g, '/');
-        const isUrl = normalized.startsWith('http://') || normalized.startsWith('https://');
-        const rel = normalized.startsWith('/') ? normalized.slice(1) : normalized;
-        
-        if (!isUrl && rel.startsWith('uploads/')) {
-            const abs = path.join(process.cwd(), rel);
-            fs.unlink(abs, () => {});
-        }
-
-        return true;
-    }
-
-    /**
-     * Save Product Supplier Compliance
-     * @param {string} clientId
-     * @param {string} type
-     * @param {string} itemId
-     * @param {Array|object} rows
-     * @param {number} rowIndex
-     * @param {object} row
-     * @param {string} userId
-     * @param {object} emitter
-     */
-    static async saveSupplierCompliance(clientId, type, itemId, rows, rowIndex, row, userId, emitter, plantName) {
-        const clientExists = await this.findClientOrPwp(clientId);
-        
-        const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
-        const itemFound = clientExists.productionFacility[listKey].id(itemId);
-        if (!itemFound) {
-            throw new ApiError(404, `${type} detail not found`);
-        }
-
-        const sanitize = (r) => {
-            const rawFoodGrade = (r.foodGrade ?? r.foodgrade ?? '') || '';
-            const foodGradeText = (rawFoodGrade ?? '').toString().trim();
-            const foodGradeLower = foodGradeText.toLowerCase();
-            let foodGrade = foodGradeText;
-            if (foodGradeLower === 'yes' || foodGradeLower === 'food') foodGrade = 'Food';
-            else if (foodGradeLower === 'no' || foodGradeLower === 'non food' || foodGradeLower === 'non-food' || foodGradeLower === 'nonfood') foodGrade = 'Non Food';
-
-            return {
-                systemCode: r.systemCode || '',
-                componentCode: r.componentCode || '',
-                componentDescription: r.componentDescription || '',
-                supplierName: r.supplierName || '',
-                supplierState: r.supplierState || '',
-                supplierType: r.supplierType || '',
-                supplierStatus: r.supplierStatus || '',
-                applicationType: r.applicationType || '',
-                foodGrade,
-                eprCertificateNumber: r.eprCertificateNumber || '',
-                fssaiLicNo: r.fssaiLicNo || '',
-                fssaiValidUpto: r.fssaiValidUpto || ''
-            };
-        };
-
-        let doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
-        if (!doc) {
-            doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [], componentDetails: [], supplierCompliance: [] });
-        }
-        if (typeof plantName !== 'undefined') doc.plantName = plantName || '';
-        if (!Array.isArray(doc.changeHistory)) doc.changeHistory = [];
-
-        const toText = (v) => {
-            if (v === null || v === undefined) return '';
-            if (typeof v === 'string') return v;
-            return String(v);
-        };
-        const humanize = (field) => field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-        
-        const pushDiffs = (tableName, rowNumber, beforeRow, afterRow, fields) => {
-            const at = new Date();
-            fields.forEach((field) => {
-                const prevVal = toText(beforeRow?.[field]);
-                const currVal = toText(afterRow?.[field]);
-                if (prevVal !== currVal) {
-                    doc.changeHistory.push({
-                        table: tableName,
-                        row: rowNumber,
-                        field: humanize(field),
-                        prev: prevVal || '-',
-                        curr: currVal || '-',
-                        user: userId || null,
-                        userName: '',
-                        at
-                    });
-                }
-            });
-        };
-
-        if (typeof rowIndex !== 'undefined' && row !== undefined) {
-            let single = row;
-            if (typeof single === 'string') {
-                try { single = JSON.parse(single); } catch (_) { single = {}; }
-            }
-            single = sanitize(single);
-            const idx = parseInt(rowIndex, 10);
-            if (Number.isNaN(idx) || idx < 0) {
-                throw new ApiError(400, "Invalid rowIndex");
-            }
-            const beforeRow = doc.supplierCompliance?.[idx] || {};
-            if (idx >= doc.supplierCompliance.length) {
-                doc.supplierCompliance.push(single);
-            } else {
-                doc.supplierCompliance.set(idx, single);
-            }
-            pushDiffs('Supplier Compliance', idx + 1, beforeRow, single, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierStatus', 'applicationType', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo']);
-            doc.markModified('supplierCompliance');
-        } else {
-            let parsed = rows;
-            if (typeof parsed === 'string') {
-                try { parsed = JSON.parse(parsed); } catch (_) { parsed = []; }
-            }
-            if (!Array.isArray(parsed)) parsed = [];
-            const beforeRows = Array.isArray(doc.supplierCompliance) ? doc.supplierCompliance : [];
-            const afterRows = parsed.map(sanitize);
-            const maxLen = Math.max(beforeRows.length, afterRows.length);
-            for (let i = 0; i < maxLen; i += 1) {
-                pushDiffs('Supplier Compliance', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierStatus', 'applicationType', 'foodGrade', 'eprCertificateNumber', 'fssaiLicNo', 'fssaiValidUpto']);
-            }
-            doc.supplierCompliance = afterRows;
-            doc.markModified('supplierCompliance');
-        }
-
-        if (doc.changeHistory.length > 5000) doc.changeHistory = doc.changeHistory.slice(-5000);
-        doc.updatedBy = userId;
-        await doc.save();
-
-        if (emitter) {
-            emitter.emit('markingLabellingUpdate', {
-                clientId,
-                type,
-                itemId,
-                operation: 'upsert',
-                source: 'productSupplierCompliance'
-            });
-        }
-
-        return doc.supplierCompliance;
-    }
-
-    /**
-     * Save Product Compliance
-     * @param {string} clientId
-     * @param {string} type
-     * @param {string} itemId
-     * @param {Array|object} rows
-     * @param {number} rowIndex
-     * @param {object} row
-     * @param {string} userId
-     * @param {object} emitter
-     */
-    static async saveProductCompliance(clientId, type, itemId, rows, rowIndex, row, userId, emitter, plantName) {
-        const clientExists = await this.findClientOrPwp(clientId);
-        
-        const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
-        const itemFound = clientExists.productionFacility[listKey].id(itemId);
-        if (!itemFound) {
-            throw new ApiError(404, `${type} detail not found`);
-        }
-        
-        const sanitize = (r) => {
-            const s = {
-                generate: r.generate || 'No',
-                systemCode: r.systemCode || '',
-                packagingType: r.packagingType || '',
-                clientName: r.clientName || '',
-                clientState: r.clientState || '',
-                industryCategory: r.industryCategory || '',
-                skuCode: r.skuCode || '',
-                skuDescription: r.skuDescription || '',
-                skuUom: r.skuUom || '',
-                productImage: typeof r.productImage === 'string' ? r.productImage : '',
-                componentCode: r.componentCode || '',
-                componentDescription: r.componentDescription || '',
-                supplierName: r.supplierName || '',
-                supplierState: r.supplierState || '',
-                supplierType: r.supplierType || '',
-                supplierCategory: r.supplierCategory || '',
-                generateSupplierCode: r.generateSupplierCode || 'No',
-                supplierCode: r.supplierCode || '',
-                componentImage: typeof r.componentImage === 'string' ? r.componentImage : '',
-                thickness: r.thickness ? Number(r.thickness) : 0,
-                rcPercent: r.rcPercent ? Number(r.rcPercent) : 0,
-                auditorRemarks: r.auditorRemarks || '',
-                clientRemarks: r.clientRemarks || '',
-                componentComplianceStatus: r.componentComplianceStatus || r.complianceStatus || '',
-                productComplianceStatus: r.productComplianceStatus || '',
-                additionalDocument: typeof r.additionalDocument === 'string' ? r.additionalDocument : '',
-                managerRemarks: r.managerRemarks || ''
-            };
-            return s;
-        };
-
-        let doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
-        if (!doc) {
-            doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [] });
-        }
-        if (typeof plantName !== 'undefined') doc.plantName = plantName || '';
-        if (!Array.isArray(doc.changeHistory)) doc.changeHistory = [];
-        
-        const toText = (v) => {
-            if (v === null || v === undefined) return '';
-            if (typeof v === 'string') return v;
-            return String(v);
-        };
-        const humanize = (field) => field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-        
-        const pushDiffs = (tableName, rowNumber, beforeRow, afterRow, fields) => {
-            const at = new Date();
-            fields.forEach((field) => {
-                const prevVal = toText(beforeRow?.[field]);
-                const currVal = toText(afterRow?.[field]);
-                if (prevVal !== currVal) {
-                    doc.changeHistory.push({
-                        table: tableName,
-                        row: rowNumber,
-                        field: humanize(field),
-                        prev: prevVal || '-',
-                        curr: currVal || '-',
-                        user: userId || null,
-                        userName: '',
-                        at
-                    });
-                }
-            });
-        };
-
-        if (typeof rowIndex !== 'undefined' && row !== undefined) {
-            const idx = parseInt(rowIndex, 10);
-            if (Number.isNaN(idx) || idx < 0) {
-                throw new ApiError(400, "Invalid rowIndex");
-            }
-            const rawRow = doc.rows?.[idx] || {};
-            const hasNonEmpty = (r) => {
-                if (!r || typeof r !== 'object') return false;
-                const keysToCheck = [
-                    'systemCode','packagingType','clientName','clientState','industryCategory','skuCode','skuDescription','skuUom',
-                    'productImage','componentCode','componentDescription',
-                    'supplierName','supplierState','supplierType','supplierCategory','generateSupplierCode','supplierCode',
-                    'componentImage','thickness'
-                ];
-                return keysToCheck.some(k => {
-                    const v = r[k];
-                    return v !== undefined && v !== null && String(v).trim() !== '';
-                });
-            };
-            let baseRow = hasNonEmpty(rawRow) ? rawRow : {};
-            if (!hasNonEmpty(baseRow)) {
-                const embeddedRows = Array.isArray(itemFound.productComplianceRows) ? itemFound.productComplianceRows : [];
-                const embedded = embeddedRows[idx] || {};
-                const embeddedObj = embedded && typeof embedded.toObject === 'function' ? embedded.toObject() : embedded;
-                if (hasNonEmpty(embeddedObj)) baseRow = embeddedObj;
-            }
-            const beforeRow = baseRow || {};
-            const baseRowObj = (baseRow && typeof baseRow.toObject === 'function') ? baseRow.toObject() : baseRow;
-            const sanitized = sanitize({ ...baseRowObj, ...row });
-            const setUpdate = {};
-            Object.keys(sanitized).forEach(key => {
-                setUpdate[`rows.${idx}.${key}`] = sanitized[key];
-            });
-
-            if (Object.keys(setUpdate).length === 0) {
-                throw new ApiError(400, "No valid fields to update");
-            }
-
-            await ProductComplianceModel.updateOne(
-                { client: clientId, type, itemId },
-                { $set: setUpdate },
-                { upsert: false }
-            );
-
-            // Sync productComplianceStatus to all rows with the same SKU
-            if (sanitized.skuCode && sanitized.productComplianceStatus) {
-                await ProductComplianceModel.updateOne(
-                    { client: clientId, type, itemId },
-                    { 
-                        $set: { "rows.$[elem].productComplianceStatus": sanitized.productComplianceStatus } 
-                    },
-                    {
-                        arrayFilters: [ { "elem.skuCode": sanitized.skuCode } ]
-                    }
-                );
-            }
-
-            // Sync componentDescription across other ProductComplianceModel tables for same componentCode/systemCode
-            if (typeof sanitized.componentDescription === 'string' && sanitized.componentCode) {
-                const componentCode = String(sanitized.componentCode || '').trim();
-                const systemCode = String(sanitized.systemCode || '').trim();
-                const componentDescription = sanitized.componentDescription;
-
-                if (componentCode) {
-                    const arrayFilters = [
-                        systemCode ? { "sc.componentCode": componentCode, "sc.systemCode": systemCode } : { "sc.componentCode": componentCode },
-                        systemCode ? { "cd.componentCode": componentCode, "cd.systemCode": systemCode } : { "cd.componentCode": componentCode },
-                        systemCode ? { "pd.componentCode": componentCode, "pd.systemCode": systemCode } : { "pd.componentCode": componentCode },
-                        systemCode ? { "rq.componentCode": componentCode, "rq.systemCode": systemCode } : { "rq.componentCode": componentCode }
-                    ];
-
-                    await ProductComplianceModel.updateOne(
-                        { client: clientId, type, itemId },
-                        {
-                            $set: {
-                                "supplierCompliance.$[sc].componentDescription": componentDescription,
-                                "componentDetails.$[cd].componentDescription": componentDescription,
-                                "procurementDetails.$[pd].componentDescription": componentDescription,
-                                "recycledQuantityUsed.$[rq].componentDescription": componentDescription
-                            }
-                        },
-                        { arrayFilters }
-                    );
-                }
-            }
-
-            const refreshedDoc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
-            const afterRow = refreshedDoc?.rows?.[idx] || {};
-            const allFields = ['generate', 'systemCode', 'packagingType', 'clientName', 'clientState', 'industryCategory', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage', 'thickness', 'auditorRemarks', 'clientRemarks', 'componentComplianceStatus', 'managerRemarks'];
-            pushDiffs('Product Compliance', idx + 1, beforeRow, afterRow, allFields);
-            doc = refreshedDoc || doc;
-
-            const normalize = (v) => (v === null || v === undefined) ? '' : String(v);
-            const changed = [];
-            if (normalize(beforeRow?.auditorRemarks) !== normalize(afterRow?.auditorRemarks)) changed.push('auditorRemarks');
-            if (normalize(beforeRow?.clientRemarks) !== normalize(afterRow?.clientRemarks)) changed.push('clientRemarks');
-            if (normalize(beforeRow?.managerRemarks) !== normalize(afterRow?.managerRemarks)) changed.push('managerRemarks');
-
-            if (changed.length > 0) {
-                const toId = (v) => (v && typeof v === 'object' && v._id) ? String(v._id) : (v ? String(v) : '');
-                const actorId = toId(userId);
-                const creatorId = toId(clientExists?.createdBy);
-                const managerId = toId(clientExists?.assignedManager) || toId(clientExists?.assignedTo);
-
-                const recipientId = (actorId && creatorId && actorId === creatorId) ? managerId : creatorId;
-                if (recipientId && actorId && recipientId !== actorId) {
-                    const clientName = (clientExists?.clientName || clientExists?.name || clientExists?.tradeName || '').toString();
-                    const sku = (afterRow?.skuCode || '').toString();
-                    const component = (afterRow?.componentCode || '').toString();
-                    const parts = changed
-                        .map((f) => (f === 'auditorRemarks' ? 'Auditor remarks' : f === 'managerRemarks' ? 'Manager remarks' : 'Client remarks'));
-
-                    await NotificationModel.create({
-                        recipient: recipientId,
-                        sender: actorId,
-                        type: 'REMARKS_UPDATED',
-                        title: `${parts.join(' & ')} updated`,
-                        message: [clientName, sku || component].filter(Boolean).join(' • '),
-                        clientId,
-                        linkPath: `/dashboard/client/${clientId}/edit`,
-                        meta: {
-                            clientId,
-                            type,
-                            itemId,
-                            rowIndex: idx,
-                            skuCode: sku,
-                            componentCode: component,
-                            changedFields: changed
-                        }
-                    });
-                }
-            }
-        } else {
-            let parsed = rows;
-            if (typeof parsed === 'string') {
-                try { parsed = JSON.parse(parsed); } catch (_) { parsed = []; }
-            }
-            if (!Array.isArray(parsed)) parsed = [];
-            const beforeRows = Array.isArray(doc.rows) ? doc.rows : [];
-            const embeddedRows = Array.isArray(itemFound.productComplianceRows) ? itemFound.productComplianceRows : [];
-            const sanitizedIncoming = parsed.map(sanitize);
-
-            // Prefer existing non-empty values; only replace with incoming when not empty
-            const mergeField = (incoming, base) => {
-                const toStr = (v) => (v === null || v === undefined) ? '' : String(v);
-                const inc = toStr(incoming).trim();
-                const bas = toStr(base).trim();
-                return inc !== '' ? inc : bas;
-            };
-
-            const afterRows = sanitizedIncoming.map((incomingRow, i) => {
-                const baseRow = beforeRows[i] || (embeddedRows[i]?.toObject ? embeddedRows[i].toObject() : embeddedRows[i]) || {};
-                return {
-                    generate: mergeField(incomingRow.generate, baseRow.generate),
-                    systemCode: mergeField(incomingRow.systemCode, baseRow.systemCode),
-                    packagingType: mergeField(incomingRow.packagingType, baseRow.packagingType),
-                    clientName: mergeField(incomingRow.clientName, baseRow.clientName),
-                    clientState: mergeField(incomingRow.clientState, baseRow.clientState),
-                    industryCategory: mergeField(incomingRow.industryCategory, baseRow.industryCategory),
-                    skuCode: mergeField(incomingRow.skuCode, baseRow.skuCode),
-                    skuDescription: mergeField(incomingRow.skuDescription, baseRow.skuDescription),
-                    skuUom: mergeField(incomingRow.skuUom, baseRow.skuUom),
-                    productImage: mergeField(incomingRow.productImage, baseRow.productImage),
-                    componentCode: mergeField(incomingRow.componentCode, baseRow.componentCode),
-                    componentDescription: mergeField(incomingRow.componentDescription, baseRow.componentDescription),
-                    supplierName: mergeField(incomingRow.supplierName, baseRow.supplierName),
-                    supplierState: mergeField(incomingRow.supplierState, baseRow.supplierState),
-                    supplierType: mergeField(incomingRow.supplierType, baseRow.supplierType),
-                    supplierCategory: mergeField(incomingRow.supplierCategory, baseRow.supplierCategory),
-                    generateSupplierCode: mergeField(incomingRow.generateSupplierCode, baseRow.generateSupplierCode),
-                    supplierCode: mergeField(incomingRow.supplierCode, baseRow.supplierCode),
-                    componentImage: mergeField(incomingRow.componentImage, baseRow.componentImage),
-                    thickness: mergeField(incomingRow.thickness, baseRow.thickness),
-                    auditorRemarks: mergeField(incomingRow.auditorRemarks, baseRow.auditorRemarks),
-                    clientRemarks: mergeField(incomingRow.clientRemarks, baseRow.clientRemarks),
-                    componentComplianceStatus: mergeField(incomingRow.componentComplianceStatus, baseRow.componentComplianceStatus),
-                    productComplianceStatus: mergeField(incomingRow.productComplianceStatus, baseRow.productComplianceStatus),
-                    managerRemarks: mergeField(incomingRow.managerRemarks, baseRow.managerRemarks)
-                };
-            });
-
-            // Check uniqueness within the new list
-            const codeMap = new Map(); // code -> {sku, desc}
-            for (const r of afterRows) {
-                const c = (r.componentCode || '').trim();
-                const sku = (r.skuCode || '').trim();
-                const desc = (r.componentDescription || '').trim();
-                if (c) {
-                    if (codeMap.has(c)) {
-                        const existing = codeMap.get(c);
-                        if (existing.sku !== sku || existing.desc !== desc) {
-                             throw new ApiError(400, `Duplicate Component Code '${c}' found with different SKU/Description`);
-                        }
-                    } else {
-                        codeMap.set(c, { sku, desc });
-                    }
-                }
-            }
-
-            const maxLen = Math.max(beforeRows.length, afterRows.length);
-            for (let i = 0; i < maxLen; i += 1) {
-                pushDiffs('Product Compliance', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['generate', 'systemCode', 'packagingType', 'clientName', 'clientState', 'industryCategory', 'skuCode', 'skuDescription', 'skuUom', 'productImage', 'componentCode', 'componentDescription', 'supplierName', 'supplierState', 'supplierType', 'supplierCategory', 'generateSupplierCode', 'supplierCode', 'componentImage']);
-            }
-            doc.rows = afterRows;
-        }
-        if (doc.changeHistory.length > 5000) doc.changeHistory = doc.changeHistory.slice(-5000);
-        doc.updatedBy = userId;
-        await doc.save();
-
-        if (emitter) {
-            emitter.emit('markingLabellingUpdate', {
-                clientId,
-                type,
-                itemId,
-                operation: 'upsert',
-                source: 'productCompliance'
-            });
-        }
-
-        return doc.rows;
-    }
-
-    /**
-     * Save Product Component Details
-     * @param {string} clientId
-     * @param {string} type
-     * @param {string} itemId
-     * @param {Array|object} rows
-     * @param {number} rowIndex
-     * @param {object} row
-     * @param {string} userId
-     * @param {object} emitter
-     */
-    static async saveProductComponentDetails(clientId, type, itemId, rows, rowIndex, row, userId, emitter, plantName) {
-        const clientExists = await this.findClientOrPwp(clientId);
-        
-        const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
-        const itemFound = clientExists.productionFacility[listKey].id(itemId);
-        if (!itemFound) {
-            throw new ApiError(404, `${type} detail not found`);
-        }
-        const sanitize = (r) => {
-            const category = r.category || '';
-            const polymerType = r.polymerType || '';
-            const recycled = category === 'Category I' ? (r.recycledPolymerUsed || '') : '';
-            return {
-                systemCode: r.systemCode || '',
-                skuCode: r.skuCode || '',
-                componentCode: r.componentCode || '',
-                componentDescription: r.componentDescription || '',
-                supplierName: r.supplierName || '',
-                polymerType,
-                recycledPolymerUsed: recycled,
-                componentPolymer: r.componentPolymer || '',
-                polymerCode: r.polymerCode || null,
-                category,
-                categoryIIType: r.categoryIIType || '',
-                containerCapacity: r.containerCapacity || '',
-                foodGrade: r.foodGrade || '',
-                layerType: r.layerType || '',
-                thickness: r.thickness || '',
-                auditorRemarks: r.auditorRemarks || '-',
-                managerRemarks: r.managerRemarks || '-'
-            };
-        };
-        let doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
-        if (!doc) {
-            doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [], componentDetails: [] });
-        }
-        if (typeof plantName !== 'undefined') doc.plantName = plantName || '';
-        if (!Array.isArray(doc.changeHistory)) doc.changeHistory = [];
-        const toText = (v) => {
-            if (v === null || v === undefined) return '';
-            if (typeof v === 'string') return v;
-            return String(v);
-        };
-        const humanize = (field) => field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-        const pushDiffs = (tableName, rowNumber, beforeRow, afterRow, fields) => {
-            const at = new Date();
-            fields.forEach((field) => {
-                const prevVal = toText(beforeRow?.[field]);
-                const currVal = toText(afterRow?.[field]);
-                if (prevVal !== currVal) {
-                    doc.changeHistory.push({
-                        table: tableName,
-                        row: rowNumber,
-                        field: humanize(field),
-                        prev: prevVal || '-',
-                        curr: currVal || '-',
-                        user: userId || null,
-                        userName: '',
-                        at
-                    });
-                }
-            });
-        };
-        if (typeof rowIndex !== 'undefined' && row !== undefined) {
-            let single = row;
-            if (typeof single === 'string') {
-                try { single = JSON.parse(single); } catch (_) { single = {}; }
-            }
-            single = sanitize(single);
-            const idx = parseInt(rowIndex, 10);
-            if (Number.isNaN(idx) || idx < 0) {
-                throw new ApiError(400, "Invalid rowIndex");
-            }
-            const beforeRow = doc.componentDetails?.[idx] || {};
-            // Validate rPET usage
-            if ((single.recycledPolymerUsed || '').toString().trim().toLowerCase() === 'rpet' &&
-                (single.polymerType || '').toString().trim().toUpperCase() !== 'PET') {
-                throw new ApiError(400, "Recycled Polymer Used 'rPET' requires Polymer Type 'PET'");
-            }
-            if (idx >= doc.componentDetails.length) {
-                doc.componentDetails.push(single);
-            } else {
-                doc.componentDetails.set(idx, single);
-            }
-            pushDiffs('Component Details', idx + 1, beforeRow, single, ['skuCode', 'componentCode', 'componentDescription', 'supplierName', 'polymerType', 'recycledPolymerUsed', 'componentPolymer', 'polymerCode', 'category', 'containerCapacity', 'foodGrade', 'layerType', 'thickness', 'auditorRemarks', 'managerRemarks']);
-        } else {
-            let parsed = rows;
-            if (typeof parsed === 'string') {
-                try { parsed = JSON.parse(parsed); } catch (_) { parsed = []; }
-            }
-            if (!Array.isArray(parsed)) parsed = [];
-            const beforeRows = Array.isArray(doc.componentDetails) ? doc.componentDetails : [];
-            const afterRows = parsed.map(sanitize);
-            // Validate all rows
-            for (const r of afterRows) {
-                if ((r.recycledPolymerUsed || '').toString().trim().toLowerCase() === 'rpet' &&
-                    (r.polymerType || '').toString().trim().toUpperCase() !== 'PET') {
-                    throw new ApiError(400, "Recycled Polymer Used 'rPET' requires Polymer Type 'PET'");
-                }
-            }
-            const maxLen = Math.max(beforeRows.length, afterRows.length);
-            for (let i = 0; i < maxLen; i += 1) {
-                pushDiffs('Component Details', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['skuCode', 'componentCode', 'componentDescription', 'supplierName', 'polymerType', 'recycledPolymerUsed', 'componentPolymer', 'polymerCode', 'category', 'categoryIIType', 'containerCapacity', 'foodGrade', 'layerType', 'thickness', 'auditorRemarks', 'managerRemarks']);
-            }
-            doc.componentDetails = afterRows;
-        }
-
-        // --- Notification Logic ---
+      }
+      single = sanitize(single);
+      const idx = parseInt(rowIndex, 10);
+      if (Number.isNaN(idx) || idx < 0) {
+        throw new ApiError(400, "Invalid rowIndex");
+      }
+      const beforeRow = doc.supplierCompliance?.[idx] || {};
+      if (idx >= doc.supplierCompliance.length) {
+        doc.supplierCompliance.push(single);
+      } else {
+        doc.supplierCompliance.set(idx, single);
+      }
+      pushDiffs("Supplier Compliance", idx + 1, beforeRow, single, [
+        "systemCode",
+        "componentCode",
+        "componentDescription",
+        "supplierName",
+        "supplierState",
+        "supplierType",
+        "supplierStatus",
+        "applicationType",
+        "foodGrade",
+        "eprCertificateNumber",
+        "fssaiLicNo",
+        "fssaiValidUpto",
+        "ctoPlantNo",
+        "ctoPlantName",
+        "ctoStartDate",
+        "ctoValidUpto",
+        "ctoCcaDocument",
+      ]);
+      doc.markModified("supplierCompliance");
+    } else {
+      let parsed = rows;
+      if (typeof parsed === "string") {
         try {
-            const now = new Date();
-            const recentChanges = doc.changeHistory.filter(h => 
-                h.at && (now.getTime() - new Date(h.at).getTime() < 1000) && 
-                (h.field === 'Auditor Remarks' || h.field === 'Manager Remarks')
-            );
-            
-            if (recentChanges.length > 0) {
-                 const fields = [...new Set(recentChanges.map(c => c.field))];
-                 const toId = (v) => (v && typeof v === 'object' && v._id) ? String(v._id) : (v ? String(v) : '');
-                 const actorId = toId(userId);
-                 const assignedToId = toId(clientExists?.assignedTo);
-                 const assignedManagerId = toId(clientExists?.assignedManager);
-                 
-                 let recipientId = null;
-                 if (actorId === assignedToId) {
-                     recipientId = assignedManagerId;
-                 } else {
-                     recipientId = assignedToId;
-                 }
-                 
-                 if (recipientId && recipientId !== actorId) {
-                     const clientName = (clientExists?.clientName || clientExists?.name || clientExists?.tradeName || '').toString();
-                     await NotificationModel.create({
-                         recipient: recipientId,
-                         sender: actorId,
-                         type: 'REMARKS_UPDATED',
-                         title: `${fields.join(' & ')} Updated`,
-                         message: `${clientName} • Component Details`,
-                         clientId,
-                         linkPath: `/dashboard/client/${clientId}/edit`,
-                         meta: {
-                             clientId,
-                             type,
-                             itemId,
-                             changedFields: fields
-                         }
-                     });
-                 }
-            }
-        } catch (err) {
-            console.error("Error sending notification:", err);
+          parsed = JSON.parse(parsed);
+        } catch (_) {
+          parsed = [];
         }
-
-        if (doc.changeHistory.length > 5000) doc.changeHistory = doc.changeHistory.slice(-5000);
-        doc.updatedBy = userId;
-        await doc.save();
-
-        if (emitter) {
-            emitter.emit('markingLabellingUpdate', {
-                clientId,
-                type,
-                itemId,
-                operation: 'upsert',
-                source: 'productComponentDetails'
-            });
-        }
-
-        return doc.componentDetails;
+      }
+      if (!Array.isArray(parsed)) parsed = [];
+      const beforeRows = Array.isArray(doc.supplierCompliance)
+        ? doc.supplierCompliance
+        : [];
+      const afterRows = parsed.map(sanitize);
+      const maxLen = Math.max(beforeRows.length, afterRows.length);
+      for (let i = 0; i < maxLen; i += 1) {
+        pushDiffs(
+          "Supplier Compliance",
+          i + 1,
+          beforeRows[i] || {},
+          afterRows[i] || {},
+          [
+            "systemCode",
+            "componentCode",
+            "componentDescription",
+            "supplierName",
+            "supplierState",
+            "supplierType",
+            "supplierStatus",
+            "applicationType",
+            "foodGrade",
+            "eprCertificateNumber",
+            "fssaiLicNo",
+            "fssaiValidUpto",
+            "ctoPlantNo",
+            "ctoPlantName",
+            "ctoStartDate",
+            "ctoValidUpto",
+            "ctoCcaDocument",
+          ],
+        );
+      }
+      doc.supplierCompliance = afterRows;
+      doc.markModified("supplierCompliance");
     }
 
-    /**
-     * Save Recycled Quantity Used
-     * @param {string} clientId
-     * @param {string} type
-     * @param {string} itemId
-     * @param {Array|object} rows
-     * @param {number} rowIndex
-     * @param {object} row
-     * @param {string} userId
-     */
-    static async saveRecycledQuantityUsed(clientId, type, itemId, rows, rowIndex, row, userId, plantName) {
-        const clientExists = await this.findClientOrPwp(clientId);
-        
-        const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
-        const itemFound = clientExists.productionFacility[listKey].id(itemId);
-        if (!itemFound) {
-            throw new ApiError(404, `${type} detail not found`);
+    doc.updatedBy = userId;
+    await doc.save();
+    await HistoryService.appendEntries({
+      clientId,
+      type,
+      itemId,
+      entries: historyEntries,
+      userId,
+    });
+
+    if (emitter) {
+      emitter.emit("markingLabellingUpdate", {
+        clientId,
+        type,
+        itemId,
+        operation: "upsert",
+        source: "productSupplierCompliance",
+      });
+    }
+
+    return doc.supplierCompliance;
+  }
+
+  static async getSupplierCtoChecks(clientId, type, itemId) {
+    const clientExists = await this.findClientOrPwp(clientId);
+    const listKey = type === "CTE" ? "cteDetailsList" : "ctoDetailsList";
+    const itemFound = clientExists.productionFacility[listKey].id(itemId);
+    if (!itemFound) {
+      throw new ApiError(404, `${type} detail not found`);
+    }
+
+    const doc = await ProductComplianceModel.findOne({
+      client: clientId,
+      type,
+      itemId,
+    }).lean();
+    const supplierCtoDoc = await SupplierCtoCheckModel.findOne({
+      client: clientId,
+      type,
+      itemId,
+    }).lean();
+    const supplierStatusByName = buildSupplierStatusByName(
+      doc?.supplierCompliance || [],
+    );
+
+    return mergeSupplierCtoRows({
+      supplierNames: Array.from(supplierStatusByName.keys()),
+      persistedRows: supplierCtoDoc?.rows || [],
+      supplierStatusByName,
+      normalizeDateValue: (value) => value || null,
+    });
+  }
+
+  static async saveSupplierCtoChecks(
+    clientId,
+    type,
+    itemId,
+    rows,
+    rowIndex,
+    row,
+    userId,
+    emitter,
+  ) {
+    const clientExists = await this.findClientOrPwp(clientId);
+    const listKey = type === "CTE" ? "cteDetailsList" : "ctoDetailsList";
+    const itemFound = clientExists.productionFacility[listKey].id(itemId);
+    if (!itemFound) {
+      throw new ApiError(404, `${type} detail not found`);
+    }
+
+    const isRowEmpty = (r) => {
+      const rr = r || {};
+      const supplierName = (rr.supplierName || "").toString().trim();
+      const ctoAvailability = (rr.ctoAvailability || "").toString().trim();
+      const ctoPlantNo = (rr.ctoPlantNo || "").toString().trim();
+      const ctoPlantName = (rr.ctoPlantName || "").toString().trim();
+      const ctoStartDate = toChangeText(rr.ctoStartDate).trim();
+      const ctoValidUpto = toChangeText(rr.ctoValidUpto).trim();
+      const ctoCcaDocument = (rr.ctoCcaDocument || "").toString().trim();
+      return (
+        !supplierName &&
+        !ctoAvailability &&
+        !ctoPlantNo &&
+        !ctoPlantName &&
+        !ctoStartDate &&
+        !ctoValidUpto &&
+        !ctoCcaDocument
+      );
+    };
+
+    const hasRowData = (r) => {
+      const rr = r || {};
+      const ctoPlantNo = (rr.ctoPlantNo || "").toString().trim();
+      const ctoPlantName = (rr.ctoPlantName || "").toString().trim();
+      const ctoStartDate = toChangeText(rr.ctoStartDate).trim();
+      const ctoValidUpto = toChangeText(rr.ctoValidUpto).trim();
+      const ctoCcaDocument = (rr.ctoCcaDocument || "").toString().trim();
+      return !!(
+        ctoPlantNo ||
+        ctoPlantName ||
+        ctoStartDate ||
+        ctoValidUpto ||
+        ctoCcaDocument
+      );
+    };
+
+    const productComplianceDoc = await ProductComplianceModel.findOne({
+      client: clientId,
+      type,
+      itemId,
+    });
+    if (!productComplianceDoc) {
+      throw new ApiError(404, "Product compliance record not found");
+    }
+
+    const supplierStatusByName = buildSupplierStatusByName(
+      productComplianceDoc?.supplierCompliance || [],
+    );
+
+    const sanitize = (r) => {
+      const supplierName = (r?.supplierName || "").toString().trim();
+      return normalizeSupplierCtoRow(r, {
+        supplierStatus: supplierStatusByName.get(supplierName) || "",
+        normalizeDateValue: toDateOrNull,
+      });
+    };
+
+    const historyEntries = [];
+    const pushDiffs = (rowNumber, beforeRow, afterRow, fields) => {
+      const at = new Date();
+      fields.forEach((field) => {
+        const prevVal = toChangeText(beforeRow?.[field]);
+        const currVal = toChangeText(afterRow?.[field]);
+        if (prevVal !== currVal) {
+          historyEntries.push({
+            table: "Supplier CTO Check",
+            row: rowNumber,
+            field: humanizeField(field),
+            prev: prevVal || "-",
+            curr: currVal || "-",
+            user: userId || null,
+            userName: "",
+            at,
+          });
         }
-        const sanitize = (r) => ({
-            systemCode: r.systemCode || '',
-            componentCode: r.componentCode || '',
-            componentDescription: r.componentDescription || '',
-            supplierName: r.supplierName || '',
-            category: r.category || '',
-            annualConsumption: Number(r.annualConsumption) || 0,
-            uom: r.uom || '',
-            perPieceWeight: Number(r.perPieceWeight) || 0,
-            annualConsumptionMt: Number(r.annualConsumptionMt) || 0,
-            usedRecycledPercent: Number(r.usedRecycledPercent) || 0,
-            usedRecycledQtyMt: Number(r.usedRecycledQtyMt) || 0
+      });
+    };
+
+    const fields = [
+      "supplierName",
+      "registrationStatus",
+      "ctoAvailability",
+      "ctoPlantNo",
+      "ctoPlantName",
+      "ctoStartDate",
+      "ctoValidUpto",
+      "ctoCcaDocument",
+    ];
+    const supplierCtoDoc =
+      (await SupplierCtoCheckModel.findOne({
+        client: clientId,
+        type,
+        itemId,
+      })) ||
+      new SupplierCtoCheckModel({
+        client: clientId,
+        type,
+        itemId,
+        plantName: productComplianceDoc.plantName || "",
+        rows: [],
+      });
+
+    if (typeof rowIndex !== "undefined" && row !== undefined) {
+      let single = row;
+      if (typeof single === "string") {
+        try {
+          single = JSON.parse(single);
+        } catch (_) {
+          single = {};
+        }
+      }
+      single = sanitize(single);
+      if (!single.supplierName) {
+        if (hasRowData(single)) {
+          throw new ApiError(400, "Supplier Name is required");
+        }
+        throw new ApiError(400, "Supplier Name is required");
+      }
+      const idx = parseInt(rowIndex, 10);
+      if (Number.isNaN(idx) || idx < 0)
+        throw new ApiError(400, "Invalid rowIndex");
+
+      const beforeRow = supplierCtoDoc.rows?.[idx] || {};
+      if (!Array.isArray(supplierCtoDoc.rows)) supplierCtoDoc.rows = [];
+      if (idx >= supplierCtoDoc.rows.length) {
+        supplierCtoDoc.rows.push(single);
+        pushDiffs(idx + 1, {}, single, fields);
+      } else {
+        supplierCtoDoc.rows.set(idx, single);
+        pushDiffs(idx + 1, beforeRow, single, fields);
+      }
+      supplierCtoDoc.markModified("rows");
+    } else {
+      let parsed = rows;
+      if (typeof parsed === "string") {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch (_) {
+          parsed = [];
+        }
+      }
+      if (!Array.isArray(parsed)) parsed = [];
+      const beforeRows = Array.isArray(supplierCtoDoc.rows)
+        ? supplierCtoDoc.rows
+        : [];
+      const afterRows = parsed
+        .map(sanitize)
+        .filter((r) => {
+          if (isRowEmpty(r)) return false;
+          if (!r.supplierName && hasRowData(r))
+            throw new ApiError(400, "Supplier Name is required");
+          return !!r.supplierName;
         });
-        let doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
-        if (!doc) {
-            doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [], componentDetails: [], supplierCompliance: [], recycledQuantityUsed: [] });
-        }
-        if (typeof plantName !== 'undefined') doc.plantName = plantName || '';
-        if (!Array.isArray(doc.changeHistory)) doc.changeHistory = [];
-        const toText = (v) => {
-            if (v === null || v === undefined) return '';
-            if (typeof v === 'string') return v;
-            return String(v);
-        };
-        const humanize = (field) => field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-        const pushDiffs = (tableName, rowNumber, beforeRow, afterRow, fields) => {
-            const at = new Date();
-            fields.forEach((field) => {
-                const prevVal = toText(beforeRow?.[field]);
-                const currVal = toText(afterRow?.[field]);
-                if (prevVal !== currVal) {
-                    doc.changeHistory.push({
-                        table: tableName,
-                        row: rowNumber,
-                        field: humanize(field),
-                        prev: prevVal || '-',
-                        curr: currVal || '-',
-                        user: userId || null,
-                        userName: '',
-                        at
-                    });
-                }
-            });
-        };
-        if (typeof rowIndex !== 'undefined' && row !== undefined) {
-            let single = row;
-            if (typeof single === 'string') {
-                try { single = JSON.parse(single); } catch (_) { single = {}; }
-            }
-            single = sanitize(single);
-            const idx = parseInt(rowIndex, 10);
-            if (Number.isNaN(idx) || idx < 0) {
-                throw new ApiError(400, "Invalid rowIndex");
-            }
-            const beforeRow = doc.recycledQuantityUsed?.[idx] || {};
-            if (idx >= doc.recycledQuantityUsed.length) {
-                doc.recycledQuantityUsed.push(single);
-            } else {
-                doc.recycledQuantityUsed.set(idx, single);
-            }
-            pushDiffs('Recycled Quantity Used', idx + 1, beforeRow, single, ['systemCode', 'componentCode', 'componentDescription', 'supplierName', 'category', 'annualConsumption', 'uom', 'perPieceWeight', 'usedRecycledPercent', 'usedRecycledQtyMt']);
-        } else {
-            let parsed = rows;
-            if (typeof parsed === 'string') {
-                try { parsed = JSON.parse(parsed); } catch (_) { parsed = []; }
-            }
-            if (!Array.isArray(parsed)) parsed = [];
-            const beforeRows = Array.isArray(doc.recycledQuantityUsed) ? doc.recycledQuantityUsed : [];
-            const afterRows = parsed.map(sanitize);
-            const maxLen = Math.max(beforeRows.length, afterRows.length);
-            for (let i = 0; i < maxLen; i += 1) {
-                pushDiffs('Recycled Quantity Used', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['componentCode', 'componentDescription', 'supplierName', 'category', 'annualConsumption', 'uom', 'perPieceWeight', 'usedRecycledPercent', 'usedRecycledQtyMt']);
-            }
-            doc.recycledQuantityUsed = afterRows;
-        }
-        if (doc.changeHistory.length > 5000) doc.changeHistory = doc.changeHistory.slice(-5000);
-        doc.updatedBy = userId;
-        await doc.save();
-        
-        return doc.recycledQuantityUsed;
+      const maxLen = Math.max(beforeRows.length, afterRows.length);
+      for (let i = 0; i < maxLen; i += 1) {
+        pushDiffs(i + 1, beforeRows[i] || {}, afterRows[i] || {}, fields);
+      }
+      supplierCtoDoc.rows = afterRows;
+      supplierCtoDoc.markModified("rows");
     }
 
-    /**
-     * Save Monthly Procurement
-     * @param {string} clientId
-     * @param {string} type
-     * @param {string} itemId
-     * @param {Array|object} rows
-     * @param {number} rowIndex
-     * @param {object} row
-     * @param {string} userId
-     */
-    static async saveMonthlyProcurement(clientId, type, itemId, rows, rowIndex, row, userId, plantName) {
-        const clientExists = await this.findClientOrPwp(clientId);
-        
-        const listKey = type === 'CTE' ? 'cteDetailsList' : 'ctoDetailsList';
-        const itemFound = clientExists.productionFacility[listKey].id(itemId);
-        if (!itemFound) {
-            throw new ApiError(404, `${type} detail not found`);
-        }
-        
-        const sanitize = (r) => {
-            const uom = (r.uom || '').toString();
-            const purchaseQty = Number(r.purchaseQty) || 0;
-            const perPieceWeightKg = Number(r.perPieceWeightKg) || 0;
-            let monthlyPurchaseMt = Number(r.monthlyPurchaseMt) || 0;
-            if (!monthlyPurchaseMt) {
-                if (uom === 'Units' || uom === 'Nos') {
-                    monthlyPurchaseMt = purchaseQty * perPieceWeightKg;
-                } else if (uom === 'KG') {
-                    monthlyPurchaseMt = purchaseQty / 1000;
-                } else if (uom === 'MT') {
-                    monthlyPurchaseMt = purchaseQty;
-                }
-            }
-            return {
-                systemCode: r.systemCode || '',
-                skuCode: r.skuCode || '',
-                supplierName: r.supplierName || '',
-                supplierCategory: r.supplierCategory || '',
-                foodGrade: r.foodGrade || '',
-                componentCode: r.componentCode || '',
-                componentDescription: r.componentDescription || '',
-                polymerType: r.polymerType || '',
-                recycledPolymerUsed: r.recycledPolymerUsed || '',
-                componentPolymer: r.componentPolymer || '',
-                category: r.category || '',
-                dateOfInvoice: r.dateOfInvoice || '',
-                monthName: r.monthName || '',
-                quarter: r.quarter || '',
-                yearlyQuarter: r.yearlyQuarter || '',
-                purchaseQty,
-                uom,
-                perPieceWeightKg,
-                monthlyPurchaseMt,
-                recycledPercent: Number(r.recycledPercent) || 0,
-                recycledQty: Number(r.recycledQty) || 0,
-                recycledRate: Number(r.recycledRate) || 0,
-                recycledQrtAmount: Number(r.recycledQrtAmount) || 0,
-                virginQty: Number(r.virginQty) || 0,
-                virginRate: Number(r.virginRate) || 0,
-                virginQtyAmount: Number(r.virginQtyAmount) || 0,
-                rcPercentMentioned: r.rcPercentMentioned || ''
-            };
-        };
+    supplierCtoDoc.updatedBy = userId;
+    await supplierCtoDoc.save();
+    await HistoryService.appendEntries({
+      clientId,
+      type,
+      itemId,
+      entries: historyEntries,
+      userId,
+    });
 
-        let doc = await ProductComplianceModel.findOne({ client: clientId, type, itemId });
-        if (!doc) {
-            doc = new ProductComplianceModel({ client: clientId, type, itemId, rows: [], componentDetails: [], supplierCompliance: [], recycledQuantityUsed: [], procurementDetails: [] });
-        }
-        if (typeof plantName !== 'undefined') doc.plantName = plantName || '';
-        if (!Array.isArray(doc.changeHistory)) doc.changeHistory = [];
-        const toText = (v) => {
-            if (v === null || v === undefined) return '';
-            if (typeof v === 'string') return v;
-            return String(v);
-        };
-        const humanize = (field) => field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-        const pushDiffs = (tableName, rowNumber, beforeRow, afterRow, fields) => {
-            const at = new Date();
-            fields.forEach((field) => {
-                const prevVal = toText(beforeRow?.[field]);
-                const currVal = toText(afterRow?.[field]);
-                if (prevVal !== currVal) {
-                    doc.changeHistory.push({
-                        table: tableName,
-                        row: rowNumber,
-                        field: humanize(field),
-                        prev: prevVal || '-',
-                        curr: currVal || '-',
-                        user: userId || null,
-                        userName: '',
-                        at
-                    });
-                }
-            });
-        };
-
-        if (typeof rowIndex !== 'undefined' && row !== undefined) {
-            let single = row;
-            if (typeof single === 'string') {
-                try { single = JSON.parse(single); } catch (_) { single = {}; }
-            }
-            single = sanitize(single);
-            const idx = parseInt(rowIndex, 10);
-            if (Number.isNaN(idx) || idx < 0) {
-                throw new ApiError(400, "Invalid rowIndex");
-            }
-            const beforeRow = doc.procurementDetails?.[idx] || {};
-            if (idx >= doc.procurementDetails.length) {
-                doc.procurementDetails.push(single);
-            } else {
-                doc.procurementDetails.set(idx, single);
-            }
-            pushDiffs('Monthly Procurement Data', idx + 1, beforeRow, single, ['systemCode', 'skuCode', 'supplierName', 'supplierCategory', 'foodGrade', 'componentCode', 'componentDescription', 'polymerType', 'recycledPolymerUsed', 'componentPolymer', 'category', 'dateOfInvoice', 'monthName', 'quarter', 'yearlyQuarter', 'purchaseQty', 'uom', 'perPieceWeightKg', 'monthlyPurchaseMt', 'recycledPercent', 'recycledQty', 'recycledRate', 'recycledQrtAmount', 'virginQty', 'virginRate', 'virginQtyAmount', 'rcPercentMentioned']);
-        } else {
-            let parsed = rows;
-            if (typeof parsed === 'string') {
-                try { parsed = JSON.parse(parsed); } catch (_) { parsed = []; }
-            }
-            if (!Array.isArray(parsed)) parsed = [];
-            const beforeRows = Array.isArray(doc.procurementDetails) ? doc.procurementDetails : [];
-            const afterRows = parsed.map(sanitize);
-            const maxLen = Math.max(beforeRows.length, afterRows.length);
-            for (let i = 0; i < maxLen; i += 1) {
-                pushDiffs('Monthly Procurement Data', i + 1, beforeRows[i] || {}, afterRows[i] || {}, ['systemCode', 'skuCode', 'supplierName', 'supplierCategory', 'foodGrade', 'componentCode', 'componentDescription', 'polymerType', 'recycledPolymerUsed', 'componentPolymer', 'category', 'dateOfInvoice', 'monthName', 'quarter', 'yearlyQuarter', 'purchaseQty', 'uom', 'perPieceWeightKg', 'monthlyPurchaseMt', 'recycledPercent', 'recycledQty', 'recycledRate', 'recycledQrtAmount', 'virginQty', 'virginRate', 'virginQtyAmount', 'rcPercentMentioned']);
-            }
-            doc.procurementDetails = afterRows;
-        }
-
-        if (doc.changeHistory.length > 5000) doc.changeHistory = doc.changeHistory.slice(-5000);
-        doc.updatedBy = userId;
-        await doc.save();
-        return doc.procurementDetails;
+    if (emitter) {
+      emitter.emit("markingLabellingUpdate", {
+        clientId,
+        type,
+        itemId,
+        operation: "upsert",
+        source: "supplierCtoChecks",
+      });
     }
 
+    return mergeSupplierCtoRows({
+      supplierNames: Array.from(supplierStatusByName.keys()),
+      persistedRows: supplierCtoDoc.rows || [],
+      supplierStatusByName,
+      normalizeDateValue: (value) => value || null,
+    });
+  }
+
+  /**
+   * Save Product Compliance
+   * @param {string} clientId
+   * @param {string} type
+   * @param {string} itemId
+   * @param {Array|object} rows
+   * @param {number} rowIndex
+   * @param {object} row
+   * @param {string} userId
+   * @param {object} emitter
+   */
+  static async saveProductCompliance(
+    clientId,
+    type,
+    itemId,
+    rows,
+    rowIndex,
+    row,
+    userId,
+    emitter,
+    plantName,
+  ) {
+    const clientExists = await this.findClientOrPwp(clientId);
+
+    const listKey = type === "CTE" ? "cteDetailsList" : "ctoDetailsList";
+    const itemFound = clientExists.productionFacility[listKey].id(itemId);
+    if (!itemFound) {
+      throw new ApiError(404, `${type} detail not found`);
+    }
+
+    const sanitize = (r) => {
+      const s = {
+        generate: r.generate || "No",
+        systemCode: r.systemCode || "",
+        packagingType: r.packagingType || "",
+        clientName: r.clientName || "",
+        clientState: r.clientState || "",
+        industryCategory: r.industryCategory || "",
+        skuCode: r.skuCode || "",
+        skuDescription: r.skuDescription || "",
+        skuUom: r.skuUom || "",
+        productImage: typeof r.productImage === "string" ? r.productImage : "",
+        componentCode: r.componentCode || "",
+        componentDescription: r.componentDescription || "",
+        supplierName: r.supplierName || "",
+        supplierState: r.supplierState || "",
+        supplierType: r.supplierType || "",
+        supplierCategory: r.supplierCategory || "",
+        generateSupplierCode: r.generateSupplierCode || "No",
+        supplierCode: r.supplierCode || "",
+        componentImage:
+          typeof r.componentImage === "string" ? r.componentImage : "",
+        thickness: r.thickness ? Number(r.thickness) : 0,
+        rcPercent: r.rcPercent ? Number(r.rcPercent) : 0,
+        auditorRemarks: r.auditorRemarks || "",
+        clientRemarks: r.clientRemarks || "",
+        componentComplianceStatus:
+          r.componentComplianceStatus || r.complianceStatus || "",
+        productComplianceStatus: r.productComplianceStatus || "",
+        additionalDocument:
+          typeof r.additionalDocument === "string" ? r.additionalDocument : "",
+        managerRemarks: r.managerRemarks || "",
+      };
+      return s;
+    };
+
+    let doc = await ProductComplianceModel.findOne({
+      client: clientId,
+      type,
+      itemId,
+    });
+    if (!doc) {
+      doc = new ProductComplianceModel({
+        client: clientId,
+        type,
+        itemId,
+        rows: [],
+      });
+    }
+    if (typeof plantName !== "undefined") doc.plantName = plantName || "";
+    const historyEntries = [];
+
+    const pushDiffs = (tableName, rowNumber, beforeRow, afterRow, fields) => {
+      const at = new Date();
+      fields.forEach((field) => {
+        const prevVal = toChangeText(beforeRow?.[field]);
+        const currVal = toChangeText(afterRow?.[field]);
+        if (prevVal !== currVal) {
+          historyEntries.push({
+            table: tableName,
+            row: rowNumber,
+            field: humanizeField(field),
+            prev: prevVal || "-",
+            curr: currVal || "-",
+            user: userId || null,
+            userName: "",
+            at,
+          });
+        }
+      });
+    };
+
+    if (typeof rowIndex !== "undefined" && row !== undefined) {
+      const idx = parseInt(rowIndex, 10);
+      if (Number.isNaN(idx) || idx < 0) {
+        throw new ApiError(400, "Invalid rowIndex");
+      }
+      const rawRow = doc.rows?.[idx] || {};
+      const hasNonEmpty = (r) => {
+        if (!r || typeof r !== "object") return false;
+        const keysToCheck = [
+          "systemCode",
+          "packagingType",
+          "clientName",
+          "clientState",
+          "industryCategory",
+          "skuCode",
+          "skuDescription",
+          "skuUom",
+          "productImage",
+          "componentCode",
+          "componentDescription",
+          "supplierName",
+          "supplierState",
+          "supplierType",
+          "supplierCategory",
+          "generateSupplierCode",
+          "supplierCode",
+          "componentImage",
+          "thickness",
+        ];
+        return keysToCheck.some((k) => {
+          const v = r[k];
+          return v !== undefined && v !== null && String(v).trim() !== "";
+        });
+      };
+      let baseRow = hasNonEmpty(rawRow) ? rawRow : {};
+      if (!hasNonEmpty(baseRow)) {
+        const embeddedRows = Array.isArray(itemFound.productComplianceRows)
+          ? itemFound.productComplianceRows
+          : [];
+        const embedded = embeddedRows[idx] || {};
+        const embeddedObj =
+          embedded && typeof embedded.toObject === "function"
+            ? embedded.toObject()
+            : embedded;
+        if (hasNonEmpty(embeddedObj)) baseRow = embeddedObj;
+      }
+      const beforeRow = baseRow || {};
+      const baseRowObj =
+        baseRow && typeof baseRow.toObject === "function"
+          ? baseRow.toObject()
+          : baseRow;
+      const sanitized = sanitize({ ...baseRowObj, ...row });
+      const setUpdate = {};
+      Object.keys(sanitized).forEach((key) => {
+        setUpdate[`rows.${idx}.${key}`] = sanitized[key];
+      });
+
+      if (Object.keys(setUpdate).length === 0) {
+        throw new ApiError(400, "No valid fields to update");
+      }
+
+      await ProductComplianceModel.updateOne(
+        { client: clientId, type, itemId },
+        { $set: setUpdate },
+        { upsert: false },
+      );
+
+      // Sync productComplianceStatus to all rows with the same SKU
+      if (sanitized.skuCode && sanitized.productComplianceStatus) {
+        await ProductComplianceModel.updateOne(
+          { client: clientId, type, itemId },
+          {
+            $set: {
+              "rows.$[elem].productComplianceStatus":
+                sanitized.productComplianceStatus,
+            },
+          },
+          {
+            arrayFilters: [{ "elem.skuCode": sanitized.skuCode }],
+          },
+        );
+      }
+
+      // Sync componentDescription across other ProductComplianceModel tables for same componentCode/systemCode
+      if (
+        typeof sanitized.componentDescription === "string" &&
+        sanitized.componentCode
+      ) {
+        const componentCode = String(sanitized.componentCode || "").trim();
+        const systemCode = String(sanitized.systemCode || "").trim();
+        const componentDescription = sanitized.componentDescription;
+
+        if (componentCode) {
+          const arrayFilters = [
+            systemCode
+              ? {
+                  "sc.componentCode": componentCode,
+                  "sc.systemCode": systemCode,
+                }
+              : { "sc.componentCode": componentCode },
+            systemCode
+              ? {
+                  "cd.componentCode": componentCode,
+                  "cd.systemCode": systemCode,
+                }
+              : { "cd.componentCode": componentCode },
+            systemCode
+              ? {
+                  "pd.componentCode": componentCode,
+                  "pd.systemCode": systemCode,
+                }
+              : { "pd.componentCode": componentCode },
+            systemCode
+              ? {
+                  "rq.componentCode": componentCode,
+                  "rq.systemCode": systemCode,
+                }
+              : { "rq.componentCode": componentCode },
+          ];
+
+          await ProductComplianceModel.updateOne(
+            { client: clientId, type, itemId },
+            {
+              $set: {
+                "supplierCompliance.$[sc].componentDescription":
+                  componentDescription,
+                "componentDetails.$[cd].componentDescription":
+                  componentDescription,
+                "recycledQuantityUsed.$[rq].componentDescription":
+                  componentDescription,
+              },
+            },
+            { arrayFilters: arrayFilters.filter((_, index) => index !== 2) },
+          );
+          await MonthlyProcurementModel.updateOne(
+            { client: clientId, type, itemId },
+            {
+              $set: {
+                "rows.$[row].componentDescription": componentDescription,
+              },
+            },
+            {
+              arrayFilters: [
+                systemCode
+                  ? {
+                      "row.componentCode": componentCode,
+                      "row.systemCode": systemCode,
+                    }
+                  : { "row.componentCode": componentCode },
+              ],
+            },
+          );
+        }
+      }
+
+      const refreshedDoc = await ProductComplianceModel.findOne({
+        client: clientId,
+        type,
+        itemId,
+      });
+      const afterRow = refreshedDoc?.rows?.[idx] || {};
+      const allFields = [
+        "generate",
+        "systemCode",
+        "packagingType",
+        "clientName",
+        "clientState",
+        "industryCategory",
+        "skuCode",
+        "skuDescription",
+        "skuUom",
+        "productImage",
+        "componentCode",
+        "componentDescription",
+        "supplierName",
+        "supplierState",
+        "supplierType",
+        "supplierCategory",
+        "generateSupplierCode",
+        "supplierCode",
+        "componentImage",
+        "thickness",
+        "auditorRemarks",
+        "clientRemarks",
+        "componentComplianceStatus",
+        "managerRemarks",
+      ];
+      pushDiffs("Product Compliance", idx + 1, beforeRow, afterRow, allFields);
+      doc = refreshedDoc || doc;
+
+      const normalize = (v) => (v === null || v === undefined ? "" : String(v));
+      const changed = [];
+      if (
+        normalize(beforeRow?.auditorRemarks) !==
+        normalize(afterRow?.auditorRemarks)
+      )
+        changed.push("auditorRemarks");
+      if (
+        normalize(beforeRow?.clientRemarks) !==
+        normalize(afterRow?.clientRemarks)
+      )
+        changed.push("clientRemarks");
+      if (
+        normalize(beforeRow?.managerRemarks) !==
+        normalize(afterRow?.managerRemarks)
+      )
+        changed.push("managerRemarks");
+
+      if (changed.length > 0) {
+        const toId = (v) =>
+          v && typeof v === "object" && v._id
+            ? String(v._id)
+            : v
+              ? String(v)
+              : "";
+        const actorId = toId(userId);
+        const creatorId = toId(clientExists?.createdBy);
+        const managerId =
+          toId(clientExists?.assignedManager) || toId(clientExists?.assignedTo);
+
+        const recipientId =
+          actorId && creatorId && actorId === creatorId ? managerId : creatorId;
+        if (recipientId && actorId && recipientId !== actorId) {
+          const clientName = (
+            clientExists?.clientName ||
+            clientExists?.name ||
+            clientExists?.tradeName ||
+            ""
+          ).toString();
+          const sku = (afterRow?.skuCode || "").toString();
+          const component = (afterRow?.componentCode || "").toString();
+          const parts = changed.map((f) =>
+            f === "auditorRemarks"
+              ? "Auditor remarks"
+              : f === "managerRemarks"
+                ? "Manager remarks"
+                : "Client remarks",
+          );
+
+          await NotificationModel.create({
+            recipient: recipientId,
+            sender: actorId,
+            type: "REMARKS_UPDATED",
+            title: `${parts.join(" & ")} updated`,
+            message: [clientName, sku || component].filter(Boolean).join(" • "),
+            clientId,
+            linkPath: `/dashboard/client/${clientId}/edit`,
+            meta: {
+              clientId,
+              type,
+              itemId,
+              rowIndex: idx,
+              skuCode: sku,
+              componentCode: component,
+              changedFields: changed,
+            },
+          });
+        }
+      }
+    } else {
+      let parsed = rows;
+      if (typeof parsed === "string") {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch (_) {
+          parsed = [];
+        }
+      }
+      if (!Array.isArray(parsed)) parsed = [];
+      const beforeRows = Array.isArray(doc.rows) ? doc.rows : [];
+      const embeddedRows = Array.isArray(itemFound.productComplianceRows)
+        ? itemFound.productComplianceRows
+        : [];
+      const sanitizedIncoming = parsed.map(sanitize);
+
+      // Prefer existing non-empty values; only replace with incoming when not empty
+      const mergeField = (incoming, base) => {
+        const toStr = (v) => (v === null || v === undefined ? "" : String(v));
+        const inc = toStr(incoming).trim();
+        const bas = toStr(base).trim();
+        return inc !== "" ? inc : bas;
+      };
+
+      const afterRows = sanitizedIncoming.map((incomingRow, i) => {
+        const baseRow =
+          beforeRows[i] ||
+          (embeddedRows[i]?.toObject
+            ? embeddedRows[i].toObject()
+            : embeddedRows[i]) ||
+          {};
+        return {
+          generate: mergeField(incomingRow.generate, baseRow.generate),
+          systemCode: mergeField(incomingRow.systemCode, baseRow.systemCode),
+          packagingType: mergeField(
+            incomingRow.packagingType,
+            baseRow.packagingType,
+          ),
+          clientName: mergeField(incomingRow.clientName, baseRow.clientName),
+          clientState: mergeField(incomingRow.clientState, baseRow.clientState),
+          industryCategory: mergeField(
+            incomingRow.industryCategory,
+            baseRow.industryCategory,
+          ),
+          skuCode: mergeField(incomingRow.skuCode, baseRow.skuCode),
+          skuDescription: mergeField(
+            incomingRow.skuDescription,
+            baseRow.skuDescription,
+          ),
+          skuUom: mergeField(incomingRow.skuUom, baseRow.skuUom),
+          productImage: mergeField(
+            incomingRow.productImage,
+            baseRow.productImage,
+          ),
+          componentCode: mergeField(
+            incomingRow.componentCode,
+            baseRow.componentCode,
+          ),
+          componentDescription: mergeField(
+            incomingRow.componentDescription,
+            baseRow.componentDescription,
+          ),
+          supplierName: mergeField(
+            incomingRow.supplierName,
+            baseRow.supplierName,
+          ),
+          supplierState: mergeField(
+            incomingRow.supplierState,
+            baseRow.supplierState,
+          ),
+          supplierType: mergeField(
+            incomingRow.supplierType,
+            baseRow.supplierType,
+          ),
+          supplierCategory: mergeField(
+            incomingRow.supplierCategory,
+            baseRow.supplierCategory,
+          ),
+          generateSupplierCode: mergeField(
+            incomingRow.generateSupplierCode,
+            baseRow.generateSupplierCode,
+          ),
+          supplierCode: mergeField(
+            incomingRow.supplierCode,
+            baseRow.supplierCode,
+          ),
+          componentImage: mergeField(
+            incomingRow.componentImage,
+            baseRow.componentImage,
+          ),
+          thickness: mergeField(incomingRow.thickness, baseRow.thickness),
+          auditorRemarks: mergeField(
+            incomingRow.auditorRemarks,
+            baseRow.auditorRemarks,
+          ),
+          clientRemarks: mergeField(
+            incomingRow.clientRemarks,
+            baseRow.clientRemarks,
+          ),
+          componentComplianceStatus: mergeField(
+            incomingRow.componentComplianceStatus,
+            baseRow.componentComplianceStatus,
+          ),
+          productComplianceStatus: mergeField(
+            incomingRow.productComplianceStatus,
+            baseRow.productComplianceStatus,
+          ),
+          managerRemarks: mergeField(
+            incomingRow.managerRemarks,
+            baseRow.managerRemarks,
+          ),
+        };
+      });
+
+      // Check uniqueness within the new list
+      const codeMap = new Map(); // code -> {sku, desc}
+      for (const r of afterRows) {
+        const c = (r.componentCode || "").trim();
+        const sku = (r.skuCode || "").trim();
+        const desc = (r.componentDescription || "").trim();
+        if (c) {
+          if (codeMap.has(c)) {
+            const existing = codeMap.get(c);
+            if (existing.sku !== sku || existing.desc !== desc) {
+              throw new ApiError(
+                400,
+                `Duplicate Component Code '${c}' found with different SKU/Description`,
+              );
+            }
+          } else {
+            codeMap.set(c, { sku, desc });
+          }
+        }
+      }
+
+      const maxLen = Math.max(beforeRows.length, afterRows.length);
+      for (let i = 0; i < maxLen; i += 1) {
+        pushDiffs(
+          "Product Compliance",
+          i + 1,
+          beforeRows[i] || {},
+          afterRows[i] || {},
+          [
+            "generate",
+            "systemCode",
+            "packagingType",
+            "clientName",
+            "clientState",
+            "industryCategory",
+            "skuCode",
+            "skuDescription",
+            "skuUom",
+            "productImage",
+            "componentCode",
+            "componentDescription",
+            "supplierName",
+            "supplierState",
+            "supplierType",
+            "supplierCategory",
+            "generateSupplierCode",
+            "supplierCode",
+            "componentImage",
+          ],
+        );
+      }
+      doc.rows = afterRows;
+    }
+    doc.updatedBy = userId;
+    await doc.save();
+    await HistoryService.appendEntries({
+      clientId,
+      type,
+      itemId,
+      entries: historyEntries,
+      userId,
+    });
+
+    if (emitter) {
+      emitter.emit("markingLabellingUpdate", {
+        clientId,
+        type,
+        itemId,
+        operation: "upsert",
+        source: "productCompliance",
+      });
+    }
+
+    return doc.rows;
+  }
+
+  /**
+   * Save Product Component Details
+   * @param {string} clientId
+   * @param {string} type
+   * @param {string} itemId
+   * @param {Array|object} rows
+   * @param {number} rowIndex
+   * @param {object} row
+   * @param {string} userId
+   * @param {object} emitter
+   */
+  static async saveProductComponentDetails(
+    clientId,
+    type,
+    itemId,
+    rows,
+    rowIndex,
+    row,
+    userId,
+    emitter,
+    plantName,
+  ) {
+    const clientExists = await this.findClientOrPwp(clientId);
+
+    const listKey = type === "CTE" ? "cteDetailsList" : "ctoDetailsList";
+    const itemFound = clientExists.productionFacility[listKey].id(itemId);
+    if (!itemFound) {
+      throw new ApiError(404, `${type} detail not found`);
+    }
+    const sanitize = (r) => {
+      const category = r.category || "";
+      const polymerType = r.polymerType || "";
+      const recycled =
+        category === "Category I" ? r.recycledPolymerUsed || "" : "";
+      return {
+        systemCode: r.systemCode || "",
+        skuCode: r.skuCode || "",
+        componentCode: r.componentCode || "",
+        componentDescription: r.componentDescription || "",
+        supplierName: r.supplierName || "",
+        polymerType,
+        recycledPolymerUsed: recycled,
+        componentPolymer: r.componentPolymer || "",
+        polymerCode: r.polymerCode || null,
+        category,
+        categoryIIType: r.categoryIIType || "",
+        containerCapacity: r.containerCapacity || "",
+        foodGrade: r.foodGrade || "",
+        layerType: r.layerType || "",
+        thickness: r.thickness || "",
+        auditorRemarks: r.auditorRemarks || "-",
+        managerRemarks: r.managerRemarks || "-",
+      };
+    };
+    let doc = await ProductComplianceModel.findOne({
+      client: clientId,
+      type,
+      itemId,
+    });
+    if (!doc) {
+      doc = new ProductComplianceModel({
+        client: clientId,
+        type,
+        itemId,
+        rows: [],
+        componentDetails: [],
+      });
+    }
+    if (typeof plantName !== "undefined") doc.plantName = plantName || "";
+    const historyEntries = [];
+    const pushDiffs = (tableName, rowNumber, beforeRow, afterRow, fields) => {
+      const at = new Date();
+      fields.forEach((field) => {
+        const prevVal = toChangeText(beforeRow?.[field]);
+        const currVal = toChangeText(afterRow?.[field]);
+        if (prevVal !== currVal) {
+          historyEntries.push({
+            table: tableName,
+            row: rowNumber,
+            field: humanizeField(field),
+            prev: prevVal || "-",
+            curr: currVal || "-",
+            user: userId || null,
+            userName: "",
+            at,
+          });
+        }
+      });
+    };
+    if (typeof rowIndex !== "undefined" && row !== undefined) {
+      let single = row;
+      if (typeof single === "string") {
+        try {
+          single = JSON.parse(single);
+        } catch (_) {
+          single = {};
+        }
+      }
+      single = sanitize(single);
+      const idx = parseInt(rowIndex, 10);
+      if (Number.isNaN(idx) || idx < 0) {
+        throw new ApiError(400, "Invalid rowIndex");
+      }
+      const beforeRow = doc.componentDetails?.[idx] || {};
+      // Validate rPET usage
+      if (
+        (single.recycledPolymerUsed || "").toString().trim().toLowerCase() ===
+          "rpet" &&
+        (single.polymerType || "").toString().trim().toUpperCase() !== "PET"
+      ) {
+        throw new ApiError(
+          400,
+          "Recycled Polymer Used 'rPET' requires Polymer Type 'PET'",
+        );
+      }
+      if (idx >= doc.componentDetails.length) {
+        doc.componentDetails.push(single);
+      } else {
+        doc.componentDetails.set(idx, single);
+      }
+      pushDiffs("Component Details", idx + 1, beforeRow, single, [
+        "skuCode",
+        "componentCode",
+        "componentDescription",
+        "supplierName",
+        "polymerType",
+        "recycledPolymerUsed",
+        "componentPolymer",
+        "polymerCode",
+        "category",
+        "containerCapacity",
+        "foodGrade",
+        "layerType",
+        "thickness",
+        "auditorRemarks",
+        "managerRemarks",
+      ]);
+    } else {
+      let parsed = rows;
+      if (typeof parsed === "string") {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch (_) {
+          parsed = [];
+        }
+      }
+      if (!Array.isArray(parsed)) parsed = [];
+      const beforeRows = Array.isArray(doc.componentDetails)
+        ? doc.componentDetails
+        : [];
+      const afterRows = parsed.map(sanitize);
+      // Validate all rows
+      for (const r of afterRows) {
+        if (
+          (r.recycledPolymerUsed || "").toString().trim().toLowerCase() ===
+            "rpet" &&
+          (r.polymerType || "").toString().trim().toUpperCase() !== "PET"
+        ) {
+          throw new ApiError(
+            400,
+            "Recycled Polymer Used 'rPET' requires Polymer Type 'PET'",
+          );
+        }
+      }
+      const maxLen = Math.max(beforeRows.length, afterRows.length);
+      for (let i = 0; i < maxLen; i += 1) {
+        pushDiffs(
+          "Component Details",
+          i + 1,
+          beforeRows[i] || {},
+          afterRows[i] || {},
+          [
+            "skuCode",
+            "componentCode",
+            "componentDescription",
+            "supplierName",
+            "polymerType",
+            "recycledPolymerUsed",
+            "componentPolymer",
+            "polymerCode",
+            "category",
+            "categoryIIType",
+            "containerCapacity",
+            "foodGrade",
+            "layerType",
+            "thickness",
+            "auditorRemarks",
+            "managerRemarks",
+          ],
+        );
+      }
+      doc.componentDetails = afterRows;
+    }
+
+    // --- Notification Logic ---
+    try {
+      const recentChanges = historyEntries.filter(
+        (h) => h.field === "Auditor Remarks" || h.field === "Manager Remarks",
+      );
+
+      if (recentChanges.length > 0) {
+        const fields = [...new Set(recentChanges.map((c) => c.field))];
+        const toId = (v) =>
+          v && typeof v === "object" && v._id
+            ? String(v._id)
+            : v
+              ? String(v)
+              : "";
+        const actorId = toId(userId);
+        const assignedToId = toId(clientExists?.assignedTo);
+        const assignedManagerId = toId(clientExists?.assignedManager);
+
+        let recipientId = null;
+        if (actorId === assignedToId) {
+          recipientId = assignedManagerId;
+        } else {
+          recipientId = assignedToId;
+        }
+
+        if (recipientId && recipientId !== actorId) {
+          const clientName = (
+            clientExists?.clientName ||
+            clientExists?.name ||
+            clientExists?.tradeName ||
+            ""
+          ).toString();
+          await NotificationModel.create({
+            recipient: recipientId,
+            sender: actorId,
+            type: "REMARKS_UPDATED",
+            title: `${fields.join(" & ")} Updated`,
+            message: `${clientName} • Component Details`,
+            clientId,
+            linkPath: `/dashboard/client/${clientId}/edit`,
+            meta: {
+              clientId,
+              type,
+              itemId,
+              changedFields: fields,
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error sending notification:", err);
+    }
+
+    doc.updatedBy = userId;
+    await doc.save();
+    await HistoryService.appendEntries({
+      clientId,
+      type,
+      itemId,
+      entries: historyEntries,
+      userId,
+    });
+
+    if (emitter) {
+      emitter.emit("markingLabellingUpdate", {
+        clientId,
+        type,
+        itemId,
+        operation: "upsert",
+        source: "productComponentDetails",
+      });
+    }
+
+    return doc.componentDetails;
+  }
+
+  /**
+   * Save Recycled Quantity Used
+   * @param {string} clientId
+   * @param {string} type
+   * @param {string} itemId
+   * @param {Array|object} rows
+   * @param {number} rowIndex
+   * @param {object} row
+   * @param {string} userId
+   */
+  static async saveRecycledQuantityUsed(
+    clientId,
+    type,
+    itemId,
+    rows,
+    rowIndex,
+    row,
+    userId,
+    plantName,
+  ) {
+    const clientExists = await this.findClientOrPwp(clientId);
+
+    const listKey = type === "CTE" ? "cteDetailsList" : "ctoDetailsList";
+    const itemFound = clientExists.productionFacility[listKey].id(itemId);
+    if (!itemFound) {
+      throw new ApiError(404, `${type} detail not found`);
+    }
+    const sanitize = (r) => ({
+      systemCode: r.systemCode || "",
+      componentCode: r.componentCode || "",
+      componentDescription: r.componentDescription || "",
+      supplierName: r.supplierName || "",
+      category: r.category || "",
+      annualConsumption: Number(r.annualConsumption) || 0,
+      uom: r.uom || "",
+      perPieceWeight: Number(r.perPieceWeight) || 0,
+      annualConsumptionMt: Number(r.annualConsumptionMt) || 0,
+      usedRecycledPercent: Number(r.usedRecycledPercent) || 0,
+      usedRecycledQtyMt: Number(r.usedRecycledQtyMt) || 0,
+    });
+    let doc = await ProductComplianceModel.findOne({
+      client: clientId,
+      type,
+      itemId,
+    });
+    if (!doc) {
+      doc = new ProductComplianceModel({
+        client: clientId,
+        type,
+        itemId,
+        rows: [],
+        componentDetails: [],
+        supplierCompliance: [],
+        recycledQuantityUsed: [],
+      });
+    }
+    if (typeof plantName !== "undefined") doc.plantName = plantName || "";
+    const historyEntries = [];
+    const pushDiffs = (tableName, rowNumber, beforeRow, afterRow, fields) => {
+      const at = new Date();
+      fields.forEach((field) => {
+        const prevVal = toChangeText(beforeRow?.[field]);
+        const currVal = toChangeText(afterRow?.[field]);
+        if (prevVal !== currVal) {
+          historyEntries.push({
+            table: tableName,
+            row: rowNumber,
+            field: humanizeField(field),
+            prev: prevVal || "-",
+            curr: currVal || "-",
+            user: userId || null,
+            userName: "",
+            at,
+          });
+        }
+      });
+    };
+    if (typeof rowIndex !== "undefined" && row !== undefined) {
+      let single = row;
+      if (typeof single === "string") {
+        try {
+          single = JSON.parse(single);
+        } catch (_) {
+          single = {};
+        }
+      }
+      single = sanitize(single);
+      const idx = parseInt(rowIndex, 10);
+      if (Number.isNaN(idx) || idx < 0) {
+        throw new ApiError(400, "Invalid rowIndex");
+      }
+      const beforeRow = doc.recycledQuantityUsed?.[idx] || {};
+      if (idx >= doc.recycledQuantityUsed.length) {
+        doc.recycledQuantityUsed.push(single);
+      } else {
+        doc.recycledQuantityUsed.set(idx, single);
+      }
+      pushDiffs("Recycled Quantity Used", idx + 1, beforeRow, single, [
+        "systemCode",
+        "componentCode",
+        "componentDescription",
+        "supplierName",
+        "category",
+        "annualConsumption",
+        "uom",
+        "perPieceWeight",
+        "usedRecycledPercent",
+        "usedRecycledQtyMt",
+      ]);
+    } else {
+      let parsed = rows;
+      if (typeof parsed === "string") {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch (_) {
+          parsed = [];
+        }
+      }
+      if (!Array.isArray(parsed)) parsed = [];
+      const beforeRows = Array.isArray(doc.recycledQuantityUsed)
+        ? doc.recycledQuantityUsed
+        : [];
+      const afterRows = parsed.map(sanitize);
+      const maxLen = Math.max(beforeRows.length, afterRows.length);
+      for (let i = 0; i < maxLen; i += 1) {
+        pushDiffs(
+          "Recycled Quantity Used",
+          i + 1,
+          beforeRows[i] || {},
+          afterRows[i] || {},
+          [
+            "componentCode",
+            "componentDescription",
+            "supplierName",
+            "category",
+            "annualConsumption",
+            "uom",
+            "perPieceWeight",
+            "usedRecycledPercent",
+            "usedRecycledQtyMt",
+          ],
+        );
+      }
+      doc.recycledQuantityUsed = afterRows;
+    }
+    doc.updatedBy = userId;
+    await doc.save();
+    await HistoryService.appendEntries({
+      clientId,
+      type,
+      itemId,
+      entries: historyEntries,
+      userId,
+    });
+
+    return doc.recycledQuantityUsed;
+  }
+
+  /**
+   * Save Monthly Procurement
+   * @param {string} clientId
+   * @param {string} type
+   * @param {string} itemId
+   * @param {Array|object} rows
+   * @param {number} rowIndex
+   * @param {object} row
+   * @param {string} userId
+   */
+  static async saveMonthlyProcurement(
+    clientId,
+    type,
+    itemId,
+    rows,
+    rowIndex,
+    row,
+    userId,
+    plantName,
+  ) {
+    const clientExists = await this.findClientOrPwp(clientId);
+
+    const listKey = type === "CTE" ? "cteDetailsList" : "ctoDetailsList";
+    const itemFound = clientExists.productionFacility[listKey].id(itemId);
+    if (!itemFound) {
+      throw new ApiError(404, `${type} detail not found`);
+    }
+
+    const sanitize = (r) => {
+      const uom = (r.uom || "").toString();
+      const purchaseQty = Number(r.purchaseQty) || 0;
+      const perPieceWeightKg = Number(r.perPieceWeightKg) || 0;
+      let monthlyPurchaseMt = Number(r.monthlyPurchaseMt) || 0;
+      if (!monthlyPurchaseMt) {
+        if (uom === "Units" || uom === "Nos") {
+          monthlyPurchaseMt = purchaseQty * perPieceWeightKg;
+        } else if (uom === "KG") {
+          monthlyPurchaseMt = purchaseQty / 1000;
+        } else if (uom === "MT") {
+          monthlyPurchaseMt = purchaseQty;
+        }
+      }
+      return {
+        systemCode: r.systemCode || "",
+        skuCode: r.skuCode || "",
+        supplierName: r.supplierName || "",
+        supplierCategory: r.supplierCategory || "",
+        foodGrade: r.foodGrade || "",
+        componentCode: r.componentCode || "",
+        componentDescription: r.componentDescription || "",
+        polymerType: r.polymerType || "",
+        recycledPolymerUsed: r.recycledPolymerUsed || "",
+        componentPolymer: r.componentPolymer || "",
+        category: r.category || "",
+        dateOfInvoice: toDateOrNull(r.dateOfInvoice),
+        monthName: r.monthName || "",
+        quarter: r.quarter || "",
+        yearlyQuarter: r.yearlyQuarter || "",
+        purchaseQty,
+        uom,
+        perPieceWeightKg,
+        monthlyPurchaseMt,
+        recycledPercent: Number(r.recycledPercent) || 0,
+        recycledQty: Number(r.recycledQty) || 0,
+        recycledRate: Number(r.recycledRate) || 0,
+        recycledQrtAmount: Number(r.recycledQrtAmount) || 0,
+        virginQty: Number(r.virginQty) || 0,
+        virginRate: Number(r.virginRate) || 0,
+        virginQtyAmount: Number(r.virginQtyAmount) || 0,
+        rcPercentMentioned: r.rcPercentMentioned || "",
+      };
+    };
+
+    const productComplianceDoc = await ProductComplianceModel.findOne({
+      client: clientId,
+      type,
+      itemId,
+    });
+    if (!productComplianceDoc) {
+      throw new ApiError(404, "Product compliance record not found");
+    }
+    if (typeof plantName !== "undefined") {
+      productComplianceDoc.plantName = plantName || "";
+      await productComplianceDoc.save();
+    }
+    const historyEntries = [];
+    const pushDiffs = (tableName, rowNumber, beforeRow, afterRow, fields) => {
+      const at = new Date();
+      fields.forEach((field) => {
+        const prevVal = toChangeText(beforeRow?.[field]);
+        const currVal = toChangeText(afterRow?.[field]);
+        if (prevVal !== currVal) {
+          historyEntries.push({
+            table: tableName,
+            row: rowNumber,
+            field: humanizeField(field),
+            prev: prevVal || "-",
+            curr: currVal || "-",
+            user: userId || null,
+            userName: "",
+            at,
+          });
+        }
+      });
+    };
+
+    const procurementDoc =
+      (await MonthlyProcurementModel.findOne({
+        client: clientId,
+        type,
+        itemId,
+      })) ||
+      new MonthlyProcurementModel({
+        client: clientId,
+        type,
+        itemId,
+        plantName: productComplianceDoc.plantName || "",
+        rows: [],
+      });
+
+    if (typeof rowIndex !== "undefined" && row !== undefined) {
+      let single = row;
+      if (typeof single === "string") {
+        try {
+          single = JSON.parse(single);
+        } catch (_) {
+          single = {};
+        }
+      }
+      single = sanitize(single);
+      const idx = parseInt(rowIndex, 10);
+      if (Number.isNaN(idx) || idx < 0) {
+        throw new ApiError(400, "Invalid rowIndex");
+      }
+      const beforeRow = procurementDoc.rows?.[idx] || {};
+      if (idx >= procurementDoc.rows.length) {
+        procurementDoc.rows.push(single);
+      } else {
+        procurementDoc.rows.set(idx, single);
+      }
+      pushDiffs("Monthly Procurement Data", idx + 1, beforeRow, single, [
+        "systemCode",
+        "skuCode",
+        "supplierName",
+        "supplierCategory",
+        "foodGrade",
+        "componentCode",
+        "componentDescription",
+        "polymerType",
+        "recycledPolymerUsed",
+        "componentPolymer",
+        "category",
+        "dateOfInvoice",
+        "monthName",
+        "quarter",
+        "yearlyQuarter",
+        "purchaseQty",
+        "uom",
+        "perPieceWeightKg",
+        "monthlyPurchaseMt",
+        "recycledPercent",
+        "recycledQty",
+        "recycledRate",
+        "recycledQrtAmount",
+        "virginQty",
+        "virginRate",
+        "virginQtyAmount",
+        "rcPercentMentioned",
+      ]);
+    } else {
+      let parsed = rows;
+      if (typeof parsed === "string") {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch (_) {
+          parsed = [];
+        }
+      }
+      if (!Array.isArray(parsed)) parsed = [];
+      const beforeRows = Array.isArray(procurementDoc.rows)
+        ? procurementDoc.rows
+        : [];
+      const afterRows = parsed.map(sanitize);
+      const maxLen = Math.max(beforeRows.length, afterRows.length);
+      for (let i = 0; i < maxLen; i += 1) {
+        pushDiffs(
+          "Monthly Procurement Data",
+          i + 1,
+          beforeRows[i] || {},
+          afterRows[i] || {},
+          [
+            "systemCode",
+            "skuCode",
+            "supplierName",
+            "supplierCategory",
+            "foodGrade",
+            "componentCode",
+            "componentDescription",
+            "polymerType",
+            "recycledPolymerUsed",
+            "componentPolymer",
+            "category",
+            "dateOfInvoice",
+            "monthName",
+            "quarter",
+            "yearlyQuarter",
+            "purchaseQty",
+            "uom",
+            "perPieceWeightKg",
+            "monthlyPurchaseMt",
+            "recycledPercent",
+            "recycledQty",
+            "recycledRate",
+            "recycledQrtAmount",
+            "virginQty",
+            "virginRate",
+            "virginQtyAmount",
+            "rcPercentMentioned",
+          ],
+        );
+      }
+      procurementDoc.rows = afterRows;
+    }
+
+    procurementDoc.updatedBy = userId;
+    await procurementDoc.save();
+    await HistoryService.appendEntries({
+      clientId,
+      type,
+      itemId,
+      entries: historyEntries,
+      userId,
+    });
+    return procurementDoc.rows;
+  }
 }
 export default ClientService;

@@ -162,7 +162,8 @@ const ProductComplianceStep = ({ client, refreshData, plantNameFilter }) => {
                                 { id: 'productCompliance', label: 'Product Compliance' },
                                 { id: 'supplierCompliance', label: 'Supplier Compliance' },
                                 { id: 'componentDetails', label: 'Component Details' },
-                                { id: 'recycledQuantity', label: 'Recycled Quantity Used' }
+                                { id: 'recycledQuantity', label: 'Recycled Quantity Used' },
+                                { id: 'supplierCtoCheck', label: 'Supplier CTO Check' }
                             ].map(tab => {
                                 const isActive = activeTab === tab.id;
                                 return (
@@ -238,6 +239,14 @@ const ProductComplianceStep = ({ client, refreshData, plantNameFilter }) => {
                                     productRows={selectedConsent.data.productComplianceRows || []}
                                     plantName={plantNameFilter}
                                 />
+                            </div>
+                        )}
+
+                        {activeTab === 'supplierCtoCheck' && (
+                            <div className="animate-fadeIn">
+                                <div className="text-sm text-gray-600">
+                                    No supplier CTO check data available.
+                                </div>
                             </div>
                         )}
 

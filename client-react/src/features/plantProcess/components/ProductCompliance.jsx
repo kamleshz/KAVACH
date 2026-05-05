@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Table, Button, Tooltip, Upload, Popconfirm, Select, Input, Card, Tag, Modal } from 'antd';
 import { SaveOutlined, DeleteOutlined, CheckCircleFilled, FileExcelOutlined, LoadingOutlined, PlusOutlined, FileImageOutlined, UploadOutlined, UndoOutlined, CodeSandboxOutlined, DownloadOutlined, SyncOutlined, DownOutlined, RightOutlined, HistoryOutlined, ArrowRightOutlined, ExclamationCircleFilled } from '@ant-design/icons';
 import Pagination from '../../../components/Pagination';
@@ -55,6 +55,10 @@ const ProductCompliance = ({
     handleSupplierBulkSave,
     isSupplierBulkSaving,
     supplierRows,
+    supplierCtoRows = [],
+    handleSupplierCtoChange,
+    saveSupplierCtoRow,
+    savingSupplierCtoRow,
     addSupplierRow,
     systemCodeOptions,
     handleSystemCodeSelect,
@@ -144,6 +148,44 @@ const ProductCompliance = ({
     categorySummary = []
 }) => {
     const isProducer = client?.entityType === 'Producer';
+    const inputValue = (value, fallback = '') => (value ?? fallback);
+
+    const supplierComplianceMeta = useMemo(() => {
+        const rows = Array.isArray(supplierRows) ? supplierRows : [];
+        const meta = new Map();
+
+        rows.forEach((row) => {
+            const supplierName = (row?.supplierName || '').toString().trim();
+            if (!supplierName) return;
+
+            const next = {
+                supplierStatus: (row?.supplierStatus || '').toString().trim(),
+                eprCertificateNumber: (row?.eprCertificateNumber || '').toString().trim()
+            };
+            const existing = meta.get(supplierName);
+
+            if (!existing) {
+                meta.set(supplierName, next);
+                return;
+            }
+
+            const existingStatus = (existing.supplierStatus || '').toLowerCase();
+            const nextStatus = (next.supplierStatus || '').toLowerCase();
+            const preferNext =
+                (!existing.supplierStatus && !!next.supplierStatus) ||
+                (!existing.eprCertificateNumber && !!next.eprCertificateNumber) ||
+                (existingStatus !== 'registered' && nextStatus === 'registered');
+
+            if (preferNext) {
+                meta.set(supplierName, {
+                    supplierStatus: next.supplierStatus || existing.supplierStatus,
+                    eprCertificateNumber: next.eprCertificateNumber || existing.eprCertificateNumber
+                });
+            }
+        });
+
+        return meta;
+    }, [supplierRows]);
 
     // Document Viewer State
     const [viewerOpen, setViewerOpen] = useState(false);
@@ -215,7 +257,7 @@ const ProductCompliance = ({
                 const b = stripVolatile(lastSavedComponentRows, ['_validationError']);
                 return JSON.stringify(a) !== JSON.stringify(b);
             }
-            if (tab === 'recycled-quantity-used') {
+            if (tab === 'recycled-quantity') {
                 if (!lastSavedRecycledRows) return false;
                 return JSON.stringify(recycledRows) !== JSON.stringify(lastSavedRecycledRows);
             }
@@ -262,7 +304,7 @@ const ProductCompliance = ({
                 success = await handleSupplierBulkSave();
             } else if (subTab === 'component-details') {
                 success = await handleComponentBulkSave();
-            } else if (subTab === 'recycled-quantity-used') {
+            } else if (subTab === 'recycled-quantity') {
                 success = await handleRecycledBulkSave();
             }
             
@@ -491,7 +533,7 @@ const ProductCompliance = ({
                                             ) : (
                                             <select
                                                 className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${packagingTypeChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
-                                                value={row.packagingType}
+                                                value={inputValue(row.packagingType)}
                                                 onChange={(e) => handleRowChange(globalIndex, 'packagingType', e.target.value)}
                                                 disabled={isManager}
                                             >
@@ -559,7 +601,7 @@ const ProductCompliance = ({
                                             ) : (
                                             <select
                                                 className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${industryCategoryChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
-                                                value={row.industryCategory}
+                                                value={inputValue(row.industryCategory)}
                                                 onChange={(e) => handleRowChange(globalIndex, 'industryCategory', e.target.value)}
                                                 disabled={isManager}
                                             >
@@ -598,7 +640,7 @@ const ProductCompliance = ({
                                             <input 
                                                 className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all text-center hover:border-primary-400 ${skuCodeChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
                                                 placeholder="Code" 
-                                                value={row.skuCode} 
+                                                value={inputValue(row.skuCode)} 
                                                 onChange={(e)=>handleRowChange(globalIndex,'skuCode',e.target.value)} 
                                                 readOnly={isManager}
                                                 disabled={isManager}
@@ -622,7 +664,7 @@ const ProductCompliance = ({
                                             <input 
                                                 className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${skuDescriptionChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
                                                 placeholder="Description" 
-                                                value={row.skuDescription} 
+                                                value={inputValue(row.skuDescription)} 
                                                 onChange={(e)=>handleRowChange(globalIndex,'skuDescription',e.target.value)} 
                                                 readOnly={isManager}
                                                 disabled={isManager}
@@ -646,7 +688,7 @@ const ProductCompliance = ({
                                             <input 
                                                 className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all text-center hover:border-primary-400 ${skuUomChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
                                                 placeholder="UOM" 
-                                                value={row.skuUom} 
+                                                value={inputValue(row.skuUom)} 
                                                 onChange={(e)=>handleRowChange(globalIndex,'skuUom',e.target.value)} 
                                                 readOnly={isManager}
                                                 disabled={isManager}
@@ -750,7 +792,7 @@ const ProductCompliance = ({
                                             <input 
                                                 className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all text-center hover:border-primary-400 ${componentCodeChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'} ${row.generate === 'No' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                                 placeholder="Code" 
-                                                value={row.componentCode} 
+                                                value={inputValue(row.componentCode)} 
                                                 readOnly={isManager || row.generate === 'No'}
                                                 onChange={(e)=>handleProductComponentCodeChange(globalIndex,e.target.value)} 
                                             />
@@ -791,7 +833,7 @@ const ProductCompliance = ({
                                             <input 
                                                 className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${componentDescriptionChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
                                                 placeholder="Description" 
-                                                value={row.componentDescription} 
+                                                value={inputValue(row.componentDescription)} 
                                                 onChange={(e)=>handleRowChange(globalIndex,'componentDescription',e.target.value)} 
                                             />
                                             )}
@@ -811,7 +853,7 @@ const ProductCompliance = ({
                                             <input 
                                                 className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${supplierNameChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
                                                 placeholder="Supplier Name" 
-                                                value={row.supplierName} 
+                                                value={inputValue(row.supplierName)} 
                                                 onChange={(e)=>handleRowChange(globalIndex,'supplierName',e.target.value)} 
                                             />
                                             )}
@@ -1176,7 +1218,7 @@ const ProductCompliance = ({
                                             ) : (
                                             <select
                                                 className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
-                                                value={row.systemCode}
+                                                value={inputValue(row.systemCode)}
                                                 onChange={(e) => handleSystemCodeSelect(idx, e.target.value)}
                                                 disabled={isManager}
                                             >
@@ -1207,7 +1249,7 @@ const ProductCompliance = ({
                                             <input 
                                                 className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
                                                 placeholder="Description" 
-                                                value={row.componentDescription} 
+                                                value={inputValue(row.componentDescription)} 
                                                 readOnly
                                             />
                                             )}
@@ -1219,7 +1261,7 @@ const ProductCompliance = ({
                                             <input 
                                                 className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
                                                 placeholder="Supplier Name" 
-                                                value={row.supplierName} 
+                                                value={inputValue(row.supplierName)} 
                                                 readOnly
                                             />
                                             )}
@@ -1258,7 +1300,7 @@ const ProductCompliance = ({
                                             ) : (
                                             <select
                                                 className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
-                                                value={row.supplierStatus}
+                                                value={inputValue(row.supplierStatus)}
                                                 onChange={(e) => handleSupplierChange(idx, 'supplierStatus', e.target.value)}
                                                 disabled={isManager}
                                             >
@@ -1292,7 +1334,7 @@ const ProductCompliance = ({
                                             ) : (
                                             <select
                                                 className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
-                                                value={row.foodGrade}
+                                                value={inputValue(row.foodGrade)}
                                                 onChange={(e) => handleSupplierChange(idx, 'foodGrade', e.target.value)}
                                                 disabled={isManager}
                                             >
@@ -1313,7 +1355,7 @@ const ProductCompliance = ({
                                                         : 'bg-white border-gray-300 text-gray-700 focus:ring-primary-500 focus:border-primary-500'
                                                 }`}
                                                 placeholder="EPR Cert No" 
-                                                value={row.eprCertificateNumber} 
+                                                value={inputValue(row.eprCertificateNumber)} 
                                                 onChange={(e)=>handleSupplierChange(idx,'eprCertificateNumber',e.target.value)}
                                                 disabled={isManager || row.supplierStatus !== 'Registered'}
                                             />
@@ -1330,7 +1372,7 @@ const ProductCompliance = ({
                                                         : 'bg-white border-gray-300 text-gray-700 focus:ring-primary-500 focus:border-primary-500'
                                                 }`}
                                                 placeholder="FSSAI Lic No" 
-                                                value={row.fssaiLicNo} 
+                                                value={inputValue(row.fssaiLicNo)} 
                                                 onChange={(e)=>handleSupplierChange(idx,'fssaiLicNo',e.target.value)} 
                                                 disabled={isManager || disableFssai}
                                             />
@@ -1349,7 +1391,7 @@ const ProductCompliance = ({
                                                         : 'bg-white border-gray-300 text-gray-700 focus:ring-primary-500 focus:border-primary-500'
                                                 }`}
                                                 placeholder="Valid Upto" 
-                                                value={row.fssaiValidUpto} 
+                                                value={inputValue(row.fssaiValidUpto)} 
                                                 onChange={(e)=>handleSupplierChange(idx,'fssaiValidUpto',e.target.value)} 
                                                 disabled={isManager || disableFssai}
                                             />
@@ -1575,7 +1617,7 @@ const ProductCompliance = ({
                                             ) : (
                                             <select
                                                 className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
-                                                value={row.polymerType}
+                                                value={inputValue(row.polymerType)}
                                                 onChange={(e) => handleComponentChange(idx, 'polymerType', e.target.value)}
                                                 disabled={isManager}
                                             >
@@ -1627,7 +1669,7 @@ const ProductCompliance = ({
                                                         : 'bg-white border-gray-300 text-gray-700 focus:ring-primary-500 focus:border-primary-500'
                                                 } text-xs rounded focus:ring-1 block px-2 py-1.5 transition-all hover:border-primary-400`}
                                                 placeholder="Component Polymer"
-                                                value={row.componentPolymer} 
+                                                value={inputValue(row.componentPolymer)} 
                                                 onChange={(e)=>handleComponentChange(idx,'componentPolymer',e.target.value)} 
                                                 readOnly={isManager}
                                                 disabled={isManager}
@@ -1667,7 +1709,7 @@ const ProductCompliance = ({
                                             ) : (
                                             <select
                                                 className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
-                                                value={row.category}
+                                                value={inputValue(row.category)}
                                                 disabled={isManager}
                                                 onChange={(e) => {
                                                     const value = e.target.value;
@@ -2487,7 +2529,7 @@ const ProductCompliance = ({
                                                 <input
                                                     className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
                                                     placeholder="Description"
-                                                    value={row.componentDescription}
+                                                    value={inputValue(row.componentDescription)}
                                                     readOnly
                                                 />
                                                 )}
@@ -2511,7 +2553,7 @@ const ProductCompliance = ({
                                                 <input
                                                     className="w-full bg-gray-100 border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all cursor-not-allowed"
                                                     placeholder="Category"
-                                                    value={row.category}
+                                                    value={inputValue(row.category)}
                                                     readOnly
                                                 />
                                                 )}
@@ -2537,7 +2579,7 @@ const ProductCompliance = ({
                                                 ) : (
                                                 <select
                                                     className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
-                                                    value={row.uom}
+                                                    value={inputValue(row.uom)}
                                                     onChange={(e)=>handleRecycledChange(idx,'uom',e.target.value)}
                                                     disabled={isManager}
                                                 >
@@ -2701,6 +2743,272 @@ const ProductCompliance = ({
                         </table>
                     </div>
                 </div>
+                </div>
+                )}
+
+                {subTab === 'supplier-cto-check' && (
+                <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-4">
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider border-b pb-2 border-primary-100 flex items-center gap-2">
+                                <span className="bg-primary-50 text-primary-700 p-1.5 rounded-md"><HistoryOutlined /></span>
+                                Supplier CTO Check
+                            </h3>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
+                        <table className="min-w-full text-xs divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                        Supplier Name
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                        Supplier Status
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                        Registration Status
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                        EPR Certificate Number
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                        CTO Av/NA
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                        CTO Plant No
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                        CTO Plant Name
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                        CTO Start Date
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                        CTO Valid Upto
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                        Upload CTO/CCA
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                                        Action
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {(() => {
+                                    const rows = Array.isArray(supplierCtoRows) ? supplierCtoRows : [];
+                                    if (rows.length === 0) {
+                                        return (
+                                            <tr>
+                                                <td colSpan={11} className="px-3 py-4 text-center text-gray-400">
+                                                    No supplier CTO check rows available.
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
+
+                                    return rows.map((r, idx) => {
+                                        const row = r || {};
+                                        const supplierName = (row.supplierName || '').toString().trim();
+                                        const supplierMeta = supplierComplianceMeta.get(supplierName) || {};
+                                        const supplierStatus = (supplierMeta.supplierStatus || '').toString().trim();
+                                        const isRegisteredSupplier = supplierStatus === 'Registered';
+                                        const eprCertificateNumber = (supplierMeta.eprCertificateNumber || '').toString().trim();
+                                        const ctoAvailability = (row.ctoAvailability || 'Available').toString();
+                                        const registrationStatus = isRegisteredSupplier
+                                            ? 'Approved'
+                                            : ['Approved', 'In Progress', 'Pending'].includes((row.registrationStatus || '').toString())
+                                                ? (row.registrationStatus || '').toString()
+                                                : 'Pending';
+                                        const isCtoNotAvailable = ctoAvailability === 'Not Available';
+
+                                        const uploadDoc = async (file) => {
+                                            try {
+                                                const form = new FormData();
+                                                form.append('document', file);
+                                                form.append('type', type);
+                                                form.append('itemId', itemId);
+                                                form.append('rowIndex', String(idx));
+                                                form.append('supplierName', (row.supplierName || '').toString());
+                                                const res = await api.post(API_ENDPOINTS.CLIENT.SUPPLIER_CTO_CHECK_UPLOAD(clientId), form, {
+                                                    headers: { 'Content-Type': 'multipart/form-data' }
+                                                });
+                                                const urlDirect = res.data?.data?.url || res.data?.data?.data?.url || '';
+                                                const serverRows = res.data?.data?.rows;
+                                                const urlFromRows =
+                                                    Array.isArray(serverRows) && serverRows[idx]
+                                                        ? (serverRows[idx]?.ctoCcaDocument || '').toString()
+                                                        : '';
+                                                const url = (urlFromRows || urlDirect || '').toString();
+
+                                                if (url) {
+                                                    handleSupplierCtoChange && handleSupplierCtoChange(idx, 'ctoCcaDocument', url);
+                                                    notify('success', 'Document uploaded');
+                                                } else {
+                                                    notify('error', 'Upload failed');
+                                                }
+                                            } catch (e) {
+                                                notify('error', e.response?.data?.message || 'Upload failed');
+                                            }
+                                        };
+
+                                        return (
+                                            <tr key={row?._id || idx} className="hover:bg-gray-50">
+                                                <td className="px-3 py-2">
+                                                    <span className="text-gray-800 font-semibold whitespace-nowrap">
+                                                        {supplierName || '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold whitespace-nowrap ${
+                                                        supplierStatus === 'Registered'
+                                                            ? 'bg-green-50 text-green-700'
+                                                            : supplierStatus === 'Unregistered'
+                                                                ? 'bg-amber-50 text-amber-700'
+                                                                : 'bg-gray-100 text-gray-500'
+                                                    }`}>
+                                                        {supplierStatus || '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    {isManager || isRegisteredSupplier ? (
+                                                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold whitespace-nowrap ${
+                                                            registrationStatus === 'Approved'
+                                                                ? 'bg-green-50 text-green-700'
+                                                                : registrationStatus === 'In Progress'
+                                                                    ? 'bg-blue-50 text-blue-700'
+                                                                    : 'bg-amber-50 text-amber-700'
+                                                        }`}>
+                                                            {registrationStatus}
+                                                        </span>
+                                                    ) : (
+                                                        <Select
+                                                            size="small"
+                                                            value={registrationStatus}
+                                                            onChange={(val) => handleSupplierCtoChange && handleSupplierCtoChange(idx, 'registrationStatus', val)}
+                                                            className="w-[150px]"
+                                                        >
+                                                            <Select.Option value="Approved">Approved</Select.Option>
+                                                            <Select.Option value="In Progress">In Progress</Select.Option>
+                                                            <Select.Option value="Pending">Pending</Select.Option>
+                                                        </Select>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <span className="text-gray-700 whitespace-nowrap">
+                                                        {eprCertificateNumber || '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    {isManager ? (
+                                                        <span className="text-gray-800 whitespace-nowrap">{ctoAvailability}</span>
+                                                    ) : (
+                                                        <Select
+                                                            size="small"
+                                                            value={ctoAvailability}
+                                                            onChange={(val) => handleSupplierCtoChange && handleSupplierCtoChange(idx, 'ctoAvailability', val)}
+                                                            className="w-[140px]"
+                                                        >
+                                                            <Select.Option value="Available">Available</Select.Option>
+                                                            <Select.Option value="Not Available">Not Available</Select.Option>
+                                                        </Select>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input
+                                                        value={(row.ctoPlantNo || '').toString()}
+                                                        onChange={(e) => handleSupplierCtoChange && handleSupplierCtoChange(idx, 'ctoPlantNo', e.target.value)}
+                                                        disabled={isManager || isCtoNotAvailable}
+                                                        className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input
+                                                        value={(row.ctoPlantName || '').toString()}
+                                                        onChange={(e) => handleSupplierCtoChange && handleSupplierCtoChange(idx, 'ctoPlantName', e.target.value)}
+                                                        disabled={isManager || isCtoNotAvailable}
+                                                        className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input
+                                                        type="date"
+                                                        value={(row.ctoStartDate || '').toString()}
+                                                        onChange={(e) => handleSupplierCtoChange && handleSupplierCtoChange(idx, 'ctoStartDate', e.target.value)}
+                                                        disabled={isManager || isCtoNotAvailable}
+                                                        className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <input
+                                                        type="date"
+                                                        value={(row.ctoValidUpto || '').toString()}
+                                                        onChange={(e) => handleSupplierCtoChange && handleSupplierCtoChange(idx, 'ctoValidUpto', e.target.value)}
+                                                        disabled={isManager || isCtoNotAvailable}
+                                                        className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <div className="flex items-center gap-2">
+                                                        {!isManager && !isCtoNotAvailable && (
+                                                            <Upload
+                                                                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                                                showUploadList={false}
+                                                                customRequest={async ({ file, onSuccess, onError }) => {
+                                                                    try {
+                                                                        await uploadDoc(file);
+                                                                        onSuccess && onSuccess('ok');
+                                                                    } catch (err) {
+                                                                        onError && onError(err);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Button size="small" icon={<UploadOutlined />}>
+                                                                    Upload
+                                                                </Button>
+                                                            </Upload>
+                                                        )}
+                                                        {row.ctoCcaDocument ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const url = resolveUrl ? resolveUrl(row.ctoCcaDocument) : row.ctoCcaDocument;
+                                                                    if (url) {
+                                                                        setViewerUrl(url);
+                                                                        setViewerName('CTO/CCA Document');
+                                                                        setViewerOpen(true);
+                                                                    }
+                                                                }}
+                                                                className="text-xs text-primary-700 font-semibold underline"
+                                                            >
+                                                                View
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400">No file</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    {!isManager && (
+                                                        <Button
+                                                            size="small"
+                                                            type="primary"
+                                                            icon={savingSupplierCtoRow === idx ? <LoadingOutlined /> : <SaveOutlined />}
+                                                            onClick={() => saveSupplierCtoRow && saveSupplierCtoRow(idx)}
+                                                            disabled={savingSupplierCtoRow === idx}
+                                                        >
+                                                            Save
+                                                        </Button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    });
+                                })()}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
                 )}
 

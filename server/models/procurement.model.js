@@ -17,7 +17,7 @@ const procurementSchema = new mongoose.Schema({
     plasticMaterialType: { type: String, default: "" },
     categoryOfPlastic: { type: String, default: "" },
     financialYear: { type: String, default: "" },
-    dateOfInvoice: { type: String, default: "" },
+    dateOfInvoice: { type: Date, default: null },
     quantityTPA: { type: Number, default: 0 },
     recycledPlasticPercent: { type: Number, default: 0 },
     gstNumber: { type: String, default: "" },
@@ -30,5 +30,8 @@ const procurementSchema = new mongoose.Schema({
     
     importedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
 }, { timestamps: true });
+
+procurementSchema.index({ client: 1, type: 1, itemId: 1 }, { name: 'idx_procurement_scope' });
+procurementSchema.index({ client: 1, createdAt: -1 }, { name: 'idx_procurement_client_created_at' });
 
 export default mongoose.model("Procurement", procurementSchema);

@@ -1,18 +1,34 @@
-import axios from 'axios';
-import { API_ENDPOINTS } from './apiEndpoints';
+import axios from "axios";
+import { API_ENDPOINTS } from "./apiEndpoints";
 
-const API_URL = import.meta.env.VITE_API_URL || '';
+export const API_URL = import.meta.env.VITE_API_URL || "";
+
+const getCookieValue = (name) => {
+  if (typeof document === "undefined") return null;
+  const cookies = document.cookie.split("; ");
+
+  for (const cookie of cookies) {
+    const [cookieName, ...valueParts] = cookie.split("=");
+
+    if (cookieName === name) {
+      return decodeURIComponent(valueParts.join("="));
+    }
+  }
+
+  return null;
+};
 
 const api = axios.create({
   baseURL: API_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
   withCredentials: true,
 });
 
 let isRefreshing = false;
 let refreshPromise = null;
+let inMemoryAccessToken = null;
 
 // Variables to hold store and actions injected from main entry point
 let store = null;
@@ -23,17 +39,26 @@ export const setupInterceptors = (_store, _logoutAction) => {
   logoutAction = _logoutAction;
 };
 
+export const setAccessToken = (token) => {
+  inMemoryAccessToken = token || null;
+};
+
+export const clearAccessToken = () => {
+  inMemoryAccessToken = null;
+};
+
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const next = config || {};
+    next.withCredentials = true;
+    next.headers = next.headers || {};
+    const token = inMemoryAccessToken || getCookieValue("accessToken");
+    if (token && !next.headers.Authorization && !next.headers.authorization) {
+      next.headers.Authorization = `Bearer ${token}`;
     }
-    return config;
+    return next;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error),
 );
 
 api.interceptors.response.use(
@@ -43,7 +68,7 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     if (status === 401 && originalRequest && !originalRequest._retry) {
-      const url = originalRequest.url || '';
+      const url = originalRequest.url || "";
       if (
         !url.includes(API_ENDPOINTS.AUTH.LOGIN) &&
         !url.includes(API_ENDPOINTS.AUTH.VERIFY_OTP) &&
@@ -59,26 +84,27 @@ api.interceptors.response.use(
           refreshPromise = api
             .post(API_ENDPOINTS.AUTH.REFRESH_TOKEN)
             .then((res) => {
-              if (res.data?.success && res.data.data?.accessToken) {
-                localStorage.setItem('accessToken', res.data.data.accessToken);
+              if (res.data?.success) {
+                if (res.data?.data?.accessToken) {
+                  setAccessToken(res.data.data.accessToken);
+                }
+                return;
               } else {
-                throw new Error('Failed to refresh session');
+                throw new Error("Failed to refresh session");
               }
             })
             .catch((refreshError) => {
               // Session expired
-              localStorage.removeItem('accessToken');
-              
               if (store && logoutAction) {
                 store.dispatch(logoutAction());
                 // The router (PrivateRoute) will handle the redirection to login
-                // We can dispatch a toast/notification here if needed, 
+                // We can dispatch a toast/notification here if needed,
                 // but usually the logout action or the UI handles "You have been logged out"
               } else {
                 // Fallback if store not injected
-                window.location.href = '/login';
+                window.location.href = "/login";
               }
-              
+
               throw refreshError;
             })
             .finally(() => {
@@ -87,11 +113,6 @@ api.interceptors.response.use(
         }
 
         return refreshPromise.then(() => {
-          const token = localStorage.getItem('accessToken');
-          if (token) {
-            originalRequest.headers = originalRequest.headers || {};
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-          }
           return api(originalRequest);
         });
       }
@@ -99,24 +120,21 @@ api.interceptors.response.use(
 
     if (status === 401) {
       // If 401 happens on a non-refreshable endpoint (or after failed refresh)
-      localStorage.removeItem('accessToken');
-      
       if (store && logoutAction) {
-         // Avoid dispatching logout multiple times if already logging out? 
-         // Redux state update is cheap enough.
-         // Check if user is already null to avoid loop?
-         const state = store.getState();
-         if (state.auth.user) {
-             toast.error('Session expired. Please login again.');
-             store.dispatch(logoutAction());
-         }
+        // Avoid dispatching logout multiple times if already logging out?
+        // Redux state update is cheap enough.
+        // Check if user is already null to avoid loop?
+        const state = store.getState();
+        if (state.auth.user) {
+          store.dispatch(logoutAction());
+        }
       } else {
-         window.location.href = '/login';
+        window.location.href = "/login";
       }
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

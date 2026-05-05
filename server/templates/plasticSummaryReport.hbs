@@ -109,6 +109,15 @@
             color: #374151;
             font-size: 11px;
         }
+        .toc-subitem {
+            padding: 4px 0 4px 18px;
+            border-bottom: 1px dashed #bbf7d0;
+            color: #475569;
+            font-size: 10px;
+        }
+        .toc-subitem:last-child {
+            border-bottom: none;
+        }
         .toc-item:last-child {
             border-bottom: none;
         }
@@ -280,6 +289,151 @@
             font-weight: 800;
             border-bottom: 1px solid #86efac;
         }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 14px;
+            align-items: start;
+        }
+        .chart-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 12px 14px;
+            background: #fff;
+        }
+        .chart-title {
+            font-weight: 800;
+            color: #111827;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        .donut {
+            width: 210px;
+            height: 210px;
+            border-radius: 999px;
+            background: var(--donut-gradient, conic-gradient(#94a3b8 0 100%));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+        }
+        .donut-inner {
+            width: 136px;
+            height: 136px;
+            border-radius: 999px;
+            background: #fff;
+            box-shadow: inset 0 0 0 1px #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .donut-pct {
+            font-size: 22px;
+            font-weight: 900;
+            color: #111827;
+            line-height: 1;
+        }
+        .donut-label {
+            margin-top: 4px;
+            font-size: 10px;
+            font-weight: 800;
+            color: #6b7280;
+            letter-spacing: 0.3px;
+        }
+        .legend {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 6px;
+            margin-top: 10px;
+            font-size: 10px;
+            color: #374151;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .industry-bars {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        .bar-row {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+            padding: 8px 10px;
+        }
+        .bar-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 7px;
+        }
+        .bar-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #111827;
+            max-width: 70%;
+        }
+        .bar-stack {
+            height: 12px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: #e2e8f0;
+            display: flex;
+        }
+        .bar-seg {
+            height: 100%;
+        }
+        .bar-seg.compliant { background: #16a34a; }
+        .bar-seg.non-compliant { background: #f97316; }
+        .bar-seg.other { background: #94a3b8; }
+        .bar-total {
+            font-size: 9px;
+            font-weight: 800;
+            color: #334155;
+            white-space: nowrap;
+        }
+        .bar-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 7px;
+        }
+        .meta-pill {
+            font-size: 9px;
+            font-weight: 700;
+            border-radius: 999px;
+            padding: 2px 8px;
+            border: 1px solid transparent;
+        }
+        .meta-pill.compliant {
+            color: #166534;
+            background: #dcfce7;
+            border-color: #86efac;
+        }
+        .meta-pill.non-compliant {
+            color: #9a3412;
+            background: #ffedd5;
+            border-color: #fdba74;
+        }
+        .meta-pill.other {
+            color: #334155;
+            background: #e2e8f0;
+            border-color: #cbd5e1;
+        }
     </style>
 </head>
 <body>
@@ -313,15 +467,16 @@
 
             <div class="toc-box">
                 <div class="toc-heading">Index</div>
-                <div class="toc-item">1. Client Information</div>
-                <div class="toc-item">2. Address Details</div>
-                <div class="toc-item">3. MSME Details</div>
-                <div class="toc-item">4. Company Documents</div>
-                <div class="toc-item">5. CTE &amp; CTO Details</div>
-                <div class="toc-item">6. Industry Category Summary</div>
-                <div class="toc-item">7. Summary Report of Industry, SKU Wise</div>
-                <div class="toc-item">8. Annual Summary</div>
-                <div class="toc-item">9. EPR Target Calculation</div>
+                <div class="toc-item">1. Company Info</div>
+                <div class="toc-subitem">▸ 1.1 Company Basic Info</div>
+                <div class="toc-subitem">▸ 1.2 Address Details</div>
+                <div class="toc-subitem">▸ 1.3 MSME Details</div>
+                <div class="toc-subitem">▸ 1.4 Company Documents</div>
+                <div class="toc-subitem">▸ 1.5 CTO Details</div>
+                <div class="toc-item">2. Compliance Overview</div>
+                <div class="toc-item">3. Summary Report of Industry, SKU Wise</div>
+                <div class="toc-item">4. Annual Summary</div>
+                <div class="toc-item">5. EPR Target Calculation</div>
             </div>
         </div>
 
@@ -342,7 +497,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">1. Client Information</div>
+            <div class="section-title">1.1 Company Basic Info</div>
             <div class="grid-2">
                 <table>
                     <tr><th style="width: 34%;">Client Name</th><td class="left">{{basicInfo.clientName}}</td></tr>
@@ -362,7 +517,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">2. Address Details</div>
+            <div class="section-title">1.2 Address Details</div>
             <div class="grid-2">
                 <div class="card">
                     <div class="card-label">Registered Address</div>
@@ -376,7 +531,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">3. MSME Details</div>
+            <div class="section-title">1.3 MSME Details</div>
             <div class="grid-3">
                 <div class="card">
                     <div class="card-label">Status</div>
@@ -405,7 +560,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">4. Company Documents</div>
+            <div class="section-title">1.4 Company Documents</div>
             {{#if companyDocuments.length}}
             <table>
                 <thead>
@@ -433,7 +588,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">5. CTE &amp; CTO Details</div>
+            <div class="section-title">1.5 CTO Details</div>
             {{#if plants.length}}
                 {{#each plants}}
                 <div class="plant-box">
@@ -460,6 +615,34 @@
                                     <td>{{this.validUpto}}</td>
                                     <td>{{this.location}}</td>
                                     <td class="left">{{this.address}}</td>
+                                    <td class="left">{{this.remark}}</td>
+                                </tr>
+                                {{/each}}
+                            </tbody>
+                        </table>
+                        {{/if}}
+
+                        {{#if this.cteProduction.length}}
+                        <div class="subheading">CTE Production Capacity</div>
+                        <table style="margin-bottom: 12px;">
+                            <thead>
+                                <tr>
+                                    <th>SR No</th>
+                                    <th>Product Name</th>
+                                    <th>Max Capacity/Year</th>
+                                    <th>UOM</th>
+                                    <th>Status</th>
+                                    <th>Remark</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{#each this.cteProduction}}
+                                <tr>
+                                    <td>{{this.sr}}</td>
+                                    <td class="left">{{this.productName}}</td>
+                                    <td>{{this.maxCapacityPerYear}}</td>
+                                    <td>{{this.uom}}</td>
+                                    <td>{{this.status}}</td>
                                     <td class="left">{{this.remark}}</td>
                                 </tr>
                                 {{/each}}
@@ -498,6 +681,34 @@
                             </tbody>
                         </table>
                         {{/if}}
+
+                        {{#if this.ctoProducts.length}}
+                        <div class="subheading">CTO/CCA Products</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>SR No</th>
+                                    <th>Product Name</th>
+                                    <th>Quantity</th>
+                                    <th>UOM</th>
+                                    <th>Status</th>
+                                    <th>Remark</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{#each this.ctoProducts}}
+                                <tr>
+                                    <td>{{this.sr}}</td>
+                                    <td class="left">{{this.productName}}</td>
+                                    <td>{{this.quantity}}</td>
+                                    <td>{{this.uom}}</td>
+                                    <td>{{this.status}}</td>
+                                    <td class="left">{{this.remark}}</td>
+                                </tr>
+                                {{/each}}
+                            </tbody>
+                        </table>
+                        {{/if}}
                     </div>
                 </div>
                 {{/each}}
@@ -506,6 +717,68 @@
             {{/if}}
         </div>
     </div>
+
+    <div class="page-break"></div>
+    {{#if complianceOverview}}
+    <div class="report-page">
+        <div class="report-header">
+            {{#if logoBase64}}
+            <img src="{{logoBase64}}" alt="AnantTattva Logo" class="header-logo" />
+            {{/if}}
+            <div class="report-title-main">Compliance Overview</div>
+            <div class="report-subtitle">Overall and Industry-wise SKU compliance snapshot</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">2. Compliance Overview</div>
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">Overall SKU Compliance</div>
+                    <div class="donut" style="--donut-gradient: {{complianceOverview.donutGradient}};">
+                        <div class="donut-inner">
+                            <div class="donut-pct">{{complianceOverview.compliantPct}}%</div>
+                            <div class="donut-label">Compliant</div>
+                        </div>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item"><span class="swatch" style="background:#16a34a;"></span>Compliant: {{complianceOverview.compliant}} ({{complianceOverview.compliantPct}}%)</div>
+                        <div class="legend-item"><span class="swatch" style="background:#f97316;"></span>Non-Compliant: {{complianceOverview.nonCompliant}} ({{complianceOverview.nonCompliantPct}}%)</div>
+                        <div class="legend-item"><span class="swatch" style="background:#94a3b8;"></span>Pending/Other: {{complianceOverview.other}} ({{complianceOverview.otherPct}}%)</div>
+                        <div class="legend-item"><span class="swatch" style="background:#111827;"></span>Total SKU: {{complianceOverview.totalSku}}</div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-title">Industry Wise Compliance</div>
+                    {{#if industryComplianceBarData.length}}
+                    <div class="industry-bars">
+                        {{#each industryComplianceBarData}}
+                        <div class="bar-row">
+                            <div class="bar-head">
+                                <div class="bar-label" title="{{this.industry}}">{{this.industry}}</div>
+                                <div class="bar-total">Total: {{this.total}} SKU</div>
+                            </div>
+                            <div class="bar-stack">
+                                <div class="bar-seg compliant" style="width: {{this.compliantPct}}%;"></div>
+                                <div class="bar-seg non-compliant" style="width: {{this.nonCompliantPct}}%;"></div>
+                                <div class="bar-seg other" style="width: {{this.otherPct}}%;"></div>
+                            </div>
+                            <div class="bar-meta">
+                                <span class="meta-pill compliant">Compliant: {{this.compliant}} ({{this.compliantPct}}%)</span>
+                                <span class="meta-pill non-compliant">Non-Compliant: {{this.nonCompliant}} ({{this.nonCompliantPct}}%)</span>
+                                <span class="meta-pill other">Pending/Other: {{this.other}} ({{this.otherPct}}%)</span>
+                            </div>
+                        </div>
+                        {{/each}}
+                    </div>
+                    {{else}}
+                    <div class="card muted">No industry compliance data available.</div>
+                    {{/if}}
+                </div>
+            </div>
+        </div>
+    </div>
+    {{/if}}
 
     <div class="page-break"></div>
     <div class="report-page">
@@ -518,7 +791,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">6. Industry Category Summary</div>
+            <div class="section-title">3.1 Industry Category Summary</div>
             {{#if industryCategorySummaryReport.length}}
             <table>
                 <thead>
@@ -554,7 +827,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">7. Summary Report of Industry, SKU Wise</div>
+            <div class="section-title">3.2 Summary Report of Industry, SKU Wise</div>
             {{#if industrySkuSummaryReport.length}}
             <table>
                 <thead>
@@ -564,6 +837,7 @@
                         <th rowspan="2" style="width: 14%;">Marking and Labeling Status</th>
                         <th colspan="2" style="width: 16%;">Supplier Status</th>
                         <th rowspan="2">Remarks</th>
+                        <th rowspan="2">Solution</th>
                     </tr>
                     <tr>
                         <th>Registered</th>
@@ -573,7 +847,7 @@
                 <tbody>
                     {{#each industrySkuSummaryReport}}
                     <tr class="industry-group">
-                        <td colspan="6">{{this.name}}</td>
+                        <td colspan="7">{{this.name}}</td>
                     </tr>
                     {{#each this.rows}}
                     <tr>
@@ -594,6 +868,7 @@
                         <td>{{this.supplierRegisteredCount}}</td>
                         <td>{{this.supplierUnregisteredCount}}</td>
                         <td class="left" style="white-space: pre-wrap;">{{this.remarks}}</td>
+                        <td class="left" style="white-space: pre-wrap;">{{this.solution}}</td>
                     </tr>
                     {{/each}}
                     {{/each}}
@@ -604,6 +879,85 @@
             {{/if}}
         </div>
     </div>
+
+    {{#if supplierCtoTable.length}}
+    <div class="page-break"></div>
+    <div class="report-page">
+        <div class="report-header">
+            {{#if logoBase64}}
+            <img src="{{logoBase64}}" alt="AnantTattva Logo" class="header-logo" />
+            {{/if}}
+            <div class="report-title-main">Supplier CTO Summary</div>
+            <div class="report-subtitle">Registration Stage and CTO Check Details</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">3.3 Supplier CTO Summary</div>
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-label">Total Supplier CTO</div>
+                    <div class="card-value">{{supplierCtoSummary.total}}</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">Approved</div>
+                    <div class="card-value">{{supplierCtoSummary.approved}}</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">In Progress</div>
+                    <div class="card-value">{{supplierCtoSummary.inProgress}}</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">Pending</div>
+                    <div class="card-value">{{supplierCtoSummary.pending}}</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">CTO Available</div>
+                    <div class="card-value">{{supplierCtoSummary.available}}</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">CTO Uploaded</div>
+                    <div class="card-value">{{supplierCtoSummary.documentUploaded}}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">3.4 Supplier CTO Check Table</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Supplier Name</th>
+                        <th>Supplier Status</th>
+                        <th>Registration Status</th>
+                        <th>EPR Certificate Number</th>
+                        <th>CTO Av/NA</th>
+                        <th>CTO Plant No</th>
+                        <th>CTO Plant Name</th>
+                        <th>CTO Start Date</th>
+                        <th>CTO Valid Upto</th>
+                        <th>CTO/CCA Document</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each supplierCtoTable}}
+                    <tr>
+                        <td class="left">{{this.supplierName}}</td>
+                        <td>{{this.supplierStatus}}</td>
+                        <td>{{this.registrationStatus}}</td>
+                        <td>{{this.eprCertificateNumber}}</td>
+                        <td>{{this.ctoAvailability}}</td>
+                        <td>{{this.ctoPlantNo}}</td>
+                        <td class="left">{{this.ctoPlantName}}</td>
+                        <td>{{this.ctoStartDate}}</td>
+                        <td>{{this.ctoValidUpto}}</td>
+                        <td>{{this.ctoCcaDocumentStatus}}</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {{/if}}
 
     <div class="page-break"></div>
     <div class="report-page">
@@ -616,7 +970,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">8. Annual Summary</div>
+            <div class="section-title">4. Annual Summary</div>
             {{#if annualTargetSummaryReport.length}}
             <table>
                 <thead>
@@ -644,7 +998,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">9. EPR Target Calculation</div>
+            <div class="section-title">5. EPR Target Calculation</div>
             {{#if targetTables.length}}
                 {{#each targetTables}}
                 <div class="target-card">

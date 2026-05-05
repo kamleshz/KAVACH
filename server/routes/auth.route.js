@@ -13,7 +13,7 @@ import {
     refreshTokenController
 } from '../controllers/auth.controller.js';
 import { auth } from '../middleware/auth.js';
-import { authLimiter } from '../middleware/rateLimiter.js';
+import { authAccountLimiter, authLimiter } from '../middleware/rateLimiter.js';
 import { validate } from '../middleware/validate.js';
 import { 
     registerSchema, 
@@ -29,7 +29,7 @@ const router = express.Router();
 router.post('/register', authLimiter, validate(registerSchema), registerController);
 router.post('/verify-email', authLimiter, validate(verifyEmailSchema), verifyEmailController);
 router.post('/resend-verify-email-otp', authLimiter, validate(emailOnlySchema), resendVerifyEmailOtpController);
-router.post('/login', authLimiter, validate(loginSchema), loginController);
+router.post('/login', authLimiter, authAccountLimiter, validate(loginSchema), loginController);
 router.post('/verify-login-otp', authLimiter, validate(verifyLoginOtpSchema), verifyLoginOtpController);
 router.post('/refresh-token', authLimiter, refreshTokenController);
 router.post('/logout', auth, logoutController);

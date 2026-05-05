@@ -1,15 +1,24 @@
 {
   "name": "eprkavach-monorepo",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "npm --prefix client-react run dev",
-    "build": "npm --prefix client-react run build",
+    "build": "npm run build:server && npm --prefix client-react run build",
+    "build:server": "npm --prefix server run build",
     "preview": "npm --prefix client-react run preview",
-    "postinstall": "npm --prefix client-react install"
+    "lint": "eslint \"server/**/*.js\" \"client-react/src/**/*.{js,jsx}\" --ignore-pattern \"client-react/src/features/plantProcess/hooks/usePlantProcessState.js\"",
+    "format:check": "prettier --check \"server/config/**/*.js\" \"server/middleware/**/*.js\" \"server/queues/**/*.js\" \"server/services/**/*.js\" \"server/utils/**/*.js\" \"server/workers/**/*.js\" \"server/controllers/analysis.controller.js\" \"server/controllers/client.controller.js\" \"server/controllers/user.controller.js\" \"server/routes/analysis.route.js\" \"server/routes/report.route.js\" \"server/index.js\" \"client-react/src/hooks/queries/**/*.js\" \"client-react/src/services/**/*.js\" \"client-react/src/pages/{Dashboard.jsx,ClientConnect.jsx,ClientConnectDetail.jsx,ClientDetail.jsx,PlantProcess.jsx}\" \"client-react/src/features/clientDetail/components/**/*.jsx\" \"client-react/src/features/plantProcess/components/{SummaryReport.jsx,ProcessTable.jsx,SupplierCompliance.jsx,ProcurementPanel.jsx,PlasticAnalysisPanel.jsx}\" \"client-react/src/components/AddClientSteps/PostAuditCheck.jsx\" \".github/workflows/build.yml\" \"eslint.config.js\"",
+    "smoke": "npm --prefix server run smoke",
+    "postinstall": "npm --prefix server install && npm --prefix client-react install"
   },
   "devDependencies": {
+    "@eslint/js": "^9.38.0",
+    "eslint": "^9.38.0",
+    "globals": "^16.4.0",
     "autoprefixer": "^10.4.23",
     "postcss": "^8.5.6",
+    "prettier": "^3.6.2",
     "tailwindcss": "^4.1.18",
     "vite": "^7.3.0"
   },

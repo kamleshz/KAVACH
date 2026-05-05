@@ -1,12 +1,17 @@
 import { useEffect, useState, useRef } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Breadcrumbs from '../components/Breadcrumbs';
+import GsapRevealGroup from '../components/GsapRevealGroup';
+import GsapFloatingPanel from '../components/GsapFloatingPanel';
+import GsapPageTransition from '../components/GsapPageTransition';
 import useAuth from '../hooks/useAuth';
 import useOnClickOutside from '../hooks/useOnClickOutside';
 import { UserOutlined, DownOutlined, LogoutOutlined, BellOutlined } from '@ant-design/icons';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
+
+const UNREAD_COUNT_POLL_MS = 60 * 1000;
 
 const DashboardLayout = () => {
   const [showDropdown, setShowDropdown] = useState(false);
@@ -16,16 +21,31 @@ const DashboardLayout = () => {
   const [notifications, setNotifications] = useState([]);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const dropdownRef = useRef(null);
   const notificationRef = useRef(null);
+  const unreadCountRetryAfterRef = useRef(0);
 
   useOnClickOutside(dropdownRef, () => setShowDropdown(false));
   useOnClickOutside(notificationRef, () => setShowNotifications(false));
 
   const fetchUnreadCount = async () => {
-    const response = await api.get(API_ENDPOINTS.NOTIFICATION.UNREAD_COUNT);
-    if (response.data?.success) {
-      setUnreadCount(Number(response.data?.data?.count) || 0);
+    const now = Date.now();
+    if (unreadCountRetryAfterRef.current > now) return;
+
+    try {
+      const response = await api.get(API_ENDPOINTS.NOTIFICATION.UNREAD_COUNT);
+      unreadCountRetryAfterRef.current = 0;
+      if (response.data?.success) {
+        setUnreadCount(Number(response.data?.data?.count) || 0);
+      }
+    } catch (error) {
+      if (error?.response?.status === 429) {
+        const retryAfterSeconds = Number(error?.response?.headers?.['retry-after']) || 60;
+        unreadCountRetryAfterRef.current = Date.now() + retryAfterSeconds * 1000;
+        return;
+      }
+      throw error;
     }
   };
 
@@ -41,15 +61,18 @@ const DashboardLayout = () => {
 
     (async () => {
       try {
-        await fetchUnreadCount();
+        if (document.visibilityState === 'visible') {
+          await fetchUnreadCount();
+        }
       } catch {
         setUnreadCount(0);
       }
     })();
 
     interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       fetchUnreadCount().catch(() => {});
-    }, 30000);
+    }, UNREAD_COUNT_POLL_MS);
 
     return () => clearInterval(interval);
   }, []);
@@ -67,26 +90,30 @@ const DashboardLayout = () => {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <div className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-gray-200 bg-white/90 px-4 backdrop-blur-md md:px-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M12 2l8 4v6c0 7-8 10-8 10S4 19 4 12V6l8-4z" />
-            </svg>
-          </div>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold text-gray-900">EPR Kavach</div>
-            <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-gray-500">
-              Audit Platform
+        <GsapRevealGroup
+          className="flex w-full items-center justify-between"
+          animateKey="dashboard-layout-header"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M12 2l8 4v6c0 7-8 10-8 10S4 19 4 12V6l8-4z" />
+              </svg>
+            </div>
+            <div className="leading-tight">
+              <div className="text-sm font-semibold text-gray-900">EPR Kavach</div>
+              <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-gray-500">
+                Audit Platform
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2">
           <div className="relative" ref={notificationRef}>
             <button
               type="button"
@@ -103,7 +130,10 @@ const DashboardLayout = () => {
             </button>
 
             {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl">
+              <GsapFloatingPanel
+                animateKey={`notifications-${notifications.length}-${unreadCount}`}
+                className="absolute right-0 mt-2 w-80 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl"
+              >
                 <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
                   <p className="text-sm font-semibold text-gray-900">Notifications</p>
                   <button
@@ -173,7 +203,7 @@ const DashboardLayout = () => {
                     })
                   )}
                 </div>
-              </div>
+              </GsapFloatingPanel>
             )}
           </div>
 
@@ -197,7 +227,10 @@ const DashboardLayout = () => {
             </button>
 
             {showDropdown && (
-              <div className="absolute right-0 mt-2 w-64 rounded-xl border border-gray-100 bg-white py-2 shadow-xl">
+              <GsapFloatingPanel
+                animateKey={`user-dropdown-${showDropdown}`}
+                className="absolute right-0 mt-2 w-64 rounded-xl border border-gray-100 bg-white py-2 shadow-xl"
+              >
                 <div className="border-b border-gray-100 px-4 py-3">
                   <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
                   <p className="text-xs text-gray-500">{user?.email}</p>
@@ -244,10 +277,11 @@ const DashboardLayout = () => {
                     <p className="text-xs text-gray-500">Sign out of your account</p>
                   </div>
                 </button>
-              </div>
+              </GsapFloatingPanel>
             )}
           </div>
-        </div>
+          </div>
+        </GsapRevealGroup>
       </div>
 
       <div className="flex pt-16 h-screen overflow-hidden">
@@ -264,7 +298,9 @@ const DashboardLayout = () => {
 
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
           <Breadcrumbs />
-          <Outlet />
+          <GsapPageTransition transitionKey={location.pathname} className="min-h-[calc(100vh-7rem)]">
+            <Outlet />
+          </GsapPageTransition>
         </div>
       </div>
     </div>

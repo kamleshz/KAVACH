@@ -144,7 +144,13 @@ const productionFacilitySchema = new mongoose.Schema({
             supplierStatus: { type: String, default: "" },
             foodGrade: { type: String, default: "" },
             eprCertificateNumber: { type: String, default: "" },
-            fssaiLicNo: { type: String, default: "" }
+            fssaiLicNo: { type: String, default: "" },
+            fssaiValidUpto: { type: String, default: "" },
+            ctoPlantNo: { type: String, default: "" },
+            ctoPlantName: { type: String, default: "" },
+            ctoStartDate: { type: String, default: "" },
+            ctoValidUpto: { type: String, default: "" },
+            ctoCcaDocument: { type: String, default: "" }
         }],
         productRecycledQuantity: [{
             systemCode: { type: String, default: "" },

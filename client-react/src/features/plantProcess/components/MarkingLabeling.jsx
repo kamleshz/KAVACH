@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Table, Modal, Upload } from 'antd';
+import { Button, Table, Modal, Upload } from 'antd';
 import { FaSave } from 'react-icons/fa';
 import { PlusOutlined } from '@ant-design/icons';
 import useSkuCompliance from '../../../hooks/useSkuCompliance';

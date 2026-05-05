@@ -1,5 +1,5 @@
 export const verifyEmailTemplate = ({ name, otp }) => {
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -49,7 +49,7 @@ export const verifyEmailTemplate = ({ name, otp }) => {
 };
 
 export const loginOtpTemplate = ({ name, otp }) => {
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -99,7 +99,7 @@ export const loginOtpTemplate = ({ name, otp }) => {
 };
 
 export const forgotPasswordTemplate = ({ name, otp }) => {
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>

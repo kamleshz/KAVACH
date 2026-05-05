@@ -1,227 +1,366 @@
-import fs from 'fs';
-import path from 'path';
-import AnalysisService from '../services/analysis.service.js';
+import fs from "fs";
+import path from "path";
+import AnalysisService from "../services/analysis.service.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import PdfService from "../services/pdf.service.js";
+import CacheService from "../services/cache.service.js";
+import PlasticAnalysisModel from "../models/plasticAnalysis.model.js";
+
+const ANALYSIS_CACHE_PREFIX = "analysis:";
+const makeAnalysisCacheKey = (scope, clientId, type, itemId) =>
+  `${ANALYSIS_CACHE_PREFIX}${scope}:${clientId}:${type}:${itemId}`;
 
 export const analyzePlasticPrePost = async (req, res) => {
-    try {
-        if (!req.files || !req.files.salesFile) {
-            return res.status(400).json({ message: "At least 'salesFile' is required." });
-        }
-
-        const { clientId, type, itemId } = req.body;
-        
-        const salesFile = req.files.salesFile[0];
-        const purchaseFile = req.files.purchaseFile ? req.files.purchaseFile[0] : null;
-        const outputDir = path.join(process.cwd(), 'temp_analysis_output');
-
-        // Use Service Layer
-        const result = await AnalysisService.runPlasticAnalysis(
-            salesFile.path, 
-            purchaseFile ? purchaseFile.path : null, 
-            outputDir, 
-            { clientId, type, itemId }
-        );
-
-        // Cleanup input files
-        try {
-            fs.unlinkSync(salesFile.path);
-            if (purchaseFile) fs.unlinkSync(purchaseFile.path);
-        } catch (cleanupErr) {
-            console.error("Error cleaning up input files:", cleanupErr);
-        }
-
-        // Return the result
-        res.status(200).json({
-            success: true,
-            data: result.summary.portal_summary,
-            full_summary: result.summary,
-            output_file: result.output_file
-        });
-
-    } catch (error) {
-        console.error("Analysis Error:", error);
-        res.status(500).json({ message: error.message || "Error processing analysis files" });
+  try {
+    if (!req.files || !req.files.salesFile) {
+      return res
+        .status(400)
+        .json({ message: "At least 'salesFile' is required." });
     }
+
+    const { clientId, type, itemId } = req.body;
+
+    const salesFile = req.files.salesFile[0];
+    const purchaseFile = req.files.purchaseFile
+      ? req.files.purchaseFile[0]
+      : null;
+    const outputDir = path.join(process.cwd(), "temp_analysis_output");
+
+    // Use Service Layer
+    const result = await AnalysisService.runPlasticAnalysis(
+      salesFile.path,
+      purchaseFile ? purchaseFile.path : null,
+      outputDir,
+      { clientId, type, itemId },
+    );
+
+    // Cleanup input files
+    try {
+      fs.unlinkSync(salesFile.path);
+      if (purchaseFile) fs.unlinkSync(purchaseFile.path);
+    } catch (cleanupErr) {
+      console.error("Error cleaning up input files:", cleanupErr);
+    }
+
+    // Return the result
+    res.status(200).json({
+      success: true,
+      data: result.summary.portal_summary,
+      full_summary: result.summary,
+      output_file: result.output_file,
+    });
+
+    await CacheService.invalidateCache(
+      `${ANALYSIS_CACHE_PREFIX}plastic-prepost:${clientId}:${type}:${itemId}`,
+    );
+  } catch (error) {
+    console.error("Analysis Error:", error);
+    res
+      .status(500)
+      .json({ message: error.message || "Error processing analysis files" });
+  }
 };
 
 export const getPlasticAnalysisController = async (req, res) => {
-    try {
-        const { clientId } = req.params;
-        const { type, itemId } = req.query;
+  try {
+    const { clientId } = req.params;
+    const { type, itemId } = req.query;
+    const cacheKey = makeAnalysisCacheKey(
+      "plastic-prepost",
+      clientId,
+      type,
+      itemId,
+    );
+    const cached = await CacheService.getCache(cacheKey);
 
-        const analysisData = await AnalysisService.getPlasticAnalysis(clientId, type, itemId);
-
-        if (!analysisData) {
-            return res.status(200).json({
-                success: true,
-                data: null,
-                message: "No analysis data found"
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            ...analysisData
-        });
-
-    } catch (error) {
-        console.error("Get Analysis Error:", error);
-        res.status(500).json({ message: error.message || "Error fetching analysis data" });
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+        ...cached,
+        cached: true,
+      });
     }
+
+    const analysisData = await AnalysisService.getPlasticAnalysis(
+      clientId,
+      type,
+      itemId,
+    );
+
+    if (!analysisData) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "No analysis data found",
+      });
+    }
+
+    const payload = {
+      success: true,
+      ...analysisData,
+    };
+
+    await CacheService.setCache(cacheKey, payload, CacheService.ttl.analytics);
+    res.status(200).json(payload);
+  } catch (error) {
+    console.error("Get Analysis Error:", error);
+    res
+      .status(500)
+      .json({ message: error.message || "Error fetching analysis data" });
+  }
 };
 
 export const saveSalesAnalysisController = async (req, res) => {
-    try {
-        const { clientId, type, itemId, summary, rows, targetTables, preConsumerRows } = req.body;
+  try {
+    const {
+      clientId,
+      type,
+      itemId,
+      summary,
+      rows,
+      targetTables,
+      preConsumerRows,
+    } = req.body;
 
-        if (!clientId || !type || !itemId || !summary || !rows) {
-            return res.status(400).json({ message: "Missing required fields" });
-        }
-
-        const result = await AnalysisService.saveSalesAnalysis(clientId, type, itemId, { summary, rows, targetTables, preConsumerRows });
-
-        res.status(200).json({
-            success: true,
-            message: "Sales analysis saved successfully",
-            data: result
-        });
-    } catch (error) {
-        console.error("Save Sales Analysis Error:", error);
-        res.status(500).json({ message: error.message || "Error saving sales analysis" });
+    if (!clientId || !type || !itemId || !summary || !rows) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
+
+    const result = await AnalysisService.saveSalesAnalysis(
+      clientId,
+      type,
+      itemId,
+      { summary, rows, targetTables, preConsumerRows },
+    );
+    await CacheService.invalidateCache(
+      `${ANALYSIS_CACHE_PREFIX}sales:${clientId}:${type}:${itemId}`,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Sales analysis saved successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Save Sales Analysis Error:", error);
+    res
+      .status(500)
+      .json({ message: error.message || "Error saving sales analysis" });
+  }
 };
 
 export const getSalesAnalysisController = async (req, res) => {
-    try {
-        const { clientId } = req.params;
-        const { type, itemId } = req.query;
-
-        const analysisData = await AnalysisService.getSalesAnalysis(clientId, type, itemId);
-
-        if (!analysisData) {
-            return res.status(200).json({
-                success: true,
-                data: null,
-                message: "No sales analysis data found"
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            ...analysisData
-        });
-
-    } catch (error) {
-        console.error("Get Sales Analysis Error:", error);
-        res.status(500).json({ message: error.message || "Error fetching sales analysis data" });
+  try {
+    const { clientId } = req.params;
+    const { type, itemId } = req.query;
+    const cacheKey = makeAnalysisCacheKey("sales", clientId, type, itemId);
+    const cached = await CacheService.getCache(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+        ...cached,
+        cached: true,
+      });
     }
+
+    const analysisData = await AnalysisService.getSalesAnalysis(
+      clientId,
+      type,
+      itemId,
+    );
+
+    if (!analysisData) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "No sales analysis data found",
+      });
+    }
+
+    const payload = {
+      success: true,
+      ...analysisData,
+    };
+
+    await CacheService.setCache(cacheKey, payload, CacheService.ttl.analytics);
+    res.status(200).json(payload);
+  } catch (error) {
+    console.error("Get Sales Analysis Error:", error);
+    res
+      .status(500)
+      .json({ message: error.message || "Error fetching sales analysis data" });
+  }
 };
 
 export const savePurchaseAnalysisController = async (req, res) => {
-    try {
-        const { clientId, type, itemId, summary, rows } = req.body;
+  try {
+    const { clientId, type, itemId, summary, rows } = req.body;
 
-        if (!clientId || !type || !itemId || !summary || !rows) {
-            return res.status(400).json({ message: "Missing required fields" });
-        }
-
-        const result = await AnalysisService.savePurchaseAnalysis(clientId, type, itemId, { summary, rows });
-
-        res.status(200).json({
-            success: true,
-            message: "Purchase analysis saved successfully",
-            data: result
-        });
-    } catch (error) {
-        console.error("Save Purchase Analysis Error:", error);
-        res.status(500).json({ message: error.message || "Error saving purchase analysis" });
+    if (!clientId || !type || !itemId || !summary || !rows) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
+
+    const result = await AnalysisService.savePurchaseAnalysis(
+      clientId,
+      type,
+      itemId,
+      { summary, rows },
+    );
+    await CacheService.invalidateCache(
+      `${ANALYSIS_CACHE_PREFIX}purchase:${clientId}:${type}:${itemId}`,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Purchase analysis saved successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Save Purchase Analysis Error:", error);
+    res
+      .status(500)
+      .json({ message: error.message || "Error saving purchase analysis" });
+  }
 };
 
 export const getPurchaseAnalysisController = async (req, res) => {
-    try {
-        const { clientId } = req.params;
-        const { type, itemId } = req.query;
-
-        const analysisData = await AnalysisService.getPurchaseAnalysis(clientId, type, itemId);
-
-        if (!analysisData) {
-            return res.status(200).json({
-                success: true,
-                data: null,
-                message: "No purchase analysis data found"
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            ...analysisData
-        });
-
-    } catch (error) {
-        console.error("Get Purchase Analysis Error:", error);
-        res.status(500).json({ message: error.message || "Error fetching purchase analysis data" });
+  try {
+    const { clientId } = req.params;
+    const { type, itemId } = req.query;
+    const cacheKey = makeAnalysisCacheKey("purchase", clientId, type, itemId);
+    const cached = await CacheService.getCache(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+        ...cached,
+        cached: true,
+      });
     }
+
+    const analysisData = await AnalysisService.getPurchaseAnalysis(
+      clientId,
+      type,
+      itemId,
+    );
+
+    if (!analysisData) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "No purchase analysis data found",
+      });
+    }
+
+    const payload = {
+      success: true,
+      ...analysisData,
+    };
+
+    await CacheService.setCache(cacheKey, payload, CacheService.ttl.analytics);
+    res.status(200).json(payload);
+  } catch (error) {
+    console.error("Get Purchase Analysis Error:", error);
+    res.status(500).json({
+      message: error.message || "Error fetching purchase analysis data",
+    });
+  }
 };
 
-export const generatePlasticComplianceReportController = async (req, res) => {
-    try {
-        const { clientId } = req.params;
-        const { type, itemId } = req.query;
-        const userId = req.userId;
+const queueReport = (reportType) =>
+  asyncHandler(async (req, res) => {
+    const { clientId } = req.params;
+    const { type, itemId } = req.query;
 
-        if (!clientId || !type || !itemId) {
-            return res.status(400).json({ message: "Missing required parameters: clientId, type, itemId" });
-        }
+    const result = await PdfService.enqueueReport({
+      reportType,
+      clientId,
+      type,
+      itemId,
+      userId: req.userId,
+    });
 
-        const pdfBuffer = await AnalysisService.generatePlasticComplianceReport(clientId, type, itemId, userId);
+    return res.status(202).json({
+      success: true,
+      message: "Report generation queued",
+      data: {
+        jobId: result.jobId,
+        statusUrl: `/api/reports/status/${result.jobId}`,
+        downloadUrl: `/api/reports/download/${result.jobId}`,
+        cached: Boolean(result.cached),
+      },
+    });
+  });
 
-        res.set({
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="Plastic_Compliance_Report_${clientId}.pdf"`,
-            'Content-Length': pdfBuffer.length
-        });
+export const generatePlasticComplianceReportController =
+  queueReport("compliance");
+export const generatePlasticSummaryReportController = queueReport("summary");
 
-        res.send(pdfBuffer);
+export const getReportJobStatusController = asyncHandler(async (req, res) => {
+  const status = await PdfService.getJobStatus(req.params.jobId);
+  if (!status) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Report job not found" });
+  }
 
-    } catch (error) {
-        console.error("Generate Report Error:", error);
-        console.error(error.stack); // Log stack trace for debugging
-        
-        // Ensure error response is JSON and includes details for debugging
-        res.status(500).json({ 
-            message: error.message || "Error generating report",
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-            details: "Please check Render logs for 'Puppeteer Launch Error'"
-        });
+  return res.status(200).json({
+    success: true,
+    data: status,
+  });
+});
+
+export const downloadReportByJobIdController = asyncHandler(
+  async (req, res) => {
+    const status = await PdfService.getJobStatus(req.params.jobId);
+    if (!status || status.state !== "completed") {
+      return res
+        .status(409)
+        .json({ success: false, message: "Report is not ready yet" });
     }
-};
 
-export const generatePlasticSummaryReportController = async (req, res) => {
-    try {
-        const { clientId } = req.params;
-        const { type, itemId } = req.query;
-        const userId = req.userId;
-
-        if (!clientId || !type || !itemId) {
-            return res.status(400).json({ message: "Missing required parameters: clientId, type, itemId" });
-        }
-
-        const pdfBuffer = await AnalysisService.generatePlasticSummaryReport(clientId, type, itemId, userId);
-
-        res.set({
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="Plastic_Summary_Report_${clientId}.pdf"`,
-            'Content-Length': pdfBuffer.length
-        });
-
-        res.send(pdfBuffer);
-    } catch (error) {
-        console.error("Generate Summary Report Error:", error);
-        console.error(error.stack);
-        res.status(500).json({
-            message: error.message || "Error generating summary report",
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
+    const buffer = await PdfService.getReportBuffer(req.params.jobId);
+    if (!buffer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report file not found" });
     }
-};
+
+    const fileName = `${status.reportType === "summary" ? "Plastic_Summary" : "Plastic_Compliance"}_Report_${status.clientId}.pdf`;
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+      "Content-Length": buffer.length,
+    });
+
+    return res.send(buffer);
+  },
+);
+
+export const listAnalysisSnapshotsController = asyncHandler(
+  async (req, res) => {
+    const { page, limit, skip } = req.pagination;
+    const [data, total] = await Promise.all([
+      PlasticAnalysisModel.find({})
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select("client type itemId updatedAt createdAt")
+        .lean(),
+      PlasticAnalysisModel.countDocuments({}),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      ...res.paginate({ data, total }),
+    });
+  },
+);
+
+export const listReportsController = asyncHandler(async (req, res) => {
+  const { page, limit } = req.pagination;
+  const { data, total } = await PdfService.listReportJobs({ page, limit });
+  return res.status(200).json({
+    success: true,
+    ...res.paginate({ data, total }),
+  });
+});

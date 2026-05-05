@@ -2,20 +2,18 @@ import express from 'express';
 import UserModel from '../models/user.model.js';
 import ClientModel from '../models/client.model.js';
 import RoleModel from '../models/role.model.js';
+import { auth, admin } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { z } from 'zod';
 
 const router = express.Router();
+const makeAdminSchema = z.object({
+    email: z.string().email()
+});
 
-router.post('/make-admin', async (req, res) => {
+router.post('/make-admin', auth, admin, validate(makeAdminSchema), async (req, res) => {
     try {
-        const { email, secretKey } = req.body;
-
-        if (secretKey !== 'EPRKAVACH_ADMIN_SECRET_2024') {
-            return res.status(403).json({
-                message: "Invalid secret key",
-                error: true,
-                success: false
-            });
-        }
+        const { email } = req.body;
 
         const user = await UserModel.findOne({ email });
 
@@ -58,18 +56,8 @@ router.post('/make-admin', async (req, res) => {
     }
 });
 
-router.post('/migrate-clients', async (req, res) => {
+router.post('/migrate-clients', auth, admin, async (req, res) => {
     try {
-        const { secretKey } = req.body;
-
-        if (secretKey !== 'EPRKAVACH_ADMIN_SECRET_2024') {
-            return res.status(403).json({
-                message: "Invalid secret key",
-                error: true,
-                success: false
-            });
-        }
-
         // Update clients without approval status
         const result1 = await ClientModel.updateMany(
             { approvalStatus: { $exists: false } },

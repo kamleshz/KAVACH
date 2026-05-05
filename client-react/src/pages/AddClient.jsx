@@ -29,6 +29,8 @@ import { generateMarkingLabellingReport, generateSkuComplianceReport } from '../
 import { parseRemarksToItems } from '../utils/pdfHelpers';
 import { calculateCapacityMetrics } from '../utils/numberUtils';
 import DocumentViewerModal from '../components/DocumentViewerModal';
+import GsapStepTransition from '../components/GsapStepTransition';
+import { resolveClientFileUrl } from '../utils/fileAccess';
 
 import { 
   UREP_YEAR_OPTIONS, 
@@ -142,9 +144,7 @@ const AddClientContent = () => {
   const [viewerName, setViewerName] = useState('');
 
   const resolveUrl = (p) => {
-    if (!p) return '';
-    const isAbs = p.startsWith('http://') || p.startsWith('https://');
-    return isAbs ? p : `${API_URL}/${p}`;
+    return resolveClientFileUrl(clientId, p);
   };
 
   const handleViewDocument = (filePath, docType, docName) => {
@@ -272,6 +272,14 @@ const AddClientContent = () => {
   };
 
   const { user: authUser, isAdmin, isManager } = useAuth();
+  const roleName = typeof authUser?.role === 'string' ? authUser.role : authUser?.role?.name;
+  const isClientUser = roleName === 'CLIENT';
+  const linkedClientId = authUser?.linkedClient?._id;
+
+  useEffect(() => {
+      if (!isClientUser) return;
+      navigate(linkedClientId ? `/dashboard/client/${linkedClientId}` : '/dashboard/client-connect', { replace: true });
+  }, [isClientUser, linkedClientId, navigate]);
 
   useEffect(() => {
       if (isAuditMode) {
@@ -3922,7 +3930,10 @@ const AddClientContent = () => {
           </div>
         </div>
 
-        <div className="mt-4 space-y-6">
+        <GsapStepTransition
+          className="mt-4 space-y-6"
+          transitionKey={`${activeTab}-${currentStep}-${postValidationActiveTab}`}
+        >
 
         {activeTab === 'Client Data' ? (
             <>
@@ -4192,7 +4203,7 @@ const AddClientContent = () => {
                 <div className="text-xl">Content for {activeTab} is coming soon.</div>
             </div>
         )}
-      </div>
+      </GsapStepTransition>
 
       <Modal
         open={remarkModal.visible}

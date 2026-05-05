@@ -1,6 +1,7 @@
 import asyncHandler from '../utils/asyncHandler.js';
 import AuthService from '../services/auth.service.js';
 import ApiError from '../utils/ApiError.js';
+import { registerAuthAttemptFailure, registerAuthAttemptSuccess } from '../middleware/rateLimiter.js';
 
 export const registerController = asyncHandler(async (req, res) => {
     try {
@@ -51,6 +52,7 @@ export const loginController = asyncHandler(async (req, res) => {
     try {
         const { email, password } = req.body;
         const result = await AuthService.loginUser(email, password);
+        registerAuthAttemptSuccess(req, email);
         return res.status(200).json({
             message: "OTP sent to your email",
             error: false,
@@ -58,7 +60,7 @@ export const loginController = asyncHandler(async (req, res) => {
             data: result
         });
     } catch (error) {
-        console.error("[Login Error]", error);
+        registerAuthAttemptFailure(req, req.body?.email);
         if (error instanceof ApiError) throw error;
         throw new ApiError(500, "Login failed: " + (error.message || "Unknown error"));
     }
@@ -68,8 +70,6 @@ export const verifyLoginOtpController = asyncHandler(async (req, res) => {
     try {
         const { email, otp, photo, location } = req.body;
         
-        console.log(`[Verify Login OTP] Request received for: ${email}`);
-
         // Get IP and User Agent from request
         const ipHeader = req.headers['x-forwarded-for'];
         const ipAddress = Array.isArray(ipHeader)
@@ -115,10 +115,8 @@ export const verifyLoginOtpController = asyncHandler(async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("[Login Verification Error]", error); // Detailed logging
         // Check if headers already sent to avoid crashing
         if (res.headersSent) {
-             console.error("Headers already sent, cannot send error response");
              return;
         }
         if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message, success: false, error: true });
@@ -136,8 +134,19 @@ export const logoutController = asyncHandler(async (req, res) => {
         const userId = req.userId;
         await AuthService.logoutUser(userId);
 
-        res.clearCookie('accessToken');
-        res.clearCookie('refreshToken');
+        const forwardedProto = req.headers['x-forwarded-proto'];
+        const isHttps =
+            req.secure ||
+            (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) === 'https';
+
+        const cookieOptions = {
+            httpOnly: true,
+            secure: isHttps,
+            sameSite: isHttps ? 'none' : 'lax'
+        };
+
+        res.clearCookie('accessToken', cookieOptions);
+        res.clearCookie('refreshToken', cookieOptions);
 
         return res.status(200).json({
             message: "Logout successful",
@@ -157,10 +166,15 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
 
         const { accessToken, refreshToken } = await AuthService.refreshToken(token);
 
+        const forwardedProto = req.headers['x-forwarded-proto'];
+        const isHttps =
+            req.secure ||
+            (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) === 'https';
+
         const cookieOptions = {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            secure: isHttps,
+            sameSite: isHttps ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000
         };
 

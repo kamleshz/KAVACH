@@ -222,29 +222,46 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
   );
 };
 
-const CreateUserModal = ({ isOpen, onClose, onCreate, allRoles }) => {
+const CreateUserModal = ({ isOpen, onClose, onCreate, allRoles, allClients }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
     password: '',
     role: '',
+    linkedClientId: '',
     status: 'Active'
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (error) setError('');
+    if (name === 'role') {
+      const roleObj = allRoles.find(r => String(r._id) === String(value));
+      if (roleObj?.name !== 'CLIENT') {
+        setFormData(prev => ({ ...prev, role: value, linkedClientId: '' }));
+        return;
+      }
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async () => {
+    const selectedRole = allRoles.find(r => String(r._id) === String(formData.role));
+    if (selectedRole?.name === 'CLIENT' && !formData.linkedClientId) {
+      setError('Please select a client for CLIENT users');
+      return;
+    }
     setLoading(true);
     await onCreate(formData);
     setLoading(false);
   };
 
   if (!isOpen) return null;
+  const selectedRole = allRoles.find(r => String(r._id) === String(formData.role));
+  const showClientPicker = selectedRole?.name === 'CLIENT';
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
@@ -337,6 +354,27 @@ const CreateUserModal = ({ isOpen, onClose, onCreate, allRoles }) => {
                                     </select>
                                 </div>
                             </div>
+                            {showClientPicker && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Client</label>
+                                <select
+                                  name="linkedClientId"
+                                  value={formData.linkedClientId}
+                                  onChange={handleChange}
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                >
+                                  <option value="">Select Client</option>
+                                  {(allClients || []).map(c => (
+                                    <option key={c._id} value={c._id}>{c.clientName}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                            {!!error && (
+                              <div className="text-sm text-red-600">
+                                {error}
+                              </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -383,6 +421,7 @@ const AdminPanel = () => {
     overdue: 0,
   });
   const [users, setUsers] = useState([]);
+  const [allClients, setAllClients] = useState([]);
   const [unlockingUserId, setUnlockingUserId] = useState(null);
   const [loginActivity, setLoginActivity] = useState([]);
   const [loadingActivity, setLoadingActivity] = useState(true);
@@ -499,6 +538,7 @@ const AdminPanel = () => {
       });
 
       setUsers(userList);
+      setAllClients(clientList);
       setClientsSummary({
         total: clientList.length,
         unassigned,
@@ -975,6 +1015,7 @@ const AdminPanel = () => {
         onClose={() => setIsCreateUserModalOpen(false)}
         onCreate={handleCreateUser}
         allRoles={allRoles}
+        allClients={allClients}
       />
     </div>
   );

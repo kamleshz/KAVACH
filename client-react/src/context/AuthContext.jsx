@@ -13,18 +13,15 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      try {
-        const response = await api.get(API_ENDPOINTS.AUTH.ME);
-        if (response.data.success) {
-          setUser(response.data.data);
-        } else {
-          localStorage.removeItem('accessToken');
-        }
-      } catch (error) {
-        localStorage.removeItem('accessToken');
+    try {
+      const response = await api.get(API_ENDPOINTS.AUTH.ME);
+      if (response.data.success) {
+        setUser(response.data.data);
+      } else {
+        setUser(null);
       }
+    } catch (error) {
+      setUser(null);
     }
     setLoading(false);
   };
@@ -32,7 +29,6 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const response = await api.post(API_ENDPOINTS.AUTH.LOGIN, { email, password });
     if (response.data.success) {
-      localStorage.setItem('accessToken', response.data.data.accessToken);
       setUser(response.data.data.user);
       return { success: true, user: response.data.data.user };
     }
@@ -50,7 +46,6 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     }
-    localStorage.removeItem('accessToken');
     setUser(null);
   };
 

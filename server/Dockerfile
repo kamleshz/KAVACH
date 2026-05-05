@@ -23,7 +23,8 @@ RUN apt-get update \
 # you'll need to launch puppeteer with:
 #     browser.executablePath: 'google-chrome-stable'
 # You can also use PUPPETEER_EXECUTABLE_PATH environment variable
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+ENV NODE_ENV=production \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
 WORKDIR /usr/src/app
@@ -37,5 +38,8 @@ RUN npm ci
 COPY . .
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD [ "npm", "start" ]

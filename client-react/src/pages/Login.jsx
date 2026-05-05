@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import useAuth from '../hooks/useAuth';
-import api from '../services/api';
+import api, { setAccessToken } from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 import { 
   SafetyCertificateOutlined, 
@@ -44,6 +44,9 @@ const Login = () => {
     const roleName = getRoleName(user);
     if (roleName === 'ADMIN') return '/dashboard/admin/kpi';
     if (roleName === 'SUPER ADMIN') return '/dashboard/client-connect';
+    if (roleName === 'CLIENT' && user?.linkedClient?._id) {
+      return `/dashboard/client/${user.linkedClient._id}`;
+    }
     return '/dashboard';
   };
 
@@ -206,7 +209,7 @@ const Login = () => {
           startOtpStep();
         } else if (response.data.success && response.data.data?.accessToken) {
             // Direct login success (fallback if OTP disabled)
-            localStorage.setItem('accessToken', response.data.data.accessToken);
+            setAccessToken(response.data.data.accessToken);
             setUser(response.data.data.user);
             navigate(fromPath || getPostLoginPath(response.data.data.user), { replace: true });
         } else {

@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            client-react/package-lock.json
+
+      - name: Install root dependencies
+        run: npm install
+
+      - name: Install server dependencies
+        run: npm --prefix server install
+
+      - name: Install client dependencies
+        run: npm --prefix client-react install
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Prettier check
+        run: npm run format:check
+
+      - name: Backend build check
+        run: npm run build:server
+
+      - name: Frontend build
+        run: npm --prefix client-react run build
+
+      - name: Smoke test
+        env:
+          PORT: 8080
+          FRONTEND_URL: http://localhost:5173
+          MONGODB_URI: mongodb://127.0.0.1:27017/eprkavach-ci
+          SECRET_KEY_ACCESS_TOKEN: enterprise-ci-access-token
+          SECRET_KEY_REFRESH_TOKEN: enterprise-ci-refresh-token
+          MAIL_USER: ci@example.com
+          MAIL_PASS: ci-password
+        run: npm run smoke

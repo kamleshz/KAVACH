@@ -1,5 +1,10 @@
 import mongoose from "mongoose";
 
+const dateField = {
+  type: Date,
+  default: null
+};
+
 const rowSchema = new mongoose.Schema({
   generate: { type: String, default: "No" },
   systemCode: { type: String, default: "" },
@@ -61,7 +66,12 @@ const supplierComplianceRowSchema = new mongoose.Schema({
   foodGrade: { type: String, default: "" },
   eprCertificateNumber: { type: String, default: "" },
   fssaiLicNo: { type: String, default: "" },
-  fssaiValidUpto: { type: String, default: "" }
+  fssaiValidUpto: dateField,
+  ctoPlantNo: { type: String, default: "" },
+  ctoPlantName: { type: String, default: "" },
+  ctoStartDate: dateField,
+  ctoValidUpto: dateField,
+  ctoCcaDocument: { type: String, default: "" }
 }, { _id: false });
 
 const skuComplianceRowSchema = new mongoose.Schema({
@@ -85,6 +95,17 @@ const recycledQuantityRowSchema = new mongoose.Schema({
   usedRecycledQtyMt: { type: Number, default: 0 }
 }, { _id: false });
 
+const supplierCtoCheckRowSchema = new mongoose.Schema({
+  supplierName: { type: String, default: "" },
+  registrationStatus: { type: String, enum: ['', 'Approved', 'In Progress', 'Pending'], default: '' },
+  ctoAvailability: { type: String, default: "Available" },
+  ctoPlantNo: { type: String, default: "" },
+  ctoPlantName: { type: String, default: "" },
+  ctoStartDate: dateField,
+  ctoValidUpto: dateField,
+  ctoCcaDocument: { type: String, default: "" }
+}, { _id: false });
+
 const plasticAnalysisSchema = new mongoose.Schema({
   summary: { type: Object, default: {} },
   rows: { type: Array, default: [] },
@@ -103,7 +124,7 @@ const procurementSchema = new mongoose.Schema({
   recycledPolymerUsed: { type: String, default: "" },
   componentPolymer: { type: String, default: "" },
   category: { type: String, default: "" },
-  dateOfInvoice: { type: String, default: "" },
+  dateOfInvoice: dateField,
   monthName: { type: String, default: "" },
   quarter: { type: String, default: "" },
   yearlyQuarter: { type: String, default: "" },
@@ -142,12 +163,16 @@ const productComplianceSchema = new mongoose.Schema({
   componentDetails: { type: [componentRowSchema], default: [] },
   supplierCompliance: { type: [supplierComplianceRowSchema], default: [] },
   recycledQuantityUsed: { type: [recycledQuantityRowSchema], default: [] },
-  procurementDetails: { type: [procurementSchema], default: [] },
   plasticAnalysis: { type: plasticAnalysisSchema, default: {} },
-  changeHistory: { type: [changeHistorySchema], default: [] },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }
 }, { timestamps: true });
 
+productComplianceSchema.index(
+  { client: 1, type: 1, itemId: 1 },
+  { unique: true, name: 'uniq_product_compliance_scope' }
+);
+
 const ProductComplianceModel = mongoose.model("ProductCompliance", productComplianceSchema);
 
+export { changeHistorySchema, procurementSchema, supplierCtoCheckRowSchema };
 export default ProductComplianceModel;

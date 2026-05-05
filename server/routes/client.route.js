@@ -12,6 +12,10 @@ import {
     getProductComponentDetailsController,
     saveProductSupplierComplianceController,
     getProductSupplierComplianceController,
+    uploadProductSupplierCtoDocumentController,
+    getSupplierCtoChecksController,
+    saveSupplierCtoChecksController,
+    uploadSupplierCtoCcaDocumentController,
     getProductComplianceHistoryController,
     importProductComplianceHistoryController,
     saveRecycledQuantityUsedController,
@@ -31,9 +35,11 @@ import {
     getProcurementController,
     saveSkuComplianceController,
     getSkuComplianceController,
-    uploadSkuComplianceRowController
+    uploadSkuComplianceRowController,
+    accessProtectedFileController
 } from '../controllers/client.controller.js';
 import { auth, admin } from '../middleware/auth.js';
+import { requireInternalUser, restrictClientScope } from '../middleware/clientAccess.js';
 import { upload } from '../middleware/upload.js';
 import {
     getSingleUsePlasticChecklistController,
@@ -48,18 +54,31 @@ import {
     uploadEWasteStorageImageController,
     saveEWasteAwarenessController
 } from '../controllers/eWasteCompliance.controller.js';
+import { validate } from '../middleware/validate.js';
+import { paginationMiddleware } from '../middleware/pagination.middleware.js';
+import {
+    assignClientSchema,
+    clientIdParamsSchema,
+    createClientSchema,
+    historyImportSchema,
+    paginationQuerySchema,
+    plantProcessProgressSchema,
+    productComplianceSaveSchema,
+    supplierCtoChecksSchema,
+    validateClientStatusSchema
+} from '../validators/client.validator.js';
 
 const router = express.Router();
 
-router.post('/:clientId/e-waste-compliance/upload-image', auth, upload.single('productImage'), uploadEWasteProductImageController);
-router.post('/:clientId/e-waste-compliance', auth, saveEWasteComplianceController);
-router.post('/:clientId/e-waste-compliance/rohs', auth, saveEWasteROHSComplianceController);
-router.post('/:clientId/e-waste-compliance/storage', auth, saveEWasteStorageComplianceController);
-router.post('/:clientId/e-waste-compliance/awareness', auth, saveEWasteAwarenessController);
-router.post('/:clientId/e-waste-compliance/storage/upload-image', auth, upload.single('storageImage'), uploadEWasteStorageImageController);
-router.get('/:clientId/e-waste-compliance', auth, getEWasteComplianceController);
+router.post('/:clientId/e-waste-compliance/upload-image', auth, restrictClientScope, requireInternalUser, upload.single('productImage'), uploadEWasteProductImageController);
+router.post('/:clientId/e-waste-compliance', auth, restrictClientScope, requireInternalUser, saveEWasteComplianceController);
+router.post('/:clientId/e-waste-compliance/rohs', auth, restrictClientScope, requireInternalUser, saveEWasteROHSComplianceController);
+router.post('/:clientId/e-waste-compliance/storage', auth, restrictClientScope, requireInternalUser, saveEWasteStorageComplianceController);
+router.post('/:clientId/e-waste-compliance/awareness', auth, restrictClientScope, requireInternalUser, saveEWasteAwarenessController);
+router.post('/:clientId/e-waste-compliance/storage/upload-image', auth, restrictClientScope, requireInternalUser, upload.single('storageImage'), uploadEWasteStorageImageController);
+router.get('/:clientId/e-waste-compliance', auth, restrictClientScope, getEWasteComplianceController);
 
-router.get('/:clientId/marking-labelling/events', auth, (req, res) => {
+router.get('/:clientId/marking-labelling/events', auth, restrictClientScope, (req, res) => {
     const emitter = req.app.get('realtimeEmitter');
     if (!emitter) {
         res.status(503).end();
@@ -102,15 +121,16 @@ router.get('/:clientId/marking-labelling/events', auth, (req, res) => {
     });
 });
 
-router.post('/create', auth, createClientController);
-router.post('/:clientId/plant-process-progress', auth, updatePlantProcessProgressController);
-router.post('/:clientId/verify-facility', auth, upload.single('document'), verifyFacilityController);
-router.post('/:clientId/product-compliance', auth, saveProductComplianceController);
-router.put('/:clientId/product-compliance', auth, saveProductComplianceController);
-router.post('/:clientId/product-compliance-row-save', auth, saveProductComplianceController);
-router.get('/:clientId/product-compliance', auth, getProductComplianceController);
-router.get('/:clientId/all-product-compliance-rows', auth, getAllProductComplianceRowsController);
-router.post('/:clientId/product-compliance/upload-row', auth, (req, res, next) => {
+router.post('/create', auth, requireInternalUser, validate(createClientSchema), createClientController);
+router.get('/:clientId/file-access', auth, restrictClientScope, validate(clientIdParamsSchema), accessProtectedFileController);
+router.post('/:clientId/plant-process-progress', auth, restrictClientScope, requireInternalUser, validate(plantProcessProgressSchema), updatePlantProcessProgressController);
+router.post('/:clientId/verify-facility', auth, restrictClientScope, requireInternalUser, validate(clientIdParamsSchema), upload.single('document'), verifyFacilityController);
+router.post('/:clientId/product-compliance', auth, restrictClientScope, requireInternalUser, validate(productComplianceSaveSchema), saveProductComplianceController);
+router.put('/:clientId/product-compliance', auth, restrictClientScope, requireInternalUser, validate(productComplianceSaveSchema), saveProductComplianceController);
+router.post('/:clientId/product-compliance-row-save', auth, restrictClientScope, requireInternalUser, validate(productComplianceSaveSchema), saveProductComplianceController);
+router.get('/:clientId/product-compliance', auth, restrictClientScope, getProductComplianceController);
+router.get('/:clientId/all-product-compliance-rows', auth, restrictClientScope, getAllProductComplianceRowsController);
+router.post('/:clientId/product-compliance/upload-row', auth, restrictClientScope, requireInternalUser, (req, res, next) => {
     upload.fields([
         { name: 'productImage', maxCount: 1 },
         { name: 'componentImage', maxCount: 1 },
@@ -128,38 +148,39 @@ router.post('/:clientId/product-compliance/upload-row', auth, (req, res, next) =
     });
 }, uploadProductComplianceRowController);
 
-router.post('/:clientId/sku-compliance', auth, saveSkuComplianceController);
-router.get('/:clientId/sku-compliance', auth, getSkuComplianceController);
-router.post('/:clientId/sku-compliance/upload-row', auth, upload.fields([
+router.post('/:clientId/sku-compliance', auth, restrictClientScope, requireInternalUser, saveSkuComplianceController);
+router.get('/:clientId/sku-compliance', auth, restrictClientScope, getSkuComplianceController);
+router.post('/:clientId/sku-compliance/upload-row', auth, restrictClientScope, requireInternalUser, upload.fields([
     { name: 'markingImage', maxCount: 10 }
 ]), uploadSkuComplianceRowController);
 
-router.post('/:clientId/product-component-details', auth, saveProductComponentDetailsController);
-router.get('/:clientId/product-component-details', auth, getProductComponentDetailsController);
-router.post('/:clientId/product-supplier-compliance', auth, saveProductSupplierComplianceController);
-router.get('/:clientId/product-supplier-compliance', auth, getProductSupplierComplianceController);
-router.get('/:clientId/product-compliance-history', auth, getProductComplianceHistoryController);
-router.post('/:clientId/product-compliance-history/import', auth, importProductComplianceHistoryController);
-router.post('/:clientId/recycled-quantity-used', auth, saveRecycledQuantityUsedController);
-router.get('/:clientId/recycled-quantity-used', auth, getRecycledQuantityUsedController);
-router.post('/:clientId/monthly-procurement', auth, saveMonthlyProcurementController);
-router.get('/:clientId/monthly-procurement', auth, getMonthlyProcurementController);
-router.post('/:clientId/procurement', auth, upload.single('file'), importProcurementController);
-router.get('/:clientId/procurement', auth, getProcurementController);
-router.post('/:clientId/sup-checklist', auth, saveSingleUsePlasticChecklistController);
-router.get('/:clientId/sup-checklist', auth, getSingleUsePlasticChecklistController);
+router.post('/:clientId/product-component-details', auth, restrictClientScope, requireInternalUser, validate(productComplianceSaveSchema), saveProductComponentDetailsController);
+router.get('/:clientId/product-component-details', auth, restrictClientScope, getProductComponentDetailsController);
+router.post('/:clientId/product-supplier-compliance', auth, restrictClientScope, requireInternalUser, validate(productComplianceSaveSchema), saveProductSupplierComplianceController);
+router.get('/:clientId/product-supplier-compliance', auth, restrictClientScope, getProductSupplierComplianceController);
+router.post('/:clientId/product-supplier-compliance/upload-cto', auth, restrictClientScope, requireInternalUser, validate(clientIdParamsSchema), upload.single('document'), uploadProductSupplierCtoDocumentController);
+router.get('/:clientId/supplier-cto-check', auth, restrictClientScope, getSupplierCtoChecksController);
+router.post('/:clientId/supplier-cto-check', auth, restrictClientScope, requireInternalUser, validate(supplierCtoChecksSchema), saveSupplierCtoChecksController);
+router.post('/:clientId/supplier-cto-check/upload', auth, restrictClientScope, requireInternalUser, validate(clientIdParamsSchema), upload.single('document'), uploadSupplierCtoCcaDocumentController);
+router.get('/:clientId/product-compliance-history', auth, restrictClientScope, getProductComplianceHistoryController);
+router.post('/:clientId/product-compliance-history/import', auth, restrictClientScope, requireInternalUser, validate(historyImportSchema), importProductComplianceHistoryController);
+router.post('/:clientId/recycled-quantity-used', auth, restrictClientScope, requireInternalUser, validate(productComplianceSaveSchema), saveRecycledQuantityUsedController);
+router.get('/:clientId/recycled-quantity-used', auth, restrictClientScope, getRecycledQuantityUsedController);
+router.post('/:clientId/monthly-procurement', auth, restrictClientScope, requireInternalUser, validate(productComplianceSaveSchema), saveMonthlyProcurementController);
+router.get('/:clientId/monthly-procurement', auth, restrictClientScope, getMonthlyProcurementController);
+router.post('/:clientId/procurement', auth, restrictClientScope, requireInternalUser, validate(clientIdParamsSchema), upload.single('file'), importProcurementController);
+router.get('/:clientId/procurement', auth, restrictClientScope, getProcurementController);
+router.post('/:clientId/sup-checklist', auth, restrictClientScope, requireInternalUser, saveSingleUsePlasticChecklistController);
+router.get('/:clientId/sup-checklist', auth, restrictClientScope, getSingleUsePlasticChecklistController);
 router.post('/product-compliance/cleanup', auth, admin, cleanupProductComplianceFieldsController);
-router.post('/:clientId/upload-document', auth, upload.single('document'), uploadClientDocumentController);
-router.delete('/:clientId/document/:docId', auth, deleteClientDocumentController);
-router.get('/all', auth, getAllClientsController);
+router.post('/:clientId/upload-document', auth, restrictClientScope, requireInternalUser, validate(clientIdParamsSchema), upload.single('document'), uploadClientDocumentController);
+router.delete('/:clientId/document/:docId', auth, restrictClientScope, requireInternalUser, deleteClientDocumentController);
+router.get('/all', auth, validate(paginationQuerySchema), paginationMiddleware(), getAllClientsController);
 router.get('/stats', auth, getClientStatsController);
-router.get('/:clientId', auth, getClientByIdController);
-router.put('/:clientId', auth, updateClientController);
-router.delete('/:clientId', auth, admin, deleteClientController);
-router.patch('/:clientId/assign', auth, admin, assignClientController);
-router.put('/:clientId/validate', auth, validateClientController);
-
-router.post('/:clientId/e-waste-compliance', auth, saveEWasteComplianceController);
-router.get('/:clientId/e-waste-compliance', auth, getEWasteComplianceController);
+router.get('/:clientId', auth, restrictClientScope, getClientByIdController);
+router.put('/:clientId', auth, restrictClientScope, requireInternalUser, updateClientController);
+router.delete('/:clientId', auth, restrictClientScope, admin, deleteClientController);
+router.patch('/:clientId/assign', auth, restrictClientScope, admin, validate(assignClientSchema), assignClientController);
+router.put('/:clientId/validate', auth, restrictClientScope, requireInternalUser, validate(validateClientStatusSchema), validateClientController);
 
 export default router;
