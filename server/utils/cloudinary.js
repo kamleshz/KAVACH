@@ -6,6 +6,7 @@ import {
   parseCloudinaryAssetRef,
   sanitizeDownloadName,
 } from "./fileSecurity.js";
+import logger from "./logger.js";
 
 dotenv.config();
 
@@ -18,7 +19,7 @@ if (!process.env.CLOUDINARY_API_SECRET)
   missingKeys.push("CLOUDINARY_API_SECRET");
 
 if (missingKeys.length > 0) {
-  console.error(
+  logger.error(
     `[Cloudinary Config] CRITICAL: Missing environment variables: ${missingKeys.join(", ")}`,
   );
 }
@@ -65,7 +66,7 @@ export const uploadToCloudinary = async (
     const uploadResult = await cloudinary.uploader.upload(filePath, options);
     return uploadResult.secure_url;
   } catch (error) {
-    console.error("Cloudinary Upload Error:", error);
+    logger.error({ err: error, folder, filePath }, "Cloudinary Upload Error");
     throw error;
   }
 };
@@ -76,6 +77,8 @@ export const uploadConfidentialToCloudinary = async (
   filenameOverride,
   originalFilename = "",
 ) => {
+  const safeOriginalFilename = originalFilename || path.basename(filePath || "");
+
   try {
     if (missingKeys.length > 0) {
       throw new Error(
@@ -86,8 +89,6 @@ export const uploadConfidentialToCloudinary = async (
     const ext = path.extname(filePath || "").toLowerCase();
     const isPdf = ext === ".pdf";
     const resourceType = isPdf ? "image" : "raw";
-    const safeOriginalFilename =
-      originalFilename || path.basename(filePath || "");
 
     const options = {
       resource_type: resourceType,
@@ -112,7 +113,10 @@ export const uploadConfidentialToCloudinary = async (
       originalFilename: safeOriginalFilename,
     });
   } catch (error) {
-    console.error("Confidential Cloudinary Upload Error:", error);
+    logger.error(
+      { err: error, folder, filePath, originalFilename: safeOriginalFilename },
+      "Confidential Cloudinary Upload Error",
+    );
     throw error;
   }
 };
@@ -150,7 +154,10 @@ export const uploadConfidentialBase64ToCloudinary = async (
       originalFilename,
     });
   } catch (error) {
-    console.error("Confidential Base64 Upload Error:", error);
+    logger.error(
+      { err: error, folder, originalFilename },
+      "Confidential Base64 Upload Error",
+    );
     throw error;
   }
 };

@@ -57,20 +57,31 @@ const buildRateLimitResponse = (message) => ({
   success: false,
 });
 
+const createRateLimitHandler = (message) => (req, res, _next, options) => {
+  const retryAfterSeconds = Math.ceil((options.windowMs || FIFTEEN_MINUTES) / 1000);
+  res.setHeader("Retry-After", retryAfterSeconds);
+  return res.status(options.statusCode).json({
+    ...buildRateLimitResponse(message),
+    correlationId: req.correlationId,
+  });
+};
+
 export const apiLimiter = rateLimit({
   windowMs: FIFTEEN_MINUTES,
-  max: 300,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
-  message: buildRateLimitResponse("Too many requests. Please try again later."),
+  handler: createRateLimitHandler(
+    "Too many requests. Please try again later.",
+  ),
 });
 
 export const authLimiter = rateLimit({
   windowMs: FIFTEEN_MINUTES,
-  max: 5,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
-  message: buildRateLimitResponse(
+  handler: createRateLimitHandler(
     "Too many authentication attempts from this IP. Please try again after 15 minutes.",
   ),
 });
@@ -91,9 +102,12 @@ export const authAccountLimiter = (req, res, next) => {
     return res
       .status(429)
       .json(
-        buildRateLimitResponse(
-          `Too many login attempts for this account. Retry after ${retryAfter} seconds.`,
-        ),
+        {
+          ...buildRateLimitResponse(
+            `Too many login attempts for this account. Retry after ${retryAfter} seconds.`,
+          ),
+          correlationId: req.correlationId,
+        },
       );
   }
 
@@ -103,9 +117,12 @@ export const authAccountLimiter = (req, res, next) => {
     return res
       .status(429)
       .json(
-        buildRateLimitResponse(
-          "Too many login attempts for this account. Please try again after 15 minutes.",
-        ),
+        {
+          ...buildRateLimitResponse(
+            "Too many login attempts for this account. Please try again after 15 minutes.",
+          ),
+          correlationId: req.correlationId,
+        },
       );
   }
 

@@ -42,7 +42,7 @@ const Login = () => {
 
   const getPostLoginPath = (user) => {
     const roleName = getRoleName(user);
-    if (roleName === 'ADMIN') return '/dashboard/admin/kpi';
+    if (roleName === 'ADMIN') return '/dashboard';
     if (roleName === 'SUPER ADMIN') return '/dashboard/client-connect';
     if (roleName === 'CLIENT' && user?.linkedClient?._id) {
       return `/dashboard/client/${user.linkedClient._id}`;
@@ -389,6 +389,7 @@ const Login = () => {
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
                                             className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#706B77] hover:text-[#3D2E4A] focus:outline-none"
+                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
                                         >
                                             {showPassword ? <EyeInvisibleOutlined className="text-xs" /> : <EyeOutlined className="text-xs" />}
                                         </button>
@@ -397,10 +398,9 @@ const Login = () => {
                             </div>
 
                             <div className="flex items-center justify-between text-xs">
-                                <label className="flex items-center gap-2 cursor-pointer text-[#706B77] hover:text-[#3D2E4A] transition-colors select-none">
-                                    <input type="checkbox" className="rounded text-[#E85D40] focus:ring-[#E85D40] w-4 h-4 border-[#E4E0DC]" />
-                                    <span className="text-[#706B77]">Remember me</span>
-                                </label>
+                                <span className="text-[#706B77]">
+                                    Secure OTP login is enabled for your account.
+                                </span>
                                 <Link to="/forgot-password" className="text-[#E85D40] font-medium hover:text-[#F27519] transition-colors">
                                     Forgot Password?
                                 </Link>

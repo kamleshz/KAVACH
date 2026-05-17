@@ -7,6 +7,9 @@ export default {
   theme: {
     extend: {
       colors: {
+        brand: {
+          primary: 'var(--brand-primary)',
+        },
         primary: {
           50: '#fff7ed',  // Orange-50
           100: '#ffedd5', // Orange-100

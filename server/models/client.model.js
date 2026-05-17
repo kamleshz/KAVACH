@@ -4,6 +4,14 @@ import documentSchema from "./document.schema.js";
 import msmeDetailsSchema from "./msme.schema.js";
 import productionFacilitySchema from "./productionFacility.schema.js";
 
+const statusHistorySchema = new mongoose.Schema({
+    from: { type: String, default: "" },
+    to: { type: String, default: "" },
+    changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    changedAt: { type: Date, default: Date.now },
+    reason: { type: String, default: "" }
+}, { _id: false });
+
 const clientSchema = new mongoose.Schema({
     clientName: {
         type: String,
@@ -25,7 +33,8 @@ const clientSchema = new mongoose.Schema({
     },
     financialYear: {
         type: String,
-        default: ""
+        default: "",
+        match: [/^\d{4}-\d{2}$/, "Financial year must be in YYYY-YY format"]
     },
     wasteType: {
         type: String,
@@ -65,15 +74,18 @@ const clientSchema = new mongoose.Schema({
     companyDetails: {
         pan: {
             type: String,
-            default: ""
+            default: "",
+            match: [/^[A-Z]{5}[0-9]{4}[A-Z]$/, "Invalid PAN format"]
         },
         cin: {
             type: String,
-            default: ""
+            default: "",
+            match: [/^[LU][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}$/, "Invalid CIN format"]
         },
         gst: {
             type: String,
-            default: ""
+            default: "",
+            match: [/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, "Invalid GST format"]
         },
         udyamRegistration: {
             type: String,
@@ -192,6 +204,10 @@ const clientSchema = new mongoose.Schema({
         enum: ['DRAFT', 'SUBMITTED', 'PRE_VALIDATION', 'AUDIT'],
         default: 'DRAFT'
     },
+    statusHistory: {
+        type: [statusHistorySchema],
+        default: []
+    },
     lastCompletedStep: {
         type: Number,
         default: 0
@@ -199,6 +215,9 @@ const clientSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+clientSchema.index({ "companyDetails.pan": 1 }, { sparse: true, name: "idx_client_company_pan" });
+clientSchema.index({ "companyDetails.cin": 1 }, { sparse: true, name: "idx_client_company_cin" });
 
 const ClientModel = mongoose.model("Client", clientSchema);
 

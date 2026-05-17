@@ -8,6 +8,7 @@ import useAuth from '../../../hooks/useAuth';
 import { usePlantProcessHistory } from './usePlantProcessHistory';
 import {
   PACKAGING_TYPES,
+    INDUSTRY_CATEGORY_OPTIONS,
   POLYMER_TYPES,
   CATEGORIES,
   CATEGORY_II_TYPE_OPTIONS,
@@ -96,6 +97,97 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
     return s.substring(0, 3).toUpperCase();
   };
 
+  const MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const normalizeInvoiceDateInput = (value) => {
+    if (value === undefined || value === null || value === '') {
+      return { displayValue: '', monthName: '', quarter: '', yearlyQuarter: '' };
+    }
+
+    const rawValue = typeof value === 'string' ? value.trim() : value;
+    if (rawValue === 'Not Applicable') {
+      return {
+        displayValue: 'Not Applicable',
+        monthName: 'Not Applicable',
+        quarter: 'Not Applicable',
+        yearlyQuarter: 'Not Applicable'
+      };
+    }
+
+    let day;
+    let month;
+    let year;
+
+    if (typeof rawValue === 'number') {
+      const parsed = XLSX.SSF.parse_date_code(rawValue);
+      if (parsed) {
+        day = parsed.d;
+        month = parsed.m;
+        year = parsed.y;
+      }
+    } else if (rawValue instanceof Date && !Number.isNaN(rawValue.getTime())) {
+      day = rawValue.getUTCDate();
+      month = rawValue.getUTCMonth() + 1;
+      year = rawValue.getUTCFullYear();
+    } else {
+      const text = String(rawValue).trim();
+      const dayFirstMatch = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+      const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+
+      if (dayFirstMatch) {
+        day = parseInt(dayFirstMatch[1], 10);
+        month = parseInt(dayFirstMatch[2], 10);
+        year = parseInt(dayFirstMatch[3], 10);
+      } else if (isoMatch) {
+        year = parseInt(isoMatch[1], 10);
+        month = parseInt(isoMatch[2], 10);
+        day = parseInt(isoMatch[3], 10);
+      } else {
+        const parsed = new Date(text);
+        if (!Number.isNaN(parsed.getTime())) {
+          day = parsed.getUTCDate();
+          month = parsed.getUTCMonth() + 1;
+          year = parsed.getUTCFullYear();
+        }
+      }
+    }
+
+    if (
+      !Number.isInteger(day) ||
+      !Number.isInteger(month) ||
+      !Number.isInteger(year) ||
+      month < 1 ||
+      month > 12 ||
+      day < 1 ||
+      day > 31
+    ) {
+      return {
+        displayValue: typeof rawValue === 'string' ? rawValue : String(rawValue ?? ''),
+        monthName: '',
+        quarter: '',
+        yearlyQuarter: ''
+      };
+    }
+
+    const displayValue = `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}`;
+    return {
+      displayValue,
+      monthName: MONTH_NAMES[month - 1] || '',
+      quarter:
+        month >= 4 && month <= 6
+          ? 'Q1'
+          : month >= 7 && month <= 9
+            ? 'Q2'
+            : month >= 10 && month <= 12
+              ? 'Q3'
+              : 'Q4',
+      yearlyQuarter: month >= 4 && month <= 9 ? 'H1' : 'H2'
+    };
+  };
+
   const getSupplierCodePrefix = (supplierName, supplierState, companyName) => {
     const supplierShortName = getSupplierShortName(supplierName);
     const companyShortName = getCompanyShortName(companyName);
@@ -151,6 +243,7 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
       generate: 'No',
       systemCode: '',
       packagingType: '',
+      industryCategory: '',
       skuCode: '',
       skuDescription: '',
       skuUom: '',
@@ -902,11 +995,25 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
             };
 
             const generateRef = getColRef('Generate Component Code');
+            const packagingTypeRef = getColRef('Packaging Type');
+            const industryCategoryRef = getColRef('Industry Category');
             const supplierTypeRef = getColRef('Supplier Type');
             const supplierCategoryRef = getColRef('Supplier Category');
             const generateSupplierRef = getColRef('Generate Supplier Code');
 
             ws['!dataValidation'] = [
+                packagingTypeRef ? {
+                    type: 'list',
+                    allowBlank: true,
+                    sqref: packagingTypeRef,
+                    formulae: [`"${PACKAGING_TYPES.join(',')}"`]
+                } : null,
+                industryCategoryRef ? {
+                    type: 'list',
+                    allowBlank: true,
+                    sqref: industryCategoryRef,
+                    formulae: [`"${INDUSTRY_CATEGORY_OPTIONS.join(',')}"`]
+                } : null,
                 generateRef ? {
                     type: 'list',
                     allowBlank: true,
@@ -917,7 +1024,7 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                     type: 'list',
                     allowBlank: true,
                     sqref: supplierTypeRef,
-                    formulae: ['"Manufacture,Importer of raw material,Importer,Producer,Brand Owner,Seller"']
+                    formulae: ['"Manufacture,Importer of raw material,Importer,Producer,Brand Owner,PWP,Seller"']
                 } : null,
                 supplierCategoryRef ? {
                     type: 'list',
@@ -1101,8 +1208,8 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                     return '';
                 };
                 
-                let packagingType = getValue([/packaging.*type/i]);
-                let industryCategory = getValue([/industry.*cat/i, /category/i]);
+                let packagingType = getValue([/^packaging\s*type$/i, /packaging.*type/i]);
+                let industryCategory = getValue([/^industry\s*category$/i, /industry.*cat/i]);
                 let skuCode = getValue([/sku.*code/i, /^sku$/i]);
                 let skuDescription = getValue([/sku.*desc/i]);
                 let skuUom = getValue([/sku.*uom/i, /uom/i]);
@@ -1133,9 +1240,9 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                 let supplierName = getValue([/supplier.*name/i]);
                 let supplierState = getValue([/supplier.*state/i]);
                 let supplierType = getValue([/supplier.*type/i]);
-                let supplierCategory = getValue([/supplier.*cat/i, /category/i]);
-                let generateSupplierCode = getValue([/generate.*supplier/i]) || 'No';
-                let supplierCode = getValue([/supplier.*code/i]);
+                let supplierCategory = getValue([/^supplier\s*category$/i, /supplier.*cat/i]);
+                let generateSupplierCode = getValue([/^generate\s*supplier\s*code$/i, /generate.*supplier/i]) || 'No';
+                let supplierCode = getValue([/^supplier\s*code$/i, /supplier.*code/i]);
                 let clientName = getValue([/client.*name/i]);
                 let clientState = getValue([/client.*state/i, /^state$/i]);
 
@@ -1165,7 +1272,7 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                     }
                 }
                 
-                if (generateSupplierCode === 'No') {
+                if (generateSupplierCode === 'Yes') {
                      const stateShort = getStateShortName(supplierState);
                      const supplierShort = getSupplierShortName(supplierName);
                      const companyShort = getCompanyShortName(client?.clientName);
@@ -1243,6 +1350,8 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                 if (isProducer) {
                     if (!row.clientName) missing.push('Client Name');
                     if (!row.clientState) missing.push('State');
+                    if (!row.industryCategory) missing.push('Industry Category');
+                    if (!row.skuCode) missing.push('SKU Code');
                 } else {
                     if (!row.skuCode) missing.push('SKU Code');
                     if (!row.skuDescription) missing.push('SKU Description');
@@ -1557,6 +1666,7 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
           generate: 'No',
           systemCode: newSystemCode,
           packagingType: '',
+          industryCategory: '',
           clientName: '',
           clientState: '',
           skuCode: '',
@@ -1857,6 +1967,7 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
           generate: 'No',
           systemCode: '',
           packagingType: '',
+          industryCategory: '',
           skuCode: '',
           skuDescription: '',
           skuUom: '',
@@ -2198,8 +2309,8 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                 let supplierName = getValue([/supplier.*name/i]);
                 let supplierType = getValue([/supplier.*type/i]);
                 let supplierCategory = getValue([/supplier.*cat/i, /category/i]);
-                let generateSupplierCode = getValue([/generate.*supplier/i]) || 'No';
-                let supplierCode = getValue([/supplier.*code/i]);
+                let generateSupplierCode = getValue([/^generate\s*supplier\s*code$/i, /generate.*supplier/i]) || 'No';
+                let supplierCode = getValue([/^supplier\s*code$/i, /supplier.*code/i]);
 
                 if (generate === 'Yes') {
                      const match = currentAllRows.find(r => 
@@ -3109,13 +3220,52 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
               type: 'list',
               allowBlank: true,
               sqref: 'G2:G500',
-              formulae: ['"MT,KG,Units,Roll,Nos,Not Applicable"']
+              formulae: ['"MT,KG,Units,Roll,Nos,Pcs,Not Applicable"']
           }
       ];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Recycled Quantity Template");
       XLSX.writeFile(wb, "Recycled_Quantity_Used_Template.xlsx");
+  };
+
+  const normalizeMonthlyUom = (value) => {
+      const normalized = (value || '').toString().trim();
+      switch (normalized.toUpperCase()) {
+          case 'MT':
+              return 'MT';
+          case 'KG':
+              return 'KG';
+          case 'UNITS':
+              return 'Units';
+          case 'ROLL':
+              return 'Roll';
+          case 'NOS':
+              return 'Nos';
+          case 'PCS':
+              return 'Pcs';
+          case 'NOT APPLICABLE':
+              return 'Not Applicable';
+          default:
+              return normalized;
+      }
+  };
+  const normalizeMonthlyPpwUom = (value) => {
+      const normalized = (value || '').toString().trim();
+      switch (normalized.toUpperCase()) {
+          case 'GM':
+          case 'G':
+          case 'GMS':
+          case 'GRAM':
+          case 'GRAMS':
+              return 'GM';
+          case 'KG':
+          case 'KGS':
+          case 'KILOGRAM':
+          case 'KILOGRAMS':
+          default:
+              return 'KG';
+      }
   };
 
   const handleMonthlyExcelUpload = (e) => {
@@ -3148,6 +3298,10 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                  'purchase qty': 'purchaseQty',
                  'uom': 'uom',
                  'per piece weight': 'perPieceWeightKg',
+                 'ppw uom': 'ppwUom',
+                 'ppwuom': 'ppwUom',
+                 'ppw_uom': 'ppwUom',
+                 'ppw-uom': 'ppwUom',
                  'monthly purchase mt': 'monthlyPurchaseMt',
                  'rc % mentioned': 'rcPercentMentioned',
                  'recycled %': 'recycledPercent',
@@ -3182,6 +3336,7 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                      purchaseQty: '',
                      uom: '',
                      perPieceWeightKg: '',
+                     ppwUom: 'KG',
                      monthlyPurchaseMt: '',
                      rcPercentMentioned: '',
                      recycledPercent: '',
@@ -3196,25 +3351,8 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                       if (headerMap[h]) {
                           let val = rowData[idx];
                           if (headerMap[h] === 'dateOfInvoice') {
-                              if (val !== undefined && val !== null) {
-                                  if (typeof val === 'number') {
-                                      // Parse Excel serial date
-                                      const date = new Date((val - 25569) * 86400 * 1000);
-                                      if (!isNaN(date.getTime())) {
-                                          const d = String(date.getDate()).padStart(2, '0');
-                                          const m = String(date.getMonth() + 1).padStart(2, '0');
-                                          const y = date.getFullYear();
-                                          val = `${d}-${m}-${y}`;
-                                      } else {
-                                          val = val.toString();
-                                      }
-                                  } else {
-                                      val = val.toString().trim();
-                                  }
-                              } else {
-                                  val = '';
-                              }
-                              newRow[headerMap[h]] = val;
+                              const invoiceMeta = normalizeInvoiceDateInput(val);
+                              newRow[headerMap[h]] = invoiceMeta.displayValue;
                           } else {
                               newRow[headerMap[h]] = (val ?? '').toString();
                           }
@@ -3222,31 +3360,14 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                   });
                   // Calculate date derived fields
                   if (newRow.dateOfInvoice) {
-                      const dateVal = newRow.dateOfInvoice.trim();
-                      if (dateVal === 'Not Applicable') {
-                          newRow.monthName = 'Not Applicable';
-                          newRow.quarter = 'Not Applicable';
-                          newRow.yearlyQuarter = 'Not Applicable';
-                      } else {
-                          const parts = dateVal.split('-');
-                          if (parts.length === 3) {
-                              const d = parseInt(parts[0], 10);
-                              const m = parseInt(parts[1], 10);
-                              const y = parseInt(parts[2], 10);
-                              if (!isNaN(d) && !isNaN(m) && !isNaN(y) && m >= 1 && m <= 12) {
-                                  const dateObj = new Date(y, m - 1, d);
-                                  newRow.monthName = dateObj.toLocaleString('default', { month: 'long' });
-                                  if (m >= 4 && m <= 6) newRow.quarter = 'Q1';
-                                  else if (m >= 7 && m <= 9) newRow.quarter = 'Q2';
-                                  else if (m >= 10 && m <= 12) newRow.quarter = 'Q3';
-                                  else newRow.quarter = 'Q4';
-                                  // Half Year
-                                  if (m >= 4 && m <= 9) newRow.yearlyQuarter = 'H1';
-                                  else newRow.yearlyQuarter = 'H2';
-                              }
-                          }
-                      }
+                      const invoiceMeta = normalizeInvoiceDateInput(newRow.dateOfInvoice);
+                      newRow.dateOfInvoice = invoiceMeta.displayValue;
+                      newRow.monthName = invoiceMeta.monthName;
+                      newRow.quarter = invoiceMeta.quarter;
+                      newRow.yearlyQuarter = invoiceMeta.yearlyQuarter;
                   }
+                  newRow.uom = normalizeMonthlyUom(newRow.uom);
+                  newRow.ppwUom = normalizeMonthlyPpwUom(newRow.ppwUom);
                   if (newRow.systemCode) {
                       const selected = systemCodeOptions.find(opt => opt.code === newRow.systemCode);
                       if (selected && selected.data) {
@@ -3268,12 +3389,15 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                         if (!newRow.recycledPolymerUsed) newRow.recycledPolymerUsed = (compMatch?.recycledPolymerUsed || '').toString();
                       }
                   }
-                  const uom = newRow.uom;
+                  const uom = normalizeMonthlyUom(newRow.uom);
+                  newRow.uom = uom;
                   const qty = parseFloat(newRow.purchaseQty) || 0;
                   const wt = parseFloat(newRow.perPieceWeightKg) || 0;
+                  const ppwUom = normalizeMonthlyPpwUom(newRow.ppwUom);
+                  newRow.ppwUom = ppwUom;
                   let monthlyMt = parseFloat(newRow.monthlyPurchaseMt) || 0;
                   if (!monthlyMt) {
-                      if (uom === 'Units' || uom === 'Nos' || uom === 'Roll') monthlyMt = (qty * wt) / 1000;
+                      if (uom === 'Units' || uom === 'Nos' || uom === 'Roll' || uom === 'Pcs') monthlyMt = ppwUom === 'GM' ? (qty * wt) / 1000000 : (qty * wt) / 1000;
                       else if (uom === 'KG') monthlyMt = qty / 1000;
                       else if (uom === 'MT') monthlyMt = qty;
                   }
@@ -3330,8 +3454,9 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
                   'Quarter': row.quarter || '',
                   'Half Year': row.yearlyQuarter || '',
                   'Purchase Qty': row.purchaseQty || '',
-                 'UOM': row.uom || '',
+                 'UOM': normalizeMonthlyUom(row.uom) || '',
                  'Per Piece Weight': row.perPieceWeightKg || '',
+                 'PPW UOM': normalizeMonthlyPpwUom(row.ppwUom) || 'KG',
                  'Monthly purchase MT': row.monthlyPurchaseMt || '',
                  'RC % Mentioned': row.rcPercentMentioned || '',
                  'Recycled %': (parseFloat(row.recycledPercent) * 100).toFixed(2) + '%',
@@ -3378,6 +3503,7 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
           'Purchase Qty',
           'UOM',
           'Per Piece Weight',
+          'PPW UOM',
           'Monthly purchase MT',
           'Recycled %',
           'Recycled QTY',
@@ -3390,20 +3516,26 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
       ].filter(Boolean);
 
       const ws = XLSX.utils.aoa_to_sheet([headers]);
-      ws['!dataValidation'] = [
-          {
+      const uomCol = headers.indexOf('UOM');
+      const ppwUomCol = headers.indexOf('PPW UOM');
+      const validations = [];
+      if (uomCol >= 0) {
+          validations.push({
               type: 'list',
               allowBlank: true,
-              sqref: 'J2:J500',
-              formulae: ['"MT,KG,Units,Roll,Nos,Not Applicable"']
-          },
-          {
+              sqref: `${XLSX.utils.encode_col(uomCol)}2:${XLSX.utils.encode_col(uomCol)}500`,
+              formulae: ['"MT,KG,Units,Roll,Nos,Pcs,Not Applicable"']
+          });
+      }
+      if (ppwUomCol >= 0) {
+          validations.push({
               type: 'list',
               allowBlank: true,
-              sqref: 'O2:O500',
-              formulae: ['"Yes,No"']
-          }
-      ];
+              sqref: `${XLSX.utils.encode_col(ppwUomCol)}2:${XLSX.utils.encode_col(ppwUomCol)}500`,
+              formulae: ['"KG,GM"']
+          });
+      }
+      ws['!dataValidation'] = validations;
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Monthly Procurement Template");
@@ -3831,6 +3963,11 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
         });
         const rows = (res.data?.data || []).map((row) => {
           const next = { ...row };
+          const invoiceMeta = normalizeInvoiceDateInput(next.dateOfInvoice);
+          next.dateOfInvoice = invoiceMeta.displayValue;
+          if (invoiceMeta.monthName) next.monthName = invoiceMeta.monthName;
+          if (invoiceMeta.quarter) next.quarter = invoiceMeta.quarter;
+          if (invoiceMeta.yearlyQuarter) next.yearlyQuarter = invoiceMeta.yearlyQuarter;
           const rQty = parseFloat(next.recycledQty) || 0;
           const rRate = parseFloat(next.recycledRate) || 0;
           if (rQty && rRate) next.recycledQrtAmount = (rQty * rRate).toFixed(3);
@@ -4436,23 +4573,6 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
     return isAbs ? p : `${api.defaults.baseURL}/${p}`;
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-screen bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-    </div>
-  );
-  
-  if (error) return (
-    <div className="flex items-center justify-center h-screen bg-gray-50">
-        <div className="text-red-600 bg-white p-6 rounded-lg shadow-lg">
-            <ExclamationCircleFilled className="text-4xl mb-4 block text-center" />
-            <p className="text-lg font-semibold">{error}</p>
-        </div>
-    </div>
-  );
-
-  if (!item) return <div className="p-6">Item not found</div>;
-
   // Pagination Logic
   const indexOfLastRow = currentPage * itemsPerPage;
   const indexOfFirstRow = indexOfLastRow - itemsPerPage;
@@ -4479,124 +4599,6 @@ export const usePlantProcessState = (argsOrClientId, typeArg, itemIdArg, onBackA
   const indexOfLastMonthlyRow = monthlyPage * monthlyItemsPerPage;
   const indexOfFirstMonthlyRow = indexOfLastMonthlyRow - monthlyItemsPerPage;
   const totalRecycledPages = Math.ceil(recycledRows.length / recycledItemsPerPage);
-
-  return (
-    <div className={`min-h-screen bg-gray-50 pb-12 ${onBack ? '' : '-m-6'}`}>
-      {/* Header Section */}
-      <div className="bg-white shadow-sm border-b">
-          <div className="w-full mx-auto px-2 py-3">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => {
-                            if (!isSaving) {
-                                if (onBack) {
-                                    onBack();
-                                } else {
-                                    navigate(`/dashboard/client/${clientId}`, { state: { viewMode: 'process' } });
-                                }
-                            }
-                        }}
-                        className={`group flex h-10 w-10 items-center justify-center rounded-full shadow-sm transition-all ${
-                            isSaving 
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                                : 'bg-gray-100 text-gray-500 hover:bg-primary-600 hover:text-white'
-                        }`}
-                        title={isSaving ? "Saving progress..." : "Back to Client Details"}
-                        disabled={isSaving}
-                    >
-                        {isSaving ? (
-                            <LoadingOutlined spin />
-                        ) : (
-                            <ArrowLeftOutlined className="transition-transform group-hover:-translate-x-1" />
-                        )}
-                    </button>
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold text-gray-900 m-0 leading-tight">
-                                {item.plantName || client.clientName}
-                            </h1>
-                        </div>
-                    </div>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                    <Tooltip title="View Change History">
-                        <Button 
-                            type="primary" 
-                            ghost 
-                            icon={<HistoryOutlined />} 
-                            onClick={() => setShowHistoryModal(true)}
-                            className="flex items-center gap-2 font-medium"
-                        >
-                            History
-                        </Button>
-                    </Tooltip>
-
-
-                </div>
-            </div>
-          </div>
-      </div>
-      <div className="fixed top-4 right-4 z-50 space-y-2">
-        {notifications.map(n => (
-          <div
-            key={n.id}
-            className={`min-w-[260px] max-w-sm rounded-lg px-3 py-2 shadow-sm flex items-center justify-between relative ${
-              n.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              {n.type === 'error' ? <ExclamationCircleFilled /> : <CheckCircleFilled />}
-              <span className="text-sm font-medium">{n.text}</span>
-            </div>
-            <button
-              onClick={() => dismissNotification(n.id)}
-              className={`text-white/90 hover:text-white`}
-              title="Dismiss"
-            >
-              <CloseOutlined />
-            </button>
-            <div
-              className="absolute left-0 bottom-0 h-0.5 bg-white/80"
-              style={{
-                width: n.started ? '0%' : '100%',
-                transition: `width ${n.duration}ms linear`
-              }}
-            />
-          </div>
-        ))}
-      </div>
-
-      <div className="w-full mx-auto px-2 py-8">
-        
-        {/* Progress Stepper */}
-        <div className="mb-8">
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                {/* Mobile Compact Stepper */}
-                <div className="md:hidden p-4">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-semibold text-gray-700">
-                            Step {currentStepIndex + 1} of {steps.length}: {steps[currentStepIndex].label}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                            {Math.round(((currentStepIndex + 1) / steps.length) * 100)}% Complete
-                        </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                            className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${((currentStepIndex + 1) / steps.length) * 100}%` }}
-                        ></div>
-                    </div>
-                    {/* Navigation buttons for mobile if needed, or rely on internal next/back */}
-                </div>
-
-                {/* Desktop Full Stepper */}
-                <div className="hidden md:flex flex-row">
-                    {steps.map((step, index) => {
-                        const isCurrent = index === currentStepIndex;
-                        const isCompleted = completedSteps.includes(step.id);
 
     return {
         persistedHistory,

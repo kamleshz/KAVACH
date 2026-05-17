@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import logger from '../utils/logger.js';
 dotenv.config();
 
 export const analyzeTableController = async (req, res) => {
@@ -50,7 +51,7 @@ export const analyzeTableController = async (req, res) => {
                     throw new Error(data.error?.message || "Failed to get response from OpenAI");
                 }
             } catch (apiError) {
-                console.error("AI API Error:", apiError);
+                logger.error({ err: apiError }, "AI API Error");
                 analysisResult = "Error communicating with AI service. Please check server logs.";
             }
         } else if (GEMINI_API_KEY) {
@@ -86,7 +87,7 @@ Based on the provided data (${Array.isArray(tableData) ? tableData.length : 0} r
         });
 
     } catch (error) {
-        console.error("AI Analysis Error:", error);
+        logger.error({ err: error }, "AI Analysis Error");
         return res.status(500).json({
             message: error.message || "Internal Server Error",
             error: true,

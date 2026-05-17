@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import logger from "../utils/logger.js";
 
 async function connectDB() {
   try {
@@ -20,9 +21,9 @@ async function connectDB() {
       family: 4,
       maxPoolSize: 10,
     });
-    console.log("MongoDB connected successfully");
+    logger.info("MongoDB connected successfully");
   } catch (error) {
-    console.error("MongoDB connection error:", error);
+    logger.error({ err: error }, "MongoDB connection error");
     // Throw error to let caller know
     throw error;
   }

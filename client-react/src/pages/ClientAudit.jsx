@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 import { 
@@ -23,6 +23,7 @@ import {
 import { toast } from 'react-toastify';
 import ProductComplianceStep from '../components/ProductComplianceStep';
 import DocumentViewerModal from '../components/DocumentViewerModal';
+import BackButton from '../components/BackButton';
 
 // New Consent Verification Row Component matching the image
 const ConsentVerificationRow = ({ item, type, onVerify, isSubmitting, resolveUrl, onViewDocument }) => {
@@ -237,6 +238,8 @@ const VerificationCard = ({ title, subtitle, status, remark, onVerify, isSubmitt
 };
 
 const ClientAudit = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
     // viewState: 'clientList' | 'plantList' | 'verification'
     const [viewState, setViewState] = useState('clientList');
     const [selectedClient, setSelectedClient] = useState(null);
@@ -249,6 +252,7 @@ const ClientAudit = () => {
     const [viewerOpen, setViewerOpen] = useState(false);
     const [viewerUrl, setViewerUrl] = useState('');
     const [viewerName, setViewerName] = useState('');
+    const returnTo = location.state?.from || '/dashboard/clients';
 
     const handleViewDocument = (filePath, docType, docName) => {
         setViewerUrl(resolveUrl(filePath));
@@ -352,8 +356,8 @@ const ClientAudit = () => {
                     const firstGroup = groups[0];
                     setSelectedPlant(firstGroup);
                     
-                    // Update audit status if needed
-                    if (data.clientStatus !== 'AUDIT') {
+                    // Update audit status only after validation sign-off
+                    if (data.clientStatus !== 'AUDIT' && data.validationStatus === 'Verified') {
                         try {
                             await api.put(API_ENDPOINTS.CLIENT.UPDATE(data._id), { clientStatus: 'AUDIT' });
                             data.clientStatus = 'AUDIT'; // Optimistic update
@@ -392,8 +396,8 @@ const ClientAudit = () => {
         setSelectedPlant(plantGroup);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         
-        // Ensure audit status is set on the client if not already
-        if (clientData && clientData.clientStatus !== 'AUDIT') {
+        // Ensure audit status is set only after validation sign-off
+        if (clientData && clientData.clientStatus !== 'AUDIT' && clientData.validationStatus === 'Verified') {
              try {
                 await api.put(API_ENDPOINTS.CLIENT.UPDATE(clientData._id), { clientStatus: 'AUDIT' });
                 setIsAuditStarted(true);
@@ -404,6 +408,9 @@ const ClientAudit = () => {
                  toast.error("Could not update client status, but continuing...");
              }
         } else {
+            if (clientData && clientData.clientStatus !== 'AUDIT' && clientData.validationStatus !== 'Verified') {
+                toast.info("Validation sign-off is required before moving the client to Audit.");
+            }
             setIsAuditStarted(true);
         }
         setViewState('verification');
@@ -416,6 +423,10 @@ const ClientAudit = () => {
             setViewState('plantList');
             setSelectedPlant(null);
         } else if (viewState === 'plantList') {
+            if (location.state?.from) {
+                navigate(returnTo);
+                return;
+            }
             setViewState('clientList');
             setClientData(null);
             setSelectedClient(null);
@@ -509,12 +520,14 @@ const ClientAudit = () => {
             {/* Header / Back Button */}
             {viewState !== 'clientList' && (
                 <div className="p-4 border-b border-gray-100 flex items-center gap-4">
-                    <button 
-                        onClick={handleBack}
-                        className="text-gray-500 hover:text-gray-700 flex items-center gap-2 font-medium"
-                    >
-                        <FaArrowLeft /> Back
-                    </button>
+                    <div className="flex items-center gap-2 text-gray-500">
+                        <BackButton
+                            onClick={handleBack}
+                            title={viewState === 'verification' ? 'Back to plant list' : `Back to ${clientData?.clientName || 'clients'}`}
+                            className="shadow-none"
+                        />
+                        <span className="font-medium">Back</span>
+                    </div>
                     <div>
                         <h2 className="text-lg font-bold text-gray-800">
                             {viewState === 'plantList' ? `Plants - ${clientData?.clientName}` : `Audit: ${activePlantGroup?.displayName}`}

@@ -9,6 +9,7 @@ import ProductComplianceModel from "../../models/productCompliance.model.js";
 import SkuComplianceModel from "../../models/skuCompliance.model.js";
 import ClientModel from "../../models/client.model.js";
 import PWPModel from "../../models/pwp.model.js";
+import logger from "../../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -652,9 +653,9 @@ class PlasticAnalysisService {
           });
         }
       } catch (err) {
-        console.error(
-          "Error fetching saved Purchase Analysis for fallback:",
-          err,
+        logger.error(
+          { err },
+          "Error fetching saved Purchase Analysis for fallback",
         );
       }
     }

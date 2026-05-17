@@ -69,14 +69,14 @@ const LoginLogs = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-8">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6 2xl:p-8">
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="mb-5 md:mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-500">
             Security Audit
           </p>
-          <h1 className="mt-2 text-3xl md:text-4xl font-semibold text-gray-900">
+          <h1 className="mt-2 text-2xl md:text-3xl 2xl:text-4xl font-semibold text-gray-900">
             Login History
           </h1>
           <p className="mt-1 text-sm text-gray-600">
@@ -89,7 +89,7 @@ const LoginLogs = () => {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         
         {/* Toolbar */}
-        <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
+        <div className="p-4 md:p-5 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
            <div className="flex items-center gap-2">
                <div className="h-8 w-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
                    <FaHistory className="text-sm" />
@@ -113,12 +113,12 @@ const LoginLogs = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">User</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">IP Address</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Time</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Device</th>
+                <th className="px-5 py-3.5 md:px-6 md:py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">User</th>
+                <th className="px-5 py-3.5 md:px-6 md:py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Role</th>
+                <th className="px-5 py-3.5 md:px-6 md:py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">IP Address</th>
+                <th className="px-5 py-3.5 md:px-6 md:py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
+                <th className="px-5 py-3.5 md:px-6 md:py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Time</th>
+                <th className="px-5 py-3.5 md:px-6 md:py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Device</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -146,23 +146,23 @@ const LoginLogs = () => {
               ) : (
                 logs.map((log) => (
                   <tr key={log._id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-3.5 md:px-6 md:py-4">
                       <div className="flex flex-col">
                         <span className="text-sm font-semibold text-gray-900">{log.name || 'Unknown'}</span>
                         <span className="text-xs text-gray-500">{log.email}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-3.5 md:px-6 md:py-4">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                         {log.role}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-3.5 md:px-6 md:py-4">
                       <span className="font-mono text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100">
                         {log.ipAddress}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-3.5 md:px-6 md:py-4">
                         {log.city || log.country ? (
                             <div className="flex items-center gap-1.5">
                                 <FaMapMarkerAlt className="text-red-400 text-xs" />
@@ -174,7 +174,7 @@ const LoginLogs = () => {
                             <span className="text-xs text-gray-400 italic">Unknown</span>
                         )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-3.5 md:px-6 md:py-4">
                         <div className="flex flex-col">
                             <span className="text-sm text-gray-900">
                                 {new Date(log.createdAt).toLocaleDateString()}
@@ -184,7 +184,7 @@ const LoginLogs = () => {
                             </span>
                         </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-3.5 md:px-6 md:py-4">
                         <span className="text-xs text-gray-500 max-w-xs truncate block" title={log.userAgent}>
                             {log.userAgent}
                         </span>
@@ -198,7 +198,7 @@ const LoginLogs = () => {
 
         {/* Pagination */}
         {!loading && logs.length > 0 && (
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
+            <div className="px-5 py-3.5 md:px-6 md:py-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
                 <span className="text-xs text-gray-500">
                     Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} entries
                 </span>

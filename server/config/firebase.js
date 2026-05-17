@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import dotenv from "dotenv";
+import logger from "../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,14 +26,14 @@ try {
     });
 
     bucket = admin.storage().bucket();
-    console.log("Firebase Admin initialized successfully.");
+    logger.info("Firebase Admin initialized successfully.");
   } else {
-    console.warn(
+    logger.warn(
       "Warning: serviceAccountKey.json not found in server/config/. Firebase upload will not work.",
     );
   }
 } catch (error) {
-  console.error("Error initializing Firebase Admin:", error);
+  logger.error({ err: error }, "Error initializing Firebase Admin");
 }
 
 export { bucket };

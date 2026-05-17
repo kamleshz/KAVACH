@@ -47,6 +47,13 @@ export const clearAccessToken = () => {
   inMemoryAccessToken = null;
 };
 
+const isPublicAuthRoute = () => {
+  if (typeof window === "undefined") return false;
+  return ["/login", "/register", "/forgot-password"].includes(
+    window.location.pathname,
+  );
+};
+
 api.interceptors.request.use(
   (config) => {
     const next = config || {};
@@ -69,7 +76,9 @@ api.interceptors.response.use(
 
     if (status === 401 && originalRequest && !originalRequest._retry) {
       const url = originalRequest.url || "";
+      const isUserDetailsRequest = url.includes(API_ENDPOINTS.AUTH.ME);
       if (
+        !(isUserDetailsRequest && isPublicAuthRoute()) &&
         !url.includes(API_ENDPOINTS.AUTH.LOGIN) &&
         !url.includes(API_ENDPOINTS.AUTH.VERIFY_OTP) &&
         !url.includes(API_ENDPOINTS.AUTH.FORGOT_PASSWORD) &&

@@ -4,9 +4,16 @@
     <meta charset="utf-8">
     <title>Pre-validation Report</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
         @page {
             size: A4 landscape;
             margin: 15mm 12mm;
+        }
+        
+        @page :first {
+            size: A4 landscape;
+            margin: 0;
         }
         
         * {
@@ -14,28 +21,30 @@
         }
         
         body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-family: 'Nunito', sans-serif !important;
             color: #374151;
             line-height: 1.6;
             margin: 0;
             font-size: 10px;
             background: #ffffff;
             -webkit-font-smoothing: antialiased;
+            orphans: 3;
+            widows: 3;
         }
         
         /* ============================================
            DESIGN SYSTEM - COLORS
            ============================================ */
         :root {
-            --primary: #059669;
-            --primary-light: #d1fae5;
-            --primary-dark: #065f46;
-            --secondary: #f97316;
-            --secondary-light: #ffedd5;
+            --primary: #5DBB9A;
+            --primary-light: #DDF2E8;
+            --primary-dark: #0F5D46;
+            --secondary: #5DBB9A;
+            --secondary-light: #F4FBF7;
             --danger: #dc2626;
             --danger-light: #fee2e2;
-            --warning: #f59e0b;
-            --warning-light: #fef3c7;
+            --warning: #5DBB9A;
+            --warning-light: #EAF5F0;
             --gray-50: #f9fafb;
             --gray-100: #f3f4f6;
             --gray-200: #e5e7eb;
@@ -65,9 +74,35 @@
         /* ============================================
            LAYOUT UTILITIES
            ============================================ */
-        .page-break { page-break-after: always; }
-        .page-break-before { page-break-before: always; }
-        .section { margin-bottom: 30px; }
+        .page-break {
+            page-break-after: always;
+            break-after: page;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            border: 0;
+        }
+        .page-break-before {
+            page-break-before: always;
+            break-before: page;
+        }
+        .report-page {
+            position: relative;
+            min-height: 180mm;
+            display: flex;
+            flex-direction: column;
+        }
+        .section { margin-bottom: 24px; }
+        .keep-with-next {
+            page-break-after: avoid;
+            break-after: avoid-page;
+            page-break-inside: avoid;
+            break-inside: avoid-page;
+        }
+        .keep-together {
+            page-break-inside: avoid;
+            break-inside: avoid-page;
+        }
         
         .flex { display: flex; }
         .flex-col { flex-direction: column; }
@@ -86,41 +121,59 @@
            HEADER COMPONENT
            ============================================ */
         .report-header {
-            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 50%, #a7f3d0 100%);
-            padding: 30px 40px;
+            background: linear-gradient(135deg, #BFE5D2 0%, #EAF5F0 55%, #BFE5D2 100%);
+            padding: 26px 32px 16px;
             text-align: center;
-            border-bottom: 4px solid #059669;
-            margin-bottom: 30px;
-            border-radius: 0 0 12px 12px;
+            border-bottom: 1px solid #C8DED3;
+            margin-bottom: 24px;
+            border-radius: 0;
             position: relative;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            box-shadow: none;
         }
         
         .report-header .header-logo {
             position: absolute;
-            top: 20px;
-            right: 25px;
-            height: 55px;
-            width: auto;
+            top: 16px;
+            height: 42px;
+            max-width: 72px;
+            padding: 6px 8px;
+            background: #ffffff;
+            border-radius: 4px;
+            border: 1px solid #D6EADF;
             object-fit: contain;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+            filter: none;
+        }
+
+        .report-header .header-logo-left {
+            left: 20px;
+        }
+
+        .report-header .header-logo-right {
+            right: 20px;
         }
         
         .company-name {
-            font-size: 28px;
+            font-size: 25px;
             font-weight: 800;
-            color: #065f46;
-            margin-bottom: 8px;
-            letter-spacing: -0.5px;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            color: #0F5D46;
+            margin-bottom: 6px;
+            letter-spacing: -0.3px;
+            text-shadow: none;
         }
         
         .report-title {
-            font-size: 14px;
-            color: #047857;
+            font-size: 12px;
+            color: #0F5D46;
             text-transform: uppercase;
-            letter-spacing: 3px;
-            font-weight: 700;
+            letter-spacing: 2.4px;
+            font-weight: 800;
+        }
+
+        .header-meta {
+            font-size: 10px;
+            color: #0F5D46;
+            margin-top: 8px;
+            font-weight: 600;
         }
         
         .entity-badge {
@@ -135,63 +188,237 @@
         }
         
         .entity-badge.producer {
-            background: #dbeafe;
-            color: #1e40af;
-            border: 2px solid #93c5fd;
+            background: #0F5D46;
+            color: #ffffff;
+            border: 1px solid #5DBB9A;
         }
         
         .entity-badge.brand-owner {
-            background: #ffedd5;
-            color: #9a3412;
-            border: 2px solid #fed7aa;
+            background: #0F5D46;
+            color: #ffffff;
+            border: 1px solid #5DBB9A;
         }
 
         .index-page {
-            break-inside: avoid;
+            height: 210mm;
+            background: #ffffff;
+            color: #1F2937;
+            display: flex;
+            flex-direction: column;
+            break-inside: avoid-page;
+            page-break-inside: avoid;
+            padding: 6px;
+            overflow: hidden;
+        }
+
+        .index-page-shell {
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+            border: 1px solid #D6EADF;
+            border-radius: 10px;
+            overflow: hidden;
+            break-inside: avoid-page;
+            page-break-inside: avoid;
+        }
+
+        .index-page-body {
+            position: relative;
+            flex: 1;
+            display: block;
+            background:
+                radial-gradient(circle at top left, rgba(221, 244, 234, 0.55) 0%, rgba(255, 255, 255, 0) 34%),
+                linear-gradient(180deg, #F4FBF7 0%, #FFFFFF 26%);
+            padding: 14px 16px 12px;
+            overflow: hidden;
         }
 
         .index-page .report-header {
-            padding: 18px 30px;
-            margin-bottom: 10px;
-            border-bottom-width: 3px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            background: linear-gradient(135deg, rgba(191, 229, 210, 0.96) 0%, rgba(234, 245, 240, 0.98) 56%, rgba(191, 229, 210, 0.96) 100%);
+            padding: 14px 22px 10px;
+            margin: 0;
+            border-bottom: 1px solid #C8DED3;
+            border-radius: 0;
+            box-shadow: none;
+            min-height: 88px;
+            overflow: hidden;
         }
 
         .index-page .report-header .header-logo {
-            top: 16px;
-            right: 22px;
-            height: 45px;
+            top: 10px;
+            height: 40px;
+            max-width: 78px;
+            padding: 5px 7px;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(214, 234, 223, 0.9);
+            border-radius: 4px;
+            object-fit: contain;
+            filter: none;
+            z-index: 3;
+        }
+
+        .index-page .header-logo-left {
+            left: 14px;
+        }
+
+        .index-page .header-logo-right {
+            right: 14px;
+        }
+
+        .index-page .header-leaf {
+            position: absolute;
+            right: 72px;
+            bottom: -14px;
+            width: 108px;
+            height: 82px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .index-page .header-leaf::before,
+        .index-page .header-leaf::after,
+        .index-page .header-leaf span {
+            content: "";
+            position: absolute;
+            background: #A7D7C5;
+            opacity: 0.24;
+            border-radius: 100% 0 100% 0;
+            transform-origin: bottom center;
+        }
+
+        .index-page .header-leaf::before {
+            width: 44px;
+            height: 66px;
+            right: 4px;
+            bottom: 6px;
+            transform: rotate(18deg);
+        }
+
+        .index-page .header-leaf::after {
+            width: 34px;
+            height: 54px;
+            right: 38px;
+            bottom: 0;
+            background: #8FCBB5;
+            opacity: 0.16;
+            transform: rotate(-18deg);
+        }
+
+        .index-page .header-leaf span {
+            width: 26px;
+            height: 40px;
+            right: 62px;
+            bottom: 18px;
+            background: #DDF4EA;
+            opacity: 0.14;
+            transform: rotate(6deg);
+        }
+
+        .index-page .header-content {
+            position: relative;
+            z-index: 2;
+            max-width: calc(100% - 130px);
+            margin: 0 auto;
+            text-align: center;
         }
 
         .index-page .company-name {
-            font-size: 24px;
+            font-size: 18px;
             line-height: 1.15;
             margin-bottom: 4px;
+            color: #0F5D46;
+            text-shadow: none;
         }
 
         .index-page .report-title {
-            font-size: 11px;
-            letter-spacing: 2px;
+            font-size: 8px;
+            letter-spacing: 2.8px;
+            color: #0F5D46;
+            font-weight: 800;
+        }
+
+        .index-page .entity-badge {
+            margin-top: 8px;
+            background: linear-gradient(180deg, #0F5D46 0%, #10684F 100%);
+            color: #ffffff;
+            border: 1px solid rgba(15, 93, 70, 0.18);
+            box-shadow: 0 4px 10px rgba(15, 93, 70, 0.12);
+            padding: 4px 14px;
+            border-radius: 999px;
+            font-size: 8px;
+        }
+
+        .index-page .entity-badge.producer,
+        .index-page .entity-badge.brand-owner {
+            background: linear-gradient(180deg, #0F5D46 0%, #10684F 100%);
+            color: #ffffff;
+            border: 1px solid rgba(15, 93, 70, 0.18);
         }
 
         .index-page .toc-container {
-            padding: 2px 24px 8px;
-            page-break-inside: auto;
-            break-inside: auto;
+            height: 100%;
+            margin: 0;
+            padding: 14px 18px;
+            background: #ffffff;
+            color: #1F2937;
+            border: 1px solid #D6EADF;
+            border-radius: 16px;
+            box-shadow: 0 14px 34px rgba(15, 93, 70, 0.10);
+            page-break-inside: avoid;
+            break-inside: avoid-page;
         }
 
         .index-page .toc-item {
-            margin-bottom: 5px;
-            padding-bottom: 4px;
-            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 0 !important;
+            padding: 9px 0 !important;
+            border-bottom: 1px dashed #D6EADF !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 10px !important;
+        }
+
+        .index-page .toc-item:last-child {
+            border-bottom: none !important;
+        }
+
+        .index-page .toc-number {
+            font-size: 12px;
+            font-weight: 800;
+            color: #0F5D46;
+            min-width: 18px;
         }
 
         .index-page .toc-main-link {
-            font-size: 12px;
+            display: flex !important;
+            align-items: center !important;
+            flex: 1 !important;
+            color: #1F2937 !important;
+            font-size: 12px !important;
+            font-weight: 700 !important;
+            text-decoration: none !important;
+            line-height: 1.25 !important;
         }
 
-        .index-page .toc-sub-link {
-            font-size: 8px;
+        .index-page .toc-chevron {
+            font-size: 16px;
+            color: #5DBB9A;
+            font-weight: 400;
+            line-height: 1;
+        }
+
+        .index-page-footer {
+            background: #EAF5F0;
+            color: #0F5D46;
+            font-size: 7px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 12px;
+            border-top: 1px solid #D6EADF;
         }
         
         /* ============================================
@@ -200,13 +427,15 @@
         .section-title {
             font-size: 16px;
             font-weight: 800;
-            color: #065f46;
-            border-bottom: 3px solid #059669;
+            color: #0F5D46;
+            border-bottom: 3px solid #5DBB9A;
             padding-bottom: 10px;
             margin: 30px 0 20px 0;
             display: flex;
             align-items: center;
             gap: 10px;
+            page-break-after: avoid;
+            break-after: avoid-page;
         }
         
         .section-title::before {
@@ -214,17 +443,17 @@
             display: inline-block;
             width: 5px;
             height: 22px;
-            background: linear-gradient(180deg, #059669 0%, #10b981 100%);
+            background: linear-gradient(180deg, #5DBB9A 0%, #0F5D46 100%);
             border-radius: 3px;
         }
         
         .section-title.orange {
-            color: #9a3412;
-            border-bottom-color: #f97316;
+            color: #0F5D46;
+            border-bottom-color: #5DBB9A;
         }
         
         .section-title.orange::before {
-            background: linear-gradient(180deg, #f97316 0%, #fb923c 100%);
+            background: linear-gradient(180deg, #5DBB9A 0%, #0F5D46 100%);
         }
         
         /* ============================================
@@ -232,34 +461,36 @@
            ============================================ */
         .card {
             background: #ffffff;
-            border: 1px solid #e5e7eb;
+            border: 1px solid #D6EADF;
             border-radius: 10px;
             padding: 16px;
             margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 1px 3px rgba(15, 93, 70, 0.08);
             transition: box-shadow 0.2s ease;
         }
         
         .card-header {
-            background: #ffffff;
+            background: #F4FBF7;
             padding: 12px 16px;
             margin: -16px -16px 14px -16px;
             border-radius: 10px 10px 0 0;
-            border-bottom: 1px solid #e5e7eb;
+            border-bottom: 1px solid #D6EADF;
             font-weight: 700;
             font-size: 12px;
-            color: #374151;
+            color: #0F5D46;
             display: flex;
             align-items: center;
             gap: 8px;
+            page-break-after: avoid;
+            break-after: avoid-page;
         }
         
         .card-accent {
-            border-left: 4px solid #059669;
+            border-left: 4px solid #5DBB9A;
         }
         
         .card-accent.orange {
-            border-left-color: #f97316;
+            border-left-color: #5DBB9A;
         }
         
         .card-accent.blue {
@@ -272,8 +503,8 @@
         .table-container {
             border-radius: 8px;
             overflow: hidden;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            border: 1px solid #D6EADF;
+            box-shadow: 0 1px 2px rgba(15, 93, 70, 0.05);
         }
         
         table {
@@ -281,35 +512,80 @@
             border-collapse: separate;
             border-spacing: 0;
             font-size: 10px;
+            page-break-inside: auto;
+            break-inside: auto;
         }
         
         thead {
-            background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+            background: linear-gradient(180deg, #EAF5F0 0%, #DDF2E8 100%);
+            display: table-header-group;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        tbody,
+        tfoot {
+            page-break-inside: auto;
+            break-inside: auto;
         }
         
         th {
-            color: #9a3412;
+            color: #0F5D46;
             font-weight: 800;
             font-size: 8px;
             text-transform: uppercase;
             letter-spacing: 0.8px;
             padding: 12px 10px;
-            border-bottom: 2px solid #fed7aa;
+            border-bottom: 2px solid #C8DED3;
             text-align: left;
         }
         
         td {
             padding: 10px;
-            border-bottom: 1px solid #f3f4f6;
+            border-bottom: 1px solid #EAF5F0;
             vertical-align: middle;
         }
         
         tr:nth-child(even) {
-            background-color: #fafaf9;
+            background-color: #FBFEFC;
         }
         
         tr:hover {
-            background-color: #f9fafb;
+            background-color: #F4FBF7;
+        }
+
+        tr,
+        td,
+        th,
+        img,
+        svg,
+        canvas {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        p,
+        li,
+        td,
+        th,
+        .section-title,
+        .card-header,
+        .industry-card-header,
+        .plant-header,
+        .summary-card-header,
+        .snapshot-label {
+            orphans: 3;
+            widows: 3;
+        }
+
+        .section-title + *,
+        .card-header + *,
+        .industry-card-header + *,
+        .plant-header + *,
+        .summary-card-header + *,
+        .snapshot-label + * {
+            page-break-before: avoid;
+            break-before: avoid-page;
         }
         
         /* ============================================
@@ -363,7 +639,7 @@
         
         .metric-box {
             background: #ffffff;
-            border: 1px solid #bbf7d0;
+            border: 1px solid #D6EADF;
             border-radius: 10px;
             padding: 16px 12px;
             text-align: center;
@@ -382,7 +658,7 @@
         .metric-value {
             font-size: 26px;
             font-weight: 800;
-            color: #15803d;
+            color: #0F5D46;
             line-height: 1;
             margin-bottom: 6px;
         }
@@ -456,8 +732,8 @@
            REMARKS BOX
            ============================================ */
         .remark-box {
-            background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
-            border-left: 5px solid #f59e0b;
+            background: linear-gradient(135deg, #F4FBF7 0%, #FFFFFF 100%);
+            border-left: 5px solid #5DBB9A;
             padding: 16px;
             border-radius: 8px;
             font-size: 10px;
@@ -490,13 +766,15 @@
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 10px 20px;
+            padding: 7px 16px 8px;
             font-size: 8px;
-            color: #9ca3af;
-            border-top: 1px solid #e5e7eb;
+            color: #0F5D46;
+            border-top: none;
             display: flex;
             justify-content: space-between;
-            background: #ffffff;
+            align-items: center;
+            background: #EAF5F0;
+            border-top: 1px solid #D6EADF;
         }
         
         /* ============================================
@@ -538,14 +816,72 @@
             
             .page-break {
                 page-break-after: always;
+                break-after: page;
+                height: 0;
+                margin: 0;
+                padding: 0;
+                border: 0;
+            }
+
+            .page-break-before {
+                page-break-before: always;
+                break-before: page;
             }
             
-            .card, .metric-box, .table-container {
+            .card,
+            .metric-box,
+            .table-container,
+            .summary-card,
+            .month-chart-card,
+            .summary-grid,
+            .month-chart-grid,
+            .industry-card,
+            .remark-box,
+            .visual-row,
+            .visual-content,
+            .comp-table,
+            .keep-together,
+            .keep-with-next {
+                page-break-inside: avoid;
+                break-inside: avoid-page;
+            }
+            
+            .section-title,
+            .card-header,
+            .industry-card-header,
+            .plant-header,
+            .summary-card-header,
+            .snapshot-label {
+                page-break-after: avoid;
+                break-after: avoid-page;
+            }
+
+            .section-title + *,
+            .card-header + *,
+            .industry-card-header + *,
+            .plant-header + *,
+            .summary-card-header + *,
+            .snapshot-label + * {
+                page-break-before: avoid;
+                break-before: avoid-page;
+            }
+
+            table {
+                page-break-inside: auto;
+                break-inside: auto;
+            }
+
+            thead {
+                display: table-header-group;
+                page-break-inside: avoid;
                 break-inside: avoid;
             }
-            
-            .section-title {
-                break-after: avoid;
+
+            tr,
+            td,
+            th {
+                page-break-inside: avoid;
+                break-inside: avoid;
             }
         }
         .section-title::before {
@@ -569,9 +905,23 @@
             margin-right: 0;
         }
 
-        #summary-data .report-header {
-            padding: 18px 30px;
-            margin-bottom: 16px;
+        #portal-summary-report .section {
+            margin-bottom: 18px;
+        }
+
+        #portal-summary-report .section-title {
+            margin: 18px 0 12px 0;
+            padding-bottom: 8px;
+        }
+
+        #portal-summary-report .section:first-of-type .section-title {
+            margin-top: 0;
+        }
+
+        #portal-summary-report th,
+        #portal-summary-report td {
+            padding-top: 8px;
+            padding-bottom: 8px;
         }
 
         #summary-data .section-title {
@@ -620,33 +970,33 @@
             overflow: hidden;
         }
         th {
-            font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
-            background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
-            color: #9a3412;
+            font-family: 'Nunito', sans-serif !important;
+            background: linear-gradient(180deg, #EAF5F0 0%, #DDF2E8 100%);
+            color: #0F5D46;
             font-weight: 800;
             text-transform: uppercase;
             font-size: 8.5px;
             padding: 10px 8px;
-            border: 1px solid #fed7aa;
+            border: 1px solid #C8DED3;
             text-align: left;
             word-wrap: break-word;
             letter-spacing: 0.5px;
         }
         td {
-            font-family: 'Arial', sans-serif;
+            font-family: 'Nunito', sans-serif !important;
             padding: 8px;
-            border: 1px solid #e5e7eb;
+            border: 1px solid #D6EADF;
             font-size: 10px;
             vertical-align: top;
             word-wrap: break-word;
         }
         tr:nth-child(even) {
-            background-color: #fafaf9;
+            background-color: #FBFEFC;
         }
         
         /* Engagement Letter */
         .engagement-letter {
-            font-family: 'Arial', sans-serif;
+            font-family: 'Nunito', sans-serif !important;
             font-size: 11px;
             line-height: 1.4;
             white-space: pre-wrap;
@@ -690,25 +1040,49 @@
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 8px 20px;
+            padding: 7px 16px 8px;
             font-size: 8px;
-            color: #9ca3af;
-            border-top: 1px solid #e5e7eb;
+            color: #0F5D46;
+            border-top: none;
             display: flex;
             justify-content: space-between;
-            background: #fff;
+            align-items: center;
+            background: #EAF5F0;
+            border-top: 1px solid #D6EADF;
+        }
+
+        .report-page > .footer {
+            position: static !important;
+            bottom: auto !important;
+            margin-top: auto;
+            margin-right: -12mm;
+            margin-bottom: -15mm;
+            margin-left: -12mm;
+            flex-shrink: 0;
+        }
+
+        .footer,
+        .index-page-footer,
+        .page-footer {
+            display: none !important;
+        }
+
+        .footer span,
+        .page-footer span,
+        .index-page-footer span {
+            color: #0F5D46;
         }
 
         /* Plant Header */
         .plant-header {
             background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
             padding: 12px 16px;
-            border: 1px solid #a7f3d0;
-            border-left: 5px solid #059669;
+            border: 1px solid #D6EADF;
+            border-left: 5px solid #5DBB9A;
             margin-bottom: 15px;
             font-weight: 800;
             font-size: 12px;
-            color: #065f46;
+            color: #0F5D46;
             border-radius: 0 6px 6px 0;
         }
 
@@ -717,10 +1091,10 @@
             display: flex;
             gap: 20px;
             margin-bottom: 15px;
-            border: 2px solid #fb923c;
+            border: 2px solid #D6EADF;
             border-radius: 10px;
             padding: 15px;
-            background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%);
+            background: linear-gradient(135deg, #F4FBF7 0%, #FFFFFF 100%);
             page-break-inside: avoid;
             break-inside: avoid-page;
         }
@@ -790,18 +1164,18 @@
         }
         .visual-remark {
             font-size: 9px;
-            color: #d97706; /* Orange-600 */
-            background: #fff7ed;
+            color: #0F5D46;
+            background: #F4FBF7;
             padding: 5px;
             border-radius: 4px;
-            border-left: 2px solid #f97316;
+            border-left: 2px solid #5DBB9A;
         }
         
         /* Component Table Header Color override */
         .comp-table th {
-            background-color: #fff7ed; /* Orange-50 */
-            color: #9a3412; /* Orange-800 */
-            border-color: #fed7aa;
+            background-color: #EAF5F0;
+            color: #0F5D46;
+            border-color: #C8DED3;
         }
         .comp-table {
             margin-bottom: 8px;
@@ -844,19 +1218,19 @@
 
         /* Industry Category Card */
         .industry-card {
-            border: 2px solid #f97316;
+            border: 2px solid #D6EADF;
             border-radius: 14px;
-            box-shadow: 0 4px 12px -2px rgba(249, 115, 22, 0.15);
+            box-shadow: 0 4px 12px -2px rgba(15, 93, 70, 0.12);
             background: #fff;
             padding: 0;
             overflow: hidden;
             margin-bottom: 30px;
         }
         .industry-card-header {
-            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+            background: linear-gradient(135deg, #EAF5F0 0%, #DDF2E8 100%);
             padding: 16px 24px;
-            border-bottom: 2px solid #f97316;
-            color: #9a3412;
+            border-bottom: 2px solid #C8DED3;
+            color: #0F5D46;
             font-size: 18px;
             font-weight: 800;
             letter-spacing: 0.3px;
@@ -873,17 +1247,17 @@
             margin-bottom: 30px;
         }
         .summary-card {
-            border: 2px solid #fed7aa;
+            border: 2px solid #D6EADF;
             border-radius: 12px;
             overflow: hidden;
             background: #fff;
-            box-shadow: 0 2px 8px rgba(249, 115, 22, 0.08);
+            box-shadow: 0 2px 8px rgba(15, 93, 70, 0.08);
         }
         .summary-card-header {
-            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+            background: linear-gradient(135deg, #EAF5F0 0%, #DDF2E8 100%);
             padding: 10px 15px;
-            border-bottom: 2px solid #fed7aa;
-            color: #9a3412;
+            border-bottom: 2px solid #C8DED3;
+            color: #0F5D46;
             font-weight: 800;
             font-size: 11px;
             text-align: center;
@@ -898,6 +1272,46 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+        }
+        .month-chart-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px 0;
+        }
+        .month-chart-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            background: #ffffff;
+            padding: 10px 12px;
+            break-inside: avoid;
+        }
+        .month-chart-title {
+            font-size: 10px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .month-chart-row {
+            margin-bottom: 7px;
+        }
+        .month-chart-labels {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 8px;
+            margin-bottom: 3px;
+            color: #4b5563;
+        }
+        .month-chart-track {
+            width: 100%;
+            height: 8px;
+            border-radius: 999px;
+            background: #e5e7eb;
+            overflow: hidden;
+        }
+        .month-chart-bar {
+            height: 100%;
+            border-radius: 999px;
         }
         .stat-block {
             text-align: center;
@@ -930,8 +1344,8 @@
             vertical-align: middle;
         }
         .industry-summary-table .industry-group-row td {
-            background: #fff7ed;
-            color: #ea580c;
+            background: #EAF5F0;
+            color: #0F5D46;
             font-weight: 800;
             font-size: 12px;
             padding: 5px 8px;
@@ -973,30 +1387,15 @@
             background: #f3f4f6;
             color: #374151;
         }
+        .summary-total-row td {
+            background: #EAF5F0 !important;
+            color: #111827;
+            font-weight: 800;
+            border-top: 2px solid #5DBB9A;
+        }
     </style>
     <style>
-        /* Table of Contents Styles */
-        .toc-container {
-            padding: 16px 28px;
-            font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
-            page-break-inside: avoid;
-            break-inside: avoid;
-        }
-        .toc-item {
-            margin-bottom: 10px;
-            border-bottom: 2px solid #e5e7eb;
-            padding-bottom: 6px;
-        }
-        .toc-main-link {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            text-decoration: none;
-            color: #065f46;
-            font-weight: 800;
-            font-size: 13px;
-            transition: color 0.2s;
-        }
+        /* Table of Contents Styles - overridden by .index-page scoped styles */
         .toc-sub-list {
             margin-top: 6px;
             padding-left: 20px;
@@ -1057,87 +1456,101 @@
 
     <!-- PAGE 1: INDEX -->
     <div class="index-page">
+        <div class="index-page-shell">
         <div class="report-header">
-            {{#if logoBase64}}<img src="{{logoBase64}}" class="header-logo" alt="Logo">{{/if}}
-            <div class="company-name">{{basicInfo.clientName}}</div>
-            <div class="report-title">{{#if isProducer}}Producer Pre-Validation Report{{else}}Brand Owner Compliance Report{{/if}}</div>
-            <div style="margin-top: 10px; display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
-                {{#if isProducer}}background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;
-                {{else}}background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa;{{/if}}">
-                {{entityType}}
+            {{#if companyLogoBase64}}<img src="{{companyLogoBase64}}" class="header-logo header-logo-left" alt="Company Logo">{{/if}}
+            {{#if logoBase64}}<img src="{{logoBase64}}" class="header-logo header-logo-right" alt="AnantTattva Logo">{{/if}}
+            <div class="header-leaf"><span></span></div>
+            <div class="header-content">
+                <div class="company-name">{{basicInfo.clientName}}</div>
+                <div class="report-title">{{#if isProducer}}Producer Pre-Validation Report{{else}}Brand Owner Compliance Report{{/if}}</div>
+                <div class="entity-badge {{#if isProducer}}producer{{else}}brand-owner{{/if}}" style="margin-top: 10px;">
+                    {{entityType}}
+                </div>
             </div>
         </div>
 
-        <div class="toc-container">
-            <div class="toc-item">
-                <a href="#company-info" class="toc-main-link">
-                    <span>1. Company Information</span>
-                </a>
-                <div class="toc-sub-list">
-                    <a href="#client-basic-info" class="toc-sub-link">1.1 Company Basic Info</a>
-                    <a href="#address-details" class="toc-sub-link">1.2 Address</a>
-                    <a href="#msme-details" class="toc-sub-link">1.3 MSME Details</a>
-                    <a href="#company-documents" class="toc-sub-link">1.4 Company Document</a>
-                    <a href="#plant-details" class="toc-sub-link">1.5 CTE & CTO/CCA Details</a>
+        <div class="index-page-body">
+            <div class="toc-container">
+                <div class="toc-item">
+                    <span class="toc-number">1.</span>
+                    <a href="#company-info" class="toc-main-link">Company Information</a>
+                    <span class="toc-chevron">&#x203A;</span>
+                </div>
+                <div class="toc-item">
+                    <span class="toc-number">2.</span>
+                    <a href="#summary-data" class="toc-main-link">Summary Data</a>
+                    <span class="toc-chevron">&#x203A;</span>
+                </div>
+                <div class="toc-item">
+                    <span class="toc-number">3.</span>
+                    <a href="#industry-category" class="toc-main-link">Industry Category Wise Details</a>
+                    <span class="toc-chevron">&#x203A;</span>
+                </div>
+                {{#if markingLabelingReportByIndustry.length}}
+                <div class="toc-item">
+                    <span class="toc-number">4.</span>
+                    <a href="#marking-labeling" class="toc-main-link">Marking and Labeling</a>
+                    <span class="toc-chevron">&#x203A;</span>
+                </div>
+                {{/if}}
+                <div class="toc-item">
+                    <span class="toc-number">5.</span>
+                    <a href="#portal-summary-report" class="toc-main-link">Portal Summary Report</a>
+                    <span class="toc-chevron">&#x203A;</span>
+                </div>
+                <div class="toc-item">
+                    <span class="toc-number">6.</span>
+                    <a href="#cost-sku-wise" class="toc-main-link">SKU Wise Summary</a>
+                    <span class="toc-chevron">&#x203A;</span>
+                </div>
+                <div class="toc-item">
+                    <span class="toc-number">7.</span>
+                    <a href="#cost-polymer-wise" class="toc-main-link">Polymer Wise Summary</a>
+                    <span class="toc-chevron">&#x203A;</span>
+                </div>
+                <div class="toc-item">
+                    <span class="toc-number">8.</span>
+                    <a href="#cost-category-wise" class="toc-main-link">Category Wise Summary</a>
+                    <span class="toc-chevron">&#x203A;</span>
+                </div>
+                <div class="toc-item">
+                    <span class="toc-number">9.</span>
+                    <a href="#cost-supplier-wise" class="toc-main-link">Supplier Wise Summary</a>
+                    <span class="toc-chevron">&#x203A;</span>
+                </div>
+                <div class="toc-item">
+                    <span class="toc-number">10.</span>
+                    <a href="#cost-sku-supplier-details" class="toc-main-link">SKU Wise Supplier Details</a>
+                    <span class="toc-chevron">&#x203A;</span>
+                </div>
+                <div class="toc-item">
+                    <span class="toc-number">11.</span>
+                    <a href="#cost-polymer-supplier-details" class="toc-main-link">Polymer Wise Supplier Details</a>
+                    <span class="toc-chevron">&#x203A;</span>
+                </div>
+                <div class="toc-item">
+                    <span class="toc-number">12.</span>
+                    <a href="#cost-category-supplier-details" class="toc-main-link">Category Wise Supplier Details</a>
+                    <span class="toc-chevron">&#x203A;</span>
                 </div>
             </div>
-            <div class="toc-item">
-                <a href="#summary-data" class="toc-main-link">
-                    <span>2. Summary Data</span>
-                </a>
-            </div>
-            <div class="toc-item">
-                <a href="#industry-category" class="toc-main-link">
-                    <span>3. Industry Category Wise Details</span>
-                </a>
-            </div>
-            {{#if isBrandOwner}}
-            {{#if markingLabelingReportByIndustry.length}}
-            <div class="toc-item">
-                <a href="#marking-labeling" class="toc-main-link">
-                    <span>4. Marking and Labeling</span>
-                </a>
-            </div>
-            {{/if}}
-            {{/if}}
-            {{#if isBrandOwner}}
-            <div class="toc-item">
-                <a href="#portal-summary-report" class="toc-main-link">
-                    <span>5. Portal Summary Report</span>
-                </a>
-                <div class="toc-sub-list">
-                    <a href="#annual-summary" class="toc-sub-link">5.1 Annual Summary</a>
-                    <a href="#epr-target-calculation" class="toc-sub-link">5.2 EPR Target Calculation</a>
-                    <a href="#purchase-portal-data" class="toc-sub-link">5.3 Purchase Portal Data</a>
-                </div>
-            </div>
-            <div class="toc-item">
-                <a href="#cost-analysis" class="toc-main-link">
-                    <span>6. Cost Analysis</span>
-                </a>
-                <div class="toc-sub-list">
-                    <a href="#cost-sku-wise" class="toc-sub-link">6.1 SKU Wise</a>
-                    <a href="#cost-component-wise" class="toc-sub-link">6.2 Component Wise</a>
-                    <a href="#cost-polymer-wise" class="toc-sub-link">6.3 Polymer Wise</a>
-                    <a href="#cost-category-wise" class="toc-sub-link">6.4 Category Wise</a>
-                    <a href="#cost-supplier-wise" class="toc-sub-link">6.5 Supplier Wise</a>
-                </div>
-            </div>
-            {{/if}}
         </div>
         
-        <div class="footer" style="position: static; margin-top: 12px;">
+        <div class="index-page-footer">
             <span>AnantTattva EPR Kavach System</span>
-            <span>Index</span>
+            <span>Page 1</span>
+        </div>
         </div>
     </div>
     <!-- PAGE 2: COMPANY INFORMATION -->
-    <div class="page-break-before" id="company-info">
+    <div class="page-break-before report-page" id="company-info">
         <div class="report-header">
-            {{#if logoBase64}}<img src="{{logoBase64}}" class="header-logo" alt="Logo">{{/if}}
+            {{#if companyLogoBase64}}<img src="{{companyLogoBase64}}" class="header-logo header-logo-left" alt="Company Logo">{{/if}}
+            {{#if logoBase64}}<img src="{{logoBase64}}" class="header-logo header-logo-right" alt="AnantTattva Logo">{{/if}}
             <div class="company-name">{{basicInfo.clientName}}</div>
             <div class="report-title">{{#if isProducer}}Producer Pre-Validation Report{{else}}Brand Owner Compliance Report{{/if}}</div>
-            <div style="font-size: 10px; color: #6b7280; margin-top: 8px; font-weight: 500;">Generated on: {{generatedDate}}</div>
+            <div class="header-meta">Generated on: {{generatedDate}}</div>
         </div>
 
     <!-- 1.1 Company Basic Info -->
@@ -1532,12 +1945,18 @@
         {{else}}
         <div class="card" style="text-align: center; color: #6b7280;">No plant details available.</div>
         {{/if}}
+        <div class="footer" style="position: absolute; bottom: 20px;">
+            <span>AnantTattva EPR Kavach System</span>
+            <span>Company Information</span>
+        </div>
     </div>
     </div>
 
     <!-- 2. Summary Data -->
-    <div class="page-break-before" id="summary-data">
+    <div class="page-break-before report-page" id="summary-data">
         <div class="report-header">
+            {{#if companyLogoBase64}}<img src="{{companyLogoBase64}}" class="header-logo header-logo-left" alt="Company Logo">{{/if}}
+            {{#if logoBase64}}<img src="{{logoBase64}}" class="header-logo header-logo-right" alt="AnantTattva Logo">{{/if}}
             <div class="company-name">Summary Data</div>
             <div class="report-title">Client Connect Summary</div>
         </div>
@@ -1578,8 +1997,8 @@
                             <div class="metric-value" style="color:#16a34a;">{{portalSummary.registeredSuppliers}}</div>
                             <div class="metric-label">Registered Suppliers</div>
                         </div>
-                        <div class="metric-box" style="background: linear-gradient(135deg, #fff7ed 0%, #fff 100%); border-color: #fed7aa;">
-                            <div class="metric-value" style="color:#ea580c;">{{portalSummary.unregisteredSuppliers}}</div>
+                        <div class="metric-box" style="background: linear-gradient(135deg, #F4FBF7 0%, #fff 100%); border-color: #D6EADF;">
+                            <div class="metric-value" style="color:#0F5D46;">{{portalSummary.unregisteredSuppliers}}</div>
                             <div class="metric-label">Unregistered Suppliers</div>
                         </div>
                     </div>
@@ -1590,7 +2009,7 @@
             <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;">
                 <div class="metric-box" style="background: #fff; border-color: #e5e7eb;">
                     <div class="metric-value summary-amount" style="color:#111827;">{{portalSummary.totalMonthlyPurchaseMt}}</div>
-                    <div class="metric-label">Monthly Purchase (MT)</div>
+                    <div class="metric-label">Annual Purchase (MT)</div>
                 </div>
                 <div class="metric-box" style="background: linear-gradient(135deg, #eff6ff 0%, #fff 100%); border-color: #bfdbfe;">
                     <div class="metric-value summary-amount" style="color:#1d4ed8;">{{portalSummary.recycledTargetQty}}</div>
@@ -1653,6 +2072,54 @@
                 </div>
             </div>
 
+            {{#if portalSummary.stateWiseSupplierSummary.length}}
+            <div class="section-title" style="margin-top: 18px;">State Wise Supplier Summary</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>State</th>
+                        <th style="text-align: center;">Total Suppliers</th>
+                        <th style="text-align: center;">Registered</th>
+                        <th style="text-align: center;">Unregistered</th>
+                        <th style="text-align: center;">Total SKU</th>
+                        <th style="text-align: right;">Recycled Qty</th>
+                        <th style="text-align: right;">Virgin Qty</th>
+                        <th style="text-align: right;">Recycled Amount</th>
+                        <th style="text-align: right;">Virgin Amount</th>
+                        <th style="text-align: right;">Annual Purchase MT</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each portalSummary.stateWiseSupplierSummary}}
+                    <tr>
+                        <td>{{this.stateName}}</td>
+                        <td style="text-align: center;">{{this.totalSuppliers}}</td>
+                        <td style="text-align: center; color:#16a34a; font-weight:700;">{{this.registeredSuppliers}}</td>
+                        <td style="text-align: center; color:#ea580c; font-weight:700;">{{this.unregisteredSuppliers}}</td>
+                        <td style="text-align: center;">{{this.totalSku}}</td>
+                        <td style="text-align: right;">{{this.recycledQty}}</td>
+                        <td style="text-align: right;">{{this.virginQty}}</td>
+                        <td style="text-align: right;">{{this.recycledAmount}}</td>
+                        <td style="text-align: right;">{{this.virginAmount}}</td>
+                        <td style="text-align: right;">{{this.annualPurchaseMt}}</td>
+                    </tr>
+                    {{/each}}
+                    <tr style="background:#EAF5F0; font-weight:700;">
+                        <td>Total</td>
+                        <td style="text-align: center;"></td>
+                        <td style="text-align: center;"></td>
+                        <td style="text-align: center;"></td>
+                        <td style="text-align: center;"></td>
+                        <td style="text-align: right;">{{portalSummary.stateWiseSupplierSummaryTotals.recycledQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.stateWiseSupplierSummaryTotals.virginQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.stateWiseSupplierSummaryTotals.recycledAmount}}</td>
+                        <td style="text-align: right;">{{portalSummary.stateWiseSupplierSummaryTotals.virginAmount}}</td>
+                        <td style="text-align: right;">{{portalSummary.stateWiseSupplierSummaryTotals.annualPurchaseMt}}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{/if}}
+
             {{#if portalSummary.categoryWise.length}}
             <div class="page-break"></div>
             <div class="section-title" style="margin-top: 18px;">Category Wise</div>
@@ -1665,7 +2132,7 @@
                     </div>
                     <div style="display:flex; justify-content: space-between; gap: 12px;">
                         <div style="flex:1;">
-                            <div class="card-label">Monthly Purchase (MT)</div>
+                            <div class="card-label">Annual Purchase (MT)</div>
                             <div class="category-amount" style="color:#111827;">{{this.monthlyPurchaseMt}}</div>
                         </div>
                         <div style="flex:1; text-align:right;">
@@ -1703,6 +2170,92 @@
             </div>
             {{/if}}
 
+            {{#if isProducer}}
+            {{#if portalSummary.clientWise.length}}
+            <div class="section-title" style="margin-top: 18px;">Client Wise Summary</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Client Name</th>
+                        <th style="text-align: center;">Total SKU</th>
+                        <th style="text-align: right;">Annual Purchase MT</th>
+                        <th style="text-align: right;">Recycled Qty</th>
+                        <th style="text-align: right;">Virgin Qty</th>
+                        <th style="text-align: right;">Recycled Share</th>
+                        <th style="text-align: right;">Recycled Amount</th>
+                        <th style="text-align: right;">Virgin Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each portalSummary.clientWise}}
+                    <tr>
+                        <td>{{this.name}}</td>
+                        <td style="text-align: center;">{{this.totalSku}}</td>
+                        <td style="text-align: right;">{{this.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right; color:#166534; font-weight:800;">{{this.recycledQty}}</td>
+                        <td style="text-align: right; color:#1d4ed8; font-weight:800;">{{this.virginQty}}</td>
+                        <td style="text-align: right; color:#065f46; font-weight:800;">{{this.recycledSharePct}}%</td>
+                        <td style="text-align: right;">{{this.recycledAmount}}</td>
+                        <td style="text-align: right;">{{this.virginAmount}}</td>
+                    </tr>
+                    {{/each}}
+                    <tr class="summary-total-row">
+                        <td>Total</td>
+                        <td style="text-align: center;">{{portalSummary.clientWiseTotals.totalSku}}</td>
+                        <td style="text-align: right;">{{portalSummary.clientWiseTotals.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{portalSummary.clientWiseTotals.recycledQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.clientWiseTotals.virginQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.clientWiseTotals.recycledSharePct}}%</td>
+                        <td style="text-align: right;">{{portalSummary.clientWiseTotals.recycledAmount}}</td>
+                        <td style="text-align: right;">{{portalSummary.clientWiseTotals.virginAmount}}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{/if}}
+
+            {{#if portalSummary.polymerWise.length}}
+            <div class="section-title" style="margin-top: 18px;">Polymer Wise Summary</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Polymer Name</th>
+                        <th style="text-align: center;">Total SKU</th>
+                        <th style="text-align: right;">Annual Purchase MT</th>
+                        <th style="text-align: right;">Recycled Qty</th>
+                        <th style="text-align: right;">Virgin Qty</th>
+                        <th style="text-align: right;">Recycled Share</th>
+                        <th style="text-align: right;">Recycled Amount</th>
+                        <th style="text-align: right;">Virgin Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each portalSummary.polymerWise}}
+                    <tr>
+                        <td>{{this.name}}</td>
+                        <td style="text-align: center;">{{this.totalSku}}</td>
+                        <td style="text-align: right;">{{this.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right; color:#166534; font-weight:800;">{{this.recycledQty}}</td>
+                        <td style="text-align: right; color:#1d4ed8; font-weight:800;">{{this.virginQty}}</td>
+                        <td style="text-align: right; color:#065f46; font-weight:800;">{{this.recycledSharePct}}%</td>
+                        <td style="text-align: right;">{{this.recycledAmount}}</td>
+                        <td style="text-align: right;">{{this.virginAmount}}</td>
+                    </tr>
+                    {{/each}}
+                    <tr class="summary-total-row">
+                        <td>Total</td>
+                        <td style="text-align: center;">-</td>
+                        <td style="text-align: right;">{{portalSummary.polymerWiseTotals.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{portalSummary.polymerWiseTotals.recycledQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.polymerWiseTotals.virginQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.polymerWiseTotals.recycledSharePct}}%</td>
+                        <td style="text-align: right;">{{portalSummary.polymerWiseTotals.recycledAmount}}</td>
+                        <td style="text-align: right;">{{portalSummary.polymerWiseTotals.virginAmount}}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{/if}}
+            {{/if}}
+
             {{#if portalSummary.industryWise.length}}
             <div class="section-title" style="margin-top: 18px;">Industry Wise Summary</div>
             <table>
@@ -1710,7 +2263,7 @@
                     <tr>
                         <th>Industry</th>
                         <th style="text-align: center;">Total SKU</th>
-                        <th style="text-align: right;">Monthly Purchase Qty</th>
+                        <th style="text-align: right;">Annual Purchase MT</th>
                         <th style="text-align: right;">Recycled Target Qty</th>
                         <th style="text-align: right;">Recycled Achieved (MT)</th>
                         <th style="text-align: right;">Recycled Shortfall (MT)</th>
@@ -1733,6 +2286,71 @@
                         <td style="text-align: right; font-weight:800; {{this.virginShortfallStyle}}">{{this.virginShortfallArrow}} {{this.virginShortfallAbs}}</td>
                     </tr>
                     {{/each}}
+                    <tr class="summary-total-row">
+                        <td>Total</td>
+                        <td style="text-align: center;">{{portalSummary.industryWiseTotals.totalSku}}</td>
+                        <td style="text-align: right;">{{portalSummary.industryWiseTotals.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{portalSummary.industryWiseTotals.recycledTargetQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.industryWiseTotals.recycledAchievedMt}}</td>
+                        <td style="text-align: right; {{portalSummary.industryWiseTotals.recycledShortfallStyle}}">{{portalSummary.industryWiseTotals.recycledShortfallArrow}} {{portalSummary.industryWiseTotals.recycledShortfallAbs}}</td>
+                        <td style="text-align: right;">{{portalSummary.industryWiseTotals.virginTargetQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.industryWiseTotals.virginAchievedMt}}</td>
+                        <td style="text-align: right; {{portalSummary.industryWiseTotals.virginShortfallStyle}}">{{portalSummary.industryWiseTotals.virginShortfallArrow}} {{portalSummary.industryWiseTotals.virginShortfallAbs}}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{/if}}
+
+            {{#if portalSummary.supplierTypeWise.length}}
+            <div class="section-title keep-with-next" style="margin-top: 18px;">Supplier Type Summary</div>
+            <div class="grid-4 keep-together">
+                {{#each portalSummary.supplierTypeWise}}
+                <div class="metric-box" style="background: linear-gradient(135deg, #ecfdf5 0%, #fff 100%); border-color: #a7f3d0;">
+                    <div class="metric-label" style="font-size: 10px; color:#065f46; font-weight:800;">{{this.name}}</div>
+                    <div class="metric-value" style="color:#166534;">{{this.totalSku}}</div>
+                    <div class="metric-label">Total SKU</div>
+                </div>
+                {{/each}}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Supplier Type</th>
+                        <th style="text-align: center;">Total SKU</th>
+                        <th style="text-align: right;">Annual Purchase MT</th>
+                        <th style="text-align: right;">Recycled Target Qty</th>
+                        <th style="text-align: right;">Recycled Achieved (MT)</th>
+                        <th style="text-align: right;">Recycled Shortfall (MT)</th>
+                        <th style="text-align: right;">Virgin Target Qty (MT)</th>
+                        <th style="text-align: right;">Virgin Achieved (MT)</th>
+                        <th style="text-align: right;">Virgin Shortfall (MT)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each portalSummary.supplierTypeWise}}
+                    <tr>
+                        <td>{{this.name}}</td>
+                        <td style="text-align: center;">{{this.totalSku}}</td>
+                        <td style="text-align: right;">{{this.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{this.recycledTargetQty}}</td>
+                        <td style="text-align: right; color:#166534; font-weight:800;">{{this.recycledAchievedMt}}</td>
+                        <td style="text-align: right; font-weight:800; {{this.recycledShortfallStyle}}">{{this.recycledShortfallArrow}} {{this.recycledShortfallAbs}}</td>
+                        <td style="text-align: right;">{{this.virginTargetQty}}</td>
+                        <td style="text-align: right; color:#065f46; font-weight:800;">{{this.virginAchievedMt}}</td>
+                        <td style="text-align: right; font-weight:800; {{this.virginShortfallStyle}}">{{this.virginShortfallArrow}} {{this.virginShortfallAbs}}</td>
+                    </tr>
+                    {{/each}}
+                    <tr class="summary-total-row">
+                        <td>Total</td>
+                        <td style="text-align: center;">-</td>
+                        <td style="text-align: right;">{{portalSummary.supplierTypeWiseTotals.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{portalSummary.supplierTypeWiseTotals.recycledTargetQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.supplierTypeWiseTotals.recycledAchievedMt}}</td>
+                        <td style="text-align: right; {{portalSummary.supplierTypeWiseTotals.recycledShortfallStyle}}">{{portalSummary.supplierTypeWiseTotals.recycledShortfallArrow}} {{portalSummary.supplierTypeWiseTotals.recycledShortfallAbs}}</td>
+                        <td style="text-align: right;">{{portalSummary.supplierTypeWiseTotals.virginTargetQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.supplierTypeWiseTotals.virginAchievedMt}}</td>
+                        <td style="text-align: right; {{portalSummary.supplierTypeWiseTotals.virginShortfallStyle}}">{{portalSummary.supplierTypeWiseTotals.virginShortfallArrow}} {{portalSummary.supplierTypeWiseTotals.virginShortfallAbs}}</td>
+                    </tr>
                 </tbody>
             </table>
             {{/if}}
@@ -1837,7 +2455,7 @@
                     <tr>
                         <th>Supplier Name</th>
                         <th style="text-align: center;">Total SKU</th>
-                        <th style="text-align: right;">Monthly Purchase Qty</th>
+                        <th style="text-align: right;">Annual Purchase MT</th>
                         <th style="text-align: right;">Recycled Target Qty</th>
                         <th style="text-align: right;">Recycled Achieved (MT)</th>
                         <th style="text-align: right;">Recycled Shortfall (MT)</th>
@@ -1860,6 +2478,17 @@
                         <td style="text-align: right; font-weight:800; {{this.virginShortfallStyle}}">{{this.virginShortfallArrow}} {{this.virginShortfallAbs}}</td>
                     </tr>
                     {{/each}}
+                    <tr class="summary-total-row">
+                        <td>Total</td>
+                        <td style="text-align: center;">{{portalSummary.supplierWiseTotals.totalSku}}</td>
+                        <td style="text-align: right;">{{portalSummary.supplierWiseTotals.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{portalSummary.supplierWiseTotals.recycledTargetQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.supplierWiseTotals.recycledAchievedMt}}</td>
+                        <td style="text-align: right; {{portalSummary.supplierWiseTotals.recycledShortfallStyle}}">{{portalSummary.supplierWiseTotals.recycledShortfallArrow}} {{portalSummary.supplierWiseTotals.recycledShortfallAbs}}</td>
+                        <td style="text-align: right;">{{portalSummary.supplierWiseTotals.virginTargetQty}}</td>
+                        <td style="text-align: right;">{{portalSummary.supplierWiseTotals.virginAchievedMt}}</td>
+                        <td style="text-align: right; {{portalSummary.supplierWiseTotals.virginShortfallStyle}}">{{portalSummary.supplierWiseTotals.virginShortfallArrow}} {{portalSummary.supplierWiseTotals.virginShortfallAbs}}</td>
+                    </tr>
                 </tbody>
             </table>
             {{/if}}
@@ -1955,18 +2584,23 @@
             <div class="card" style="text-align: center;">No Summary Data Available</div>
             {{/if}}
         </div>
+        <div class="footer" style="position: absolute; bottom: 20px;">
+            <span>AnantTattva EPR Kavach System</span>
+            <span>Summary Data</span>
+        </div>
     </div>
 
-    {{#if isBrandOwner}}
     {{#if industryCategories.length}}
-    <div class="page-break-before" id="industry-category">
-        <div class="report-header" style="background: linear-gradient(135deg, #fff7ed, #ffedd5); border-bottom-color: #f97316;">
-            <div class="company-name" style="color: #9a3412;">Industry Category Wise Details</div>
+    <div class="page-break-before report-page" id="industry-category">
+        <div class="report-header">
+            {{#if companyLogoBase64}}<img src="{{companyLogoBase64}}" class="header-logo header-logo-left" alt="Company Logo">{{/if}}
+            {{#if logoBase64}}<img src="{{logoBase64}}" class="header-logo header-logo-right" alt="AnantTattva Logo">{{/if}}
+            <div class="company-name">Industry Category Wise Details</div>
             <div class="report-title">SKU & Component Analysis</div>
         </div>
 
         <div class="section" style="margin-top: 20px; margin-bottom: 30px;">
-            <h3 style="color: #9a3412; margin-bottom: 20px; border-bottom: 3px solid #f97316; padding-bottom: 8px; font-weight: 800; font-size: 16px;">Industry Category Wise Details SKU & COMPONENT ANALYSIS</h3>
+            <h3 style="color: #0F5D46; margin-bottom: 20px; border-bottom: 3px solid #5DBB9A; padding-bottom: 8px; font-weight: 800; font-size: 16px;">Industry Category Wise Details SKU & COMPONENT ANALYSIS</h3>
 
             <div class="summary-grid">
                 {{#each industryCategories}}
@@ -2017,8 +2651,8 @@
                         <div class="sku-table">
                             <table style="margin: 0; border: none;">
                                 <tr>
-                                    <th style="width: 30%; background: #fed7aa; color: #9a3412;">Field</th>
-                                    <th style="background: #fed7aa; color: #9a3412;">Value</th>
+                                    <th style="width: 30%; background: #DDF2E8; color: #0F5D46;">Field</th>
+                                    <th style="background: #DDF2E8; color: #0F5D46;">Value</th>
                                 </tr>
                                 <tr>
                                     <td style="font-weight: bold;">SKU Code</td>
@@ -2028,6 +2662,12 @@
                                     <td style="font-weight: bold;">SKU Description</td>
                                     <td>{{this.skuDescription}}</td>
                                 </tr>
+                                {{#if this.clientName}}
+                                <tr>
+                                    <td style="font-weight: bold;">Client Name</td>
+                                    <td>{{this.clientName}}</td>
+                                </tr>
+                                {{/if}}
                                 <tr>
                                     <td style="font-weight: bold;">SKU UOM</td>
                                     <td>{{this.skuUom}}</td>
@@ -2125,9 +2765,11 @@
         </div>
 
         {{#if this.componentsWithImages.length}}
-        <div class="page-break-before component-images-page">
-            <div class="report-header" style="background: linear-gradient(135deg, #fff7ed, #ffedd5); border-bottom-color: #f97316;">
-                <div class="company-name" style="color: #9a3412;">Component Images</div>
+        <div class="page-break-before component-images-page report-page">
+            <div class="report-header">
+                {{#if companyLogoBase64}}<img src="{{companyLogoBase64}}" class="header-logo header-logo-left" alt="Company Logo">{{/if}}
+                {{#if logoBase64}}<img src="{{logoBase64}}" class="header-logo header-logo-right" alt="AnantTattva Logo">{{/if}}
+                <div class="company-name">Component Images</div>
                 <div class="report-title">{{../name}} | {{this.skuCode}}</div>
             </div>
 
@@ -2157,13 +2799,13 @@
         {{/each}}
     {{/each}}
     {{/if}}
-    {{/if}}
 
-    {{#if isBrandOwner}}
     {{#if markingLabelingReportByIndustry.length}}
-    <div class="page-break-before" id="marking-labeling">
-        <div class="report-header" style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-bottom-color: #059669; page-break-after: avoid; break-after: avoid-page;">
-            <div class="company-name" style="color: #065f46;">Marking and Labeling</div>
+    <div class="page-break-before report-page" id="marking-labeling">
+        <div class="report-header" style="page-break-after: avoid; break-after: avoid-page;">
+            {{#if companyLogoBase64}}<img src="{{companyLogoBase64}}" class="header-logo header-logo-left" alt="Company Logo">{{/if}}
+            {{#if logoBase64}}<img src="{{logoBase64}}" class="header-logo header-logo-right" alt="AnantTattva Logo">{{/if}}
+            <div class="company-name">Marking and Labeling</div>
             <div class="report-title">Detailed Packaging Assessment</div>
         </div>
 
@@ -2250,7 +2892,7 @@
                     </div>
                     {{/if}}
                     <div style="flex: 1;">
-                        <div style="font-weight: 800; color: #9a3412; font-size: 10px; margin-bottom: 8px; letter-spacing: 0.5px; text-transform: uppercase;">Remarks</div>
+                        <div style="font-weight: 800; color: #0F5D46; font-size: 10px; margin-bottom: 8px; letter-spacing: 0.5px; text-transform: uppercase;">Remarks</div>
                         {{#if this.hasAuditorRemarks}}
                         <div class="remark-box" style="margin-bottom: 10px;">
                             <div class="remark-title">Auditor Observation</div>
@@ -2278,11 +2920,11 @@
         </div>
     </div>
     {{/if}}
-    {{/if}}
 
-    {{#if isBrandOwner}}
-    <div class="page-break-before" id="portal-summary-report">
+    <div class="page-break-before report-page" id="portal-summary-report">
         <div class="report-header">
+            {{#if companyLogoBase64}}<img src="{{companyLogoBase64}}" class="header-logo header-logo-left" alt="Company Logo">{{/if}}
+            {{#if logoBase64}}<img src="{{logoBase64}}" class="header-logo header-logo-right" alt="AnantTattva Logo">{{/if}}
             <div class="company-name">Portal Summary Report</div>
             <div class="report-title">Annual Summary, EPR Target Calculation, Purchase Portal Data</div>
         </div>
@@ -2346,9 +2988,8 @@
             {{/if}}
         </div>
 
-        <div class="page-break"></div>
         <div class="section" id="purchase-portal-data">
-            <div class="section-title">5.3 Purchase Portal Data</div>
+            <div class="section-title">5.3 Purchase EPR Portal Data</div>
             {{#if purchaseSummary.data.length}}
             <table>
                 <thead>
@@ -2385,7 +3026,7 @@
                 </tbody>
             </table>
             {{else}}
-            <div class="card" style="text-align: center;">No Purchase Portal Data Available</div>
+            <div class="card" style="text-align: center;">No Purchase EPR Portal Data Available</div>
             {{/if}}
         </div>
 
@@ -2395,33 +3036,580 @@
         </div>
     </div>
 
-    <div class="page-break-before" id="cost-analysis">
-        <div class="report-header">
-            <div class="company-name">Cost Analysis</div>
-            <div class="report-title">SKU Wise, Component Wise, Polymer Wise, Category Wise, Supplier Wise</div>
+    <div class="page-break-before report-page">
+        <div class="section" id="cost-sku-wise">
+            <div class="section-title">6. SKU Wise Summary</div>
+            {{#if pdfCostAnalysisSections.skuWise.rows.length}}
+            <div class="summary-grid" style="margin-bottom: 14px; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px;">
+                {{#each pdfCostAnalysisSections.skuWise.cards}}
+                <div class="summary-card" style="border-color: #bfdbfe; background: #eff6ff;">
+                    <div class="summary-card-header" style="background: #dbeafe; color: #1d4ed8;">{{this.label}}</div>
+                    <div class="summary-card-body">
+                        <div class="stat-block">
+                            <div class="stat-value" style="color: #1e3a8a;">{{this.value}}</div>
+                        </div>
+                    </div>
+                </div>
+                {{/each}}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>SKU Code</th>
+                        <th>SKU Description</th>
+                        <th>Industry</th>
+                        <th style="text-align: right;">Annual Purchase MT</th>
+                        <th style="text-align: right;">Recycled Qty</th>
+                        <th style="text-align: right;">Virgin Qty</th>
+                        <th style="text-align: right;">Recycled Amount</th>
+                        <th style="text-align: right;">Virgin Amount</th>
+                        <th style="text-align: right;">Recycled Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each pdfCostAnalysisSections.skuWise.rows}}
+                    <tr>
+                        <td>{{this.skuCode}}</td>
+                        <td>{{this.skuDescription}}</td>
+                        <td>{{this.industryName}}</td>
+                        <td style="text-align: right;">{{this.annualPurchaseMt}}</td>
+                        <td style="text-align: right;">{{this.recycledQty}}</td>
+                        <td style="text-align: right;">{{this.virginQty}}</td>
+                        <td style="text-align: right;">{{this.recycledAmount}}</td>
+                        <td style="text-align: right;">{{this.virginAmount}}</td>
+                        <td style="text-align: right;">{{this.recycledSharePct}}%</td>
+                    </tr>
+                    {{/each}}
+                    <tr style="background: #fef3c7; font-weight: 800;">
+                        <td colspan="3">Total</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.totals.annualPurchaseMt}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.totals.recycledQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.totals.virginQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.totals.recycledAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.totals.virginAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.totals.recycledSharePct}}%</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{#if pdfCostAnalysisSections.skuWise.monthly.rows.length}}
+            <div class="keep-with-next">
+            <div class="card-header" style="margin-top: 16px; border-bottom: 2px solid #bfdbfe; background: #eff6ff; color: #1d4ed8;">
+                Monthly Section (Invoice Date Wise)
+            </div>
+            <div class="month-chart-grid">
+                <div class="month-chart-card" style="border-color: #bfdbfe; background: #eff6ff;">
+                    <div class="month-chart-title" style="color: #1d4ed8;">Monthly Purchase MT</div>
+                    {{#each pdfCostAnalysisSections.skuWise.monthly.monthlyChart.purchase}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #2563eb;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+                <div class="month-chart-card" style="border-color: #86efac; background: #ecfdf5;">
+                    <div class="month-chart-title" style="color: #15803d;">Recycled Qty</div>
+                    {{#each pdfCostAnalysisSections.skuWise.monthly.monthlyChart.recycled}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #16a34a;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+                <div class="month-chart-card" style="border-color: #c4b5fd; background: #f5f3ff;">
+                    <div class="month-chart-title" style="color: #7c3aed;">Virgin Qty</div>
+                    {{#each pdfCostAnalysisSections.skuWise.monthly.monthlyChart.virgin}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #7c3aed;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>SKU Code</th>
+                        <th>SKU Description</th>
+                        <th>Industry</th>
+                        <th style="text-align: right;">Monthly Purchase MT</th>
+                        <th style="text-align: right;">Recycled Qty</th>
+                        <th style="text-align: right;">Virgin Qty</th>
+                        <th style="text-align: right;">Recycled Amount</th>
+                        <th style="text-align: right;">Virgin Amount</th>
+                        <th style="text-align: right;">Recycled Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each pdfCostAnalysisSections.skuWise.monthly.rows}}
+                    <tr>
+                        <td>{{this.monthLabel}}</td>
+                        <td>{{this.skuCode}}</td>
+                        <td>{{this.skuDescription}}</td>
+                        <td>{{this.industryName}}</td>
+                        <td style="text-align: right;">{{this.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{this.recycledQty}}</td>
+                        <td style="text-align: right;">{{this.virginQty}}</td>
+                        <td style="text-align: right;">{{this.recycledAmount}}</td>
+                        <td style="text-align: right;">{{this.virginAmount}}</td>
+                        <td style="text-align: right;">{{this.recycledSharePct}}%</td>
+                    </tr>
+                    {{/each}}
+                    <tr style="background: #dbeafe; font-weight: 800;">
+                        <td colspan="4">Total</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.monthly.totals.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.monthly.totals.recycledQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.monthly.totals.virginQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.monthly.totals.recycledAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.monthly.totals.virginAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.skuWise.monthly.totals.recycledSharePct}}%</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{/if}}
+            {{else}}
+            <div class="card" style="text-align: center;">No SKU Wise Cost Analysis Data Available</div>
+            {{/if}}
         </div>
 
-        <div class="section" id="cost-sku-wise">
-            <div class="section-title">6.1 SKU Wise</div>
+        {{#if isBrandOwner}}<div class="page-break"></div>{{/if}}
+        <div class="section" id="cost-polymer-wise">
+            <div class="section-title">7. Polymer Wise Summary</div>
+            {{#if pdfCostAnalysisSections.polymerWise.rows.length}}
+            <div class="summary-grid" style="margin-bottom: 14px; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px;">
+                {{#each pdfCostAnalysisSections.polymerWise.cards}}
+                <div class="summary-card" style="border-color: #a7f3d0; background: #ecfdf5;">
+                    <div class="summary-card-header" style="background: #d1fae5; color: #047857;">{{this.label}}</div>
+                    <div class="summary-card-body">
+                        <div class="stat-block">
+                            <div class="stat-value" style="color: #065f46;">{{this.value}}</div>
+                        </div>
+                    </div>
+                </div>
+                {{/each}}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Polymer</th>
+                        <th style="text-align: right;">Annual Purchase MT</th>
+                        <th style="text-align: right;">Recycled Qty</th>
+                        <th style="text-align: right;">Virgin Qty</th>
+                        <th style="text-align: right;">Recycled Amount</th>
+                        <th style="text-align: right;">Virgin Amount</th>
+                        <th style="text-align: right;">Recycled Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each pdfCostAnalysisSections.polymerWise.rows}}
+                    <tr>
+                        <td>{{this.name}}</td>
+                        <td style="text-align: right;">{{this.annualPurchaseMt}}</td>
+                        <td style="text-align: right;">{{this.recycledQty}}</td>
+                        <td style="text-align: right;">{{this.virginQty}}</td>
+                        <td style="text-align: right;">{{this.recycledAmount}}</td>
+                        <td style="text-align: right;">{{this.virginAmount}}</td>
+                        <td style="text-align: right;">{{this.recycledSharePct}}%</td>
+                    </tr>
+                    {{/each}}
+                    <tr style="background: #fef3c7; font-weight: 800;">
+                        <td>Total</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.totals.annualPurchaseMt}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.totals.recycledQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.totals.virginQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.totals.recycledAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.totals.virginAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.totals.recycledSharePct}}%</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{#if pdfCostAnalysisSections.polymerWise.monthly.rows.length}}
+            <div class="keep-with-next">
+            <div class="card-header" style="margin-top: 16px; border-bottom: 2px solid #a7f3d0; background: #ecfdf5; color: #047857;">
+                Monthly Section (Invoice Date Wise)
+            </div>
+            <div class="month-chart-grid">
+                <div class="month-chart-card" style="border-color: #bfdbfe; background: #eff6ff;">
+                    <div class="month-chart-title" style="color: #1d4ed8;">Monthly Purchase MT</div>
+                    {{#each pdfCostAnalysisSections.polymerWise.monthly.monthlyChart.purchase}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #2563eb;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+                <div class="month-chart-card" style="border-color: #86efac; background: #ecfdf5;">
+                    <div class="month-chart-title" style="color: #15803d;">Recycled Qty</div>
+                    {{#each pdfCostAnalysisSections.polymerWise.monthly.monthlyChart.recycled}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #16a34a;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+                <div class="month-chart-card" style="border-color: #c4b5fd; background: #f5f3ff;">
+                    <div class="month-chart-title" style="color: #7c3aed;">Virgin Qty</div>
+                    {{#each pdfCostAnalysisSections.polymerWise.monthly.monthlyChart.virgin}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #7c3aed;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Polymer</th>
+                        <th style="text-align: right;">Monthly Purchase MT</th>
+                        <th style="text-align: right;">Recycled Qty</th>
+                        <th style="text-align: right;">Virgin Qty</th>
+                        <th style="text-align: right;">Recycled Amount</th>
+                        <th style="text-align: right;">Virgin Amount</th>
+                        <th style="text-align: right;">Recycled Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each pdfCostAnalysisSections.polymerWise.monthly.rows}}
+                    <tr>
+                        <td>{{this.monthLabel}}</td>
+                        <td>{{this.name}}</td>
+                        <td style="text-align: right;">{{this.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{this.recycledQty}}</td>
+                        <td style="text-align: right;">{{this.virginQty}}</td>
+                        <td style="text-align: right;">{{this.recycledAmount}}</td>
+                        <td style="text-align: right;">{{this.virginAmount}}</td>
+                        <td style="text-align: right;">{{this.recycledSharePct}}%</td>
+                    </tr>
+                    {{/each}}
+                    <tr style="background: #d1fae5; font-weight: 800;">
+                        <td colspan="2">Total</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.monthly.totals.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.monthly.totals.recycledQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.monthly.totals.virginQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.monthly.totals.recycledAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.monthly.totals.virginAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.polymerWise.monthly.totals.recycledSharePct}}%</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{/if}}
+            {{else}}
+            <div class="card" style="text-align: center;">No Polymer Wise Cost Analysis Data Available</div>
+            {{/if}}
+        </div>
+
+        {{#if isBrandOwner}}<div class="page-break"></div>{{/if}}
+        <div class="section" id="cost-category-wise">
+            <div class="section-title">8. Category Wise Summary</div>
+            {{#if pdfCostAnalysisSections.categoryWise.rows.length}}
+            <div class="summary-grid" style="margin-bottom: 14px; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px;">
+                {{#each pdfCostAnalysisSections.categoryWise.cards}}
+                <div class="summary-card" style="border-color: #fcd34d; background: #fffbeb;">
+                    <div class="summary-card-header" style="background: #fde68a; color: #b45309;">{{this.label}}</div>
+                    <div class="summary-card-body">
+                        <div class="stat-block">
+                            <div class="stat-value" style="color: #92400e;">{{this.value}}</div>
+                        </div>
+                    </div>
+                </div>
+                {{/each}}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th style="text-align: right;">Annual Purchase MT</th>
+                        <th style="text-align: right;">Recycled Qty</th>
+                        <th style="text-align: right;">Virgin Qty</th>
+                        <th style="text-align: right;">Recycled Amount</th>
+                        <th style="text-align: right;">Virgin Amount</th>
+                        <th style="text-align: right;">Recycled Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each pdfCostAnalysisSections.categoryWise.rows}}
+                    <tr>
+                        <td>{{this.name}}</td>
+                        <td style="text-align: right;">{{this.annualPurchaseMt}}</td>
+                        <td style="text-align: right;">{{this.recycledQty}}</td>
+                        <td style="text-align: right;">{{this.virginQty}}</td>
+                        <td style="text-align: right;">{{this.recycledAmount}}</td>
+                        <td style="text-align: right;">{{this.virginAmount}}</td>
+                        <td style="text-align: right;">{{this.recycledSharePct}}%</td>
+                    </tr>
+                    {{/each}}
+                    <tr style="background: #fef3c7; font-weight: 800;">
+                        <td>Total</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.totals.annualPurchaseMt}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.totals.recycledQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.totals.virginQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.totals.recycledAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.totals.virginAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.totals.recycledSharePct}}%</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{#if pdfCostAnalysisSections.categoryWise.monthly.rows.length}}
+            <div class="keep-with-next">
+            <div class="card-header" style="margin-top: 16px; border-bottom: 2px solid #fcd34d; background: #fffbeb; color: #b45309;">
+                Monthly Section (Invoice Date Wise)
+            </div>
+            <div class="month-chart-grid">
+                <div class="month-chart-card" style="border-color: #bfdbfe; background: #eff6ff;">
+                    <div class="month-chart-title" style="color: #1d4ed8;">Monthly Purchase MT</div>
+                    {{#each pdfCostAnalysisSections.categoryWise.monthly.monthlyChart.purchase}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #2563eb;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+                <div class="month-chart-card" style="border-color: #86efac; background: #ecfdf5;">
+                    <div class="month-chart-title" style="color: #15803d;">Recycled Qty</div>
+                    {{#each pdfCostAnalysisSections.categoryWise.monthly.monthlyChart.recycled}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #16a34a;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+                <div class="month-chart-card" style="border-color: #c4b5fd; background: #f5f3ff;">
+                    <div class="month-chart-title" style="color: #7c3aed;">Virgin Qty</div>
+                    {{#each pdfCostAnalysisSections.categoryWise.monthly.monthlyChart.virgin}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #7c3aed;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Category</th>
+                        <th style="text-align: right;">Monthly Purchase MT</th>
+                        <th style="text-align: right;">Recycled Qty</th>
+                        <th style="text-align: right;">Virgin Qty</th>
+                        <th style="text-align: right;">Recycled Amount</th>
+                        <th style="text-align: right;">Virgin Amount</th>
+                        <th style="text-align: right;">Recycled Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each pdfCostAnalysisSections.categoryWise.monthly.rows}}
+                    <tr>
+                        <td>{{this.monthLabel}}</td>
+                        <td>{{this.name}}</td>
+                        <td style="text-align: right;">{{this.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{this.recycledQty}}</td>
+                        <td style="text-align: right;">{{this.virginQty}}</td>
+                        <td style="text-align: right;">{{this.recycledAmount}}</td>
+                        <td style="text-align: right;">{{this.virginAmount}}</td>
+                        <td style="text-align: right;">{{this.recycledSharePct}}%</td>
+                    </tr>
+                    {{/each}}
+                    <tr style="background: #fde68a; font-weight: 800;">
+                        <td colspan="2">Total</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.monthly.totals.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.monthly.totals.recycledQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.monthly.totals.virginQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.monthly.totals.recycledAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.monthly.totals.virginAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.categoryWise.monthly.totals.recycledSharePct}}%</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{/if}}
+            {{else}}
+            <div class="card" style="text-align: center;">No Category Wise Cost Analysis Data Available</div>
+            {{/if}}
+        </div>
+
+        {{#if isBrandOwner}}<div class="page-break"></div>{{/if}}
+        <div class="section" id="cost-supplier-wise">
+            <div class="section-title">9. Supplier Wise Summary</div>
+            {{#if pdfCostAnalysisSections.supplierWise.rows.length}}
+            <div class="summary-grid" style="margin-bottom: 14px; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px;">
+                {{#each pdfCostAnalysisSections.supplierWise.cards}}
+                <div class="summary-card" style="border-color: #ddd6fe; background: #f5f3ff;">
+                    <div class="summary-card-header" style="background: #e9d5ff; color: #7c3aed;">{{this.label}}</div>
+                    <div class="summary-card-body">
+                        <div class="stat-block">
+                            <div class="stat-value" style="color: #5b21b6;">{{this.value}}</div>
+                        </div>
+                    </div>
+                </div>
+                {{/each}}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Supplier</th>
+                        <th>Supplier Status</th>
+                        <th style="text-align: right;">Annual Purchase MT</th>
+                        <th style="text-align: right;">Recycled Qty</th>
+                        <th style="text-align: right;">Virgin Qty</th>
+                        <th style="text-align: right;">Recycled Amount</th>
+                        <th style="text-align: right;">Virgin Amount</th>
+                        <th style="text-align: right;">Recycled Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each pdfCostAnalysisSections.supplierWise.rows}}
+                    <tr>
+                        <td>{{this.name}}</td>
+                        <td>{{this.supplierStatus}}</td>
+                        <td style="text-align: right;">{{this.annualPurchaseMt}}</td>
+                        <td style="text-align: right;">{{this.recycledQty}}</td>
+                        <td style="text-align: right;">{{this.virginQty}}</td>
+                        <td style="text-align: right;">{{this.recycledAmount}}</td>
+                        <td style="text-align: right;">{{this.virginAmount}}</td>
+                        <td style="text-align: right;">{{this.recycledSharePct}}%</td>
+                    </tr>
+                    {{/each}}
+                    <tr style="background: #fef3c7; font-weight: 800;">
+                        <td colspan="2">Total</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.totals.annualPurchaseMt}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.totals.recycledQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.totals.virginQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.totals.recycledAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.totals.virginAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.totals.recycledSharePct}}%</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{#if pdfCostAnalysisSections.supplierWise.monthly.rows.length}}
+            <div class="keep-with-next">
+            <div class="card-header" style="margin-top: 16px; border-bottom: 2px solid #ddd6fe; background: #f5f3ff; color: #7c3aed;">
+                Monthly Section (Invoice Date Wise)
+            </div>
+            <div class="month-chart-grid">
+                <div class="month-chart-card" style="border-color: #bfdbfe; background: #eff6ff;">
+                    <div class="month-chart-title" style="color: #1d4ed8;">Monthly Purchase MT</div>
+                    {{#each pdfCostAnalysisSections.supplierWise.monthly.monthlyChart.purchase}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #2563eb;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+                <div class="month-chart-card" style="border-color: #86efac; background: #ecfdf5;">
+                    <div class="month-chart-title" style="color: #15803d;">Recycled Qty</div>
+                    {{#each pdfCostAnalysisSections.supplierWise.monthly.monthlyChart.recycled}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #16a34a;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+                <div class="month-chart-card" style="border-color: #c4b5fd; background: #f5f3ff;">
+                    <div class="month-chart-title" style="color: #7c3aed;">Virgin Qty</div>
+                    {{#each pdfCostAnalysisSections.supplierWise.monthly.monthlyChart.virgin}}
+                    <div class="month-chart-row">
+                        <div class="month-chart-labels"><span>{{this.label}}</span><span>{{this.value}}</span></div>
+                        <div class="month-chart-track"><div class="month-chart-bar" style="width: {{this.pct}}%; background: #7c3aed;"></div></div>
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Supplier</th>
+                        <th>Supplier Status</th>
+                        <th style="text-align: right;">Monthly Purchase MT</th>
+                        <th style="text-align: right;">Recycled Qty</th>
+                        <th style="text-align: right;">Virgin Qty</th>
+                        <th style="text-align: right;">Recycled Amount</th>
+                        <th style="text-align: right;">Virgin Amount</th>
+                        <th style="text-align: right;">Recycled Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each pdfCostAnalysisSections.supplierWise.monthly.rows}}
+                    <tr>
+                        <td>{{this.monthLabel}}</td>
+                        <td>{{this.name}}</td>
+                        <td>{{this.supplierStatus}}</td>
+                        <td style="text-align: right;">{{this.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{this.recycledQty}}</td>
+                        <td style="text-align: right;">{{this.virginQty}}</td>
+                        <td style="text-align: right;">{{this.recycledAmount}}</td>
+                        <td style="text-align: right;">{{this.virginAmount}}</td>
+                        <td style="text-align: right;">{{this.recycledSharePct}}%</td>
+                    </tr>
+                    {{/each}}
+                    <tr style="background: #e9d5ff; font-weight: 800;">
+                        <td colspan="3">Total</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.monthly.totals.monthlyPurchaseMt}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.monthly.totals.recycledQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.monthly.totals.virginQty}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.monthly.totals.recycledAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.monthly.totals.virginAmount}}</td>
+                        <td style="text-align: right;">{{pdfCostAnalysisSections.supplierWise.monthly.totals.recycledSharePct}}%</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{/if}}
+            {{else}}
+            <div class="card" style="text-align: center;">No Supplier Wise Cost Analysis Data Available</div>
+            {{/if}}
+        </div>
+
+        <div class="section" id="cost-sku-supplier-details">
+            <div class="section-title">10. SKU Wise Supplier Details</div>
             {{#if costAnalysisSkuDetails.length}}
                 {{#each costAnalysisSkuDetails}}
-                <div style="{{#unless this.isFirst}}page-break-before: always;{{/unless}}">
-                    <div class="card-header" style="border-bottom: 2px solid #e5e7eb;">
+                <div class="card" style="{{#unless @first}}margin-top: 18px;{{/unless}}">
+                    <div class="card-header" style="border-bottom: 2px solid #bfdbfe; background: #eff6ff; color: #1d4ed8;">
                         {{this.skuCode}} - {{this.skuDescription}}
                     </div>
-                    <div style="font-size: 11px; color: #6b7280; margin: 6px 0 10px 0;">{{this.industryName}}</div>
+                    <table style="margin-bottom: 12px;">
+                        <tbody>
+                            <tr>
+                                <td style="font-weight: 700; width: 18%;">Industry</td>
+                                <td style="width: 32%;">{{this.industryName}}</td>
+                                <td style="font-weight: 700; width: 18%;">Annual Purchase MT</td>
+                                <td style="width: 32%; text-align: right;">{{this.procurementTons}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 700;">Recycled Qty</td>
+                                <td style="text-align: right;">{{this.recycledQty}}</td>
+                                <td style="font-weight: 700;">Virgin Qty</td>
+                                <td style="text-align: right;">{{this.virginQty}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 700;">Recycled Amount</td>
+                                <td style="text-align: right;">{{this.recycledAmount}}</td>
+                                <td style="font-weight: 700;">Virgin Amount</td>
+                                <td style="text-align: right;">{{this.virginAmount}}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                     <table>
                         <thead>
                             <tr>
                                 <th>Supplier</th>
-                                <th>Component</th>
+                                <th>Component Code</th>
+                                <th>Component Description</th>
                                 <th>Period</th>
-                                <th style="text-align: right;">Proc (MT)</th>
+                                <th style="text-align: right;">Procurement MT</th>
                                 <th style="text-align: right;">Virgin Qty</th>
-                                <th style="text-align: right;">Virgin Amt</th>
+                                <th style="text-align: right;">Virgin Rate</th>
+                                <th style="text-align: right;">Virgin Amount</th>
                                 <th style="text-align: right;">Recycled Qty</th>
-                                <th style="text-align: right;">Recycled Amt</th>
-                                <th style="text-align: right;">Total Amt</th>
+                                <th style="text-align: right;">Recycled Rate</th>
+                                <th style="text-align: right;">Recycled Amount</th>
+                                <th style="text-align: right;">Total Amount</th>
+                                <th style="text-align: right;">Avg Rate</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2429,215 +3617,211 @@
                             <tr>
                                 <td>{{this.supplierName}}</td>
                                 <td>{{this.componentCode}}</td>
+                                <td>{{this.componentDescription}}</td>
                                 <td>{{this.period}}</td>
                                 <td style="text-align: right;">{{this.procurementTons}}</td>
+                                <td style="text-align: right;">{{this.virginQty}}</td>
+                                <td style="text-align: right;">{{this.virginRate}}</td>
+                                <td style="text-align: right;">{{this.virginAmount}}</td>
+                                <td style="text-align: right;">{{this.recycledQty}}</td>
+                                <td style="text-align: right;">{{this.recycledRate}}</td>
+                                <td style="text-align: right;">{{this.recycledAmount}}</td>
+                                <td style="text-align: right;">{{this.totalAmount}}</td>
+                                <td style="text-align: right;">{{this.avgRate}}</td>
+                            </tr>
+                            {{/each}}
+                            <tr style="background: #dbeafe; font-weight: 800;">
+                                <td colspan="4">Total</td>
+                                <td style="text-align: right;">{{this.procurementTons}}</td>
+                                <td style="text-align: right;">{{this.virginQty}}</td>
+                                <td style="text-align: right;">-</td>
+                                <td style="text-align: right;">{{this.virginAmount}}</td>
+                                <td style="text-align: right;">{{this.recycledQty}}</td>
+                                <td style="text-align: right;">-</td>
+                                <td style="text-align: right;">{{this.recycledAmount}}</td>
+                                <td style="text-align: right;">{{this.totalCost}}</td>
+                                <td style="text-align: right;">{{this.avgRate}}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                {{/each}}
+            {{else}}
+            <div class="card" style="text-align: center;">No SKU Wise Supplier Details Available</div>
+            {{/if}}
+        </div>
+
+        <div class="section" id="cost-polymer-supplier-details">
+            <div class="section-title">11. Polymer Wise Supplier Details</div>
+            {{#if costAnalysisPolymerReport.length}}
+                {{#each costAnalysisPolymerReport}}
+                <div class="card" style="{{#unless @first}}margin-top: 18px;{{/unless}}">
+                    <div class="card-header" style="border-bottom: 2px solid #a7f3d0; background: #ecfdf5; color: #047857;">
+                        {{this.name}}
+                    </div>
+                    <table style="margin-bottom: 12px;">
+                        <tbody>
+                            <tr>
+                                <td style="font-weight: 700; width: 18%;">Annual Purchase MT</td>
+                                <td style="width: 15%; text-align: right;">{{this.annualPurchaseMt}}</td>
+                                <td style="font-weight: 700; width: 18%;">Recycled Qty</td>
+                                <td style="width: 15%; text-align: right;">{{this.recycledQty}}</td>
+                                <td style="font-weight: 700; width: 18%;">Virgin Qty</td>
+                                <td style="width: 16%; text-align: right;">{{this.virginQty}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 700;">Recycled Amount</td>
+                                <td style="text-align: right;">{{this.recycledAmount}}</td>
+                                <td style="font-weight: 700;">Virgin Amount</td>
+                                <td style="text-align: right;">{{this.virginAmount}}</td>
+                                <td style="font-weight: 700;">Total Spend</td>
+                                <td style="text-align: right;">{{this.totalSpend}}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    {{#each this.suppliers}}
+                    <div class="card-header" style="margin-top: 10px; border-bottom: 1px solid #d1fae5; background: #f0fdf4; color: #065f46;">
+                        Supplier: {{this.supplierName}}
+                    </div>
+                    <table style="margin-bottom: 10px;">
+                        <thead>
+                            <tr>
+                                <th>SKU Code</th>
+                                <th>SKU Description</th>
+                                <th>Component</th>
+                                <th>Category</th>
+                                <th>Recycled Polymer Used</th>
+                                <th style="text-align: right;">Annual Purchase MT</th>
+                                <th style="text-align: right;">Virgin Qty</th>
+                                <th style="text-align: right;">Virgin Amount</th>
+                                <th style="text-align: right;">Recycled Qty</th>
+                                <th style="text-align: right;">Recycled Amount</th>
+                                <th style="text-align: right;">Total Spend</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#each this.rows}}
+                            <tr>
+                                <td>{{this.skuCode}}</td>
+                                <td>{{this.skuDescription}}</td>
+                                <td>{{this.componentName}}</td>
+                                <td>{{this.category}}</td>
+                                <td>{{this.recycledPolymerUsed}}</td>
+                                <td style="text-align: right;">{{this.annualPurchaseMt}}</td>
                                 <td style="text-align: right;">{{this.virginQty}}</td>
                                 <td style="text-align: right;">{{this.virginAmount}}</td>
                                 <td style="text-align: right;">{{this.recycledQty}}</td>
                                 <td style="text-align: right;">{{this.recycledAmount}}</td>
-                                <td style="text-align: right;">{{this.totalAmount}}</td>
+                                <td style="text-align: right;">{{this.totalSpend}}</td>
                             </tr>
                             {{/each}}
+                            <tr style="background: #d1fae5; font-weight: 800;">
+                                <td colspan="5">Total</td>
+                                <td style="text-align: right;">{{this.totals.annualPurchaseMt}}</td>
+                                <td style="text-align: right;">{{this.totals.virginQty}}</td>
+                                <td style="text-align: right;">{{this.totals.virginAmount}}</td>
+                                <td style="text-align: right;">{{this.totals.recycledQty}}</td>
+                                <td style="text-align: right;">{{this.totals.recycledAmount}}</td>
+                                <td style="text-align: right;">{{this.totals.totalSpend}}</td>
+                            </tr>
                         </tbody>
                     </table>
-                </div>
-                {{/each}}
-            {{else}}
-            <div class="card" style="text-align: center;">No SKU Wise Cost Analysis Data Available</div>
-            {{/if}}
-        </div>
-
-        <div class="page-break"></div>
-        <div class="section" id="cost-component-wise">
-            <div class="section-title">6.2 Component Wise</div>
-            {{#if costAnalysisComponentReport.length}}
-                {{#each costAnalysisComponentReport}}
-                <div class="section-block" style="{{#unless @first}}margin-top: 18px;{{/unless}}">
-                    <div class="card-header" style="border-bottom: 2px solid #e5e7eb;">{{this.name}}</div>
-                    {{#each this.suppliers}}
-                    <div style="{{#unless @first}}margin-top: 14px;{{/unless}}">
-                        <div style="font-weight: 800; font-size: 13px; margin: 6px 0;">{{this.supplierName}}</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>SKU</th>
-                                    <th>Category</th>
-                                    <th>Polymer</th>
-                                    <th style="text-align: right;">Recycled Qty</th>
-                                    <th style="text-align: right;">Recycled Amt</th>
-                                    <th style="text-align: right;">Virgin Qty</th>
-                                    <th style="text-align: right;">Virgin Amt</th>
-                                    <th style="text-align: right;">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{#each this.rows}}
-                                <tr>
-                                    <td>{{this.skuCode}}</td>
-                                    <td>{{this.category}}</td>
-                                    <td>{{this.polymerName}}</td>
-                                    <td style="text-align: right;">{{this.recycledQty}}</td>
-                                    <td style="text-align: right;">₹{{this.recycledAmount}}</td>
-                                    <td style="text-align: right;">{{this.virginQty}}</td>
-                                    <td style="text-align: right;">₹{{this.virginAmount}}</td>
-                                    <td style="text-align: right; font-weight: 800;">₹{{this.totalSpend}}</td>
-                                </tr>
-                                {{/each}}
-                            </tbody>
-                        </table>
-                    </div>
                     {{/each}}
                 </div>
                 {{/each}}
             {{else}}
-            <div class="card" style="text-align: center;">No Component Wise Cost Analysis Data Available</div>
+            <div class="card" style="text-align: center;">No Polymer Wise Supplier Details Available</div>
             {{/if}}
         </div>
 
-        <div class="page-break"></div>
-        <div class="section" id="cost-polymer-wise">
-            <div class="section-title">6.3 Polymer Wise</div>
-            {{#if costAnalysisPolymerReport.length}}
-                {{#each costAnalysisPolymerReport}}
-                <div class="section-block" style="{{#unless @first}}margin-top: 18px;{{/unless}}">
-                    <div class="card-header" style="border-bottom: 2px solid #e5e7eb;">{{this.name}}</div>
-                    {{#each this.suppliers}}
-                    <div style="{{#unless @first}}margin-top: 14px;{{/unless}}">
-                        <div style="font-weight: 800; font-size: 13px; margin: 6px 0;">{{this.supplierName}}</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>SKU</th>
-                                    <th>Component</th>
-                                    <th>Category</th>
-                                    <th style="text-align: right;">Recycled Qty</th>
-                                    <th style="text-align: right;">Recycled Amt</th>
-                                    <th style="text-align: right;">Virgin Qty</th>
-                                    <th style="text-align: right;">Virgin Amt</th>
-                                    <th style="text-align: right;">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{#each this.rows}}
-                                <tr>
-                                    <td>{{this.skuCode}}</td>
-                                    <td>{{this.componentName}}</td>
-                                    <td>{{this.category}}</td>
-                                    <td style="text-align: right;">{{this.recycledQty}}</td>
-                                    <td style="text-align: right;">₹{{this.recycledAmount}}</td>
-                                    <td style="text-align: right;">{{this.virginQty}}</td>
-                                    <td style="text-align: right;">₹{{this.virginAmount}}</td>
-                                    <td style="text-align: right; font-weight: 800;">₹{{this.totalSpend}}</td>
-                                </tr>
-                                {{/each}}
-                            </tbody>
-                        </table>
-                    </div>
-                    {{/each}}
-                </div>
-                {{/each}}
-            {{else}}
-            <div class="card" style="text-align: center;">No Polymer Wise Cost Analysis Data Available</div>
-            {{/if}}
-        </div>
-
-        <div class="page-break"></div>
-        <div class="section" id="cost-category-wise">
-            <div class="section-title">6.4 Category Wise</div>
+        <div class="section" id="cost-category-supplier-details">
+            <div class="section-title">12. Category Wise Supplier Details</div>
             {{#if costAnalysisCategoryReport.length}}
                 {{#each costAnalysisCategoryReport}}
-                <div class="section-block" style="{{#unless @first}}margin-top: 18px;{{/unless}}">
-                    <div class="card-header" style="border-bottom: 2px solid #e5e7eb;">{{this.name}}</div>
-                    {{#each this.suppliers}}
-                    <div style="{{#unless @first}}margin-top: 14px;{{/unless}}">
-                        <div style="font-weight: 800; font-size: 13px; margin: 6px 0;">{{this.supplierName}}</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>SKU</th>
-                                    <th>Component</th>
-                                    <th>Polymer</th>
-                                    <th style="text-align: right;">Recycled Qty</th>
-                                    <th style="text-align: right;">Recycled Amt</th>
-                                    <th style="text-align: right;">Virgin Qty</th>
-                                    <th style="text-align: right;">Virgin Amt</th>
-                                    <th style="text-align: right;">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{#each this.rows}}
-                                <tr>
-                                    <td>{{this.skuCode}}</td>
-                                    <td>{{this.componentName}}</td>
-                                    <td>{{this.polymerName}}</td>
-                                    <td style="text-align: right;">{{this.recycledQty}}</td>
-                                    <td style="text-align: right;">₹{{this.recycledAmount}}</td>
-                                    <td style="text-align: right;">{{this.virginQty}}</td>
-                                    <td style="text-align: right;">₹{{this.virginAmount}}</td>
-                                    <td style="text-align: right; font-weight: 800;">₹{{this.totalSpend}}</td>
-                                </tr>
-                                {{/each}}
-                            </tbody>
-                        </table>
+                <div class="card" style="{{#unless @first}}margin-top: 18px;{{/unless}}">
+                    <div class="card-header" style="border-bottom: 2px solid #fcd34d; background: #fffbeb; color: #b45309;">
+                        {{this.name}}
                     </div>
-                    {{/each}}
-                </div>
-                {{/each}}
-            {{else}}
-            <div class="card" style="text-align: center;">No Category Wise Cost Analysis Data Available</div>
-            {{/if}}
-        </div>
-
-        <div class="page-break"></div>
-        <div class="section" id="cost-supplier-wise">
-            <div class="section-title">6.5 Supplier Wise</div>
-            {{#if costAnalysisSupplierReport.length}}
-                {{#each costAnalysisSupplierReport}}
-                <div class="section-block" style="{{#unless @first}}margin-top: 18px;{{/unless}}">
-                    <div class="card-header" style="border-bottom: 2px solid #e5e7eb;">{{this.name}}</div>
-                    <table>
+                    <table style="margin-bottom: 12px;">
+                        <tbody>
+                            <tr>
+                                <td style="font-weight: 700; width: 18%;">Annual Purchase MT</td>
+                                <td style="width: 15%; text-align: right;">{{this.annualPurchaseMt}}</td>
+                                <td style="font-weight: 700; width: 18%;">Recycled Qty</td>
+                                <td style="width: 15%; text-align: right;">{{this.recycledQty}}</td>
+                                <td style="font-weight: 700; width: 18%;">Virgin Qty</td>
+                                <td style="width: 16%; text-align: right;">{{this.virginQty}}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 700;">Recycled Amount</td>
+                                <td style="text-align: right;">{{this.recycledAmount}}</td>
+                                <td style="font-weight: 700;">Virgin Amount</td>
+                                <td style="text-align: right;">{{this.virginAmount}}</td>
+                                <td style="font-weight: 700;">Total Spend</td>
+                                <td style="text-align: right;">{{this.totalSpend}}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    {{#each this.suppliers}}
+                    <div class="card-header" style="margin-top: 10px; border-bottom: 1px solid #fde68a; background: #fffbeb; color: #92400e;">
+                        Supplier: {{this.supplierName}}
+                    </div>
+                    <table style="margin-bottom: 10px;">
                         <thead>
                             <tr>
-                                <th>SKU</th>
+                                <th>SKU Code</th>
+                                <th>SKU Description</th>
                                 <th>Component</th>
-                                <th>Category</th>
                                 <th>Polymer</th>
-                                <th style="text-align: right;">Recycled Qty</th>
-                                <th style="text-align: right;">Recycled Amt</th>
+                                <th>Recycled Polymer Used</th>
+                                <th style="text-align: right;">Annual Purchase MT</th>
                                 <th style="text-align: right;">Virgin Qty</th>
-                                <th style="text-align: right;">Virgin Amt</th>
-                                <th style="text-align: right;">Total</th>
+                                <th style="text-align: right;">Virgin Amount</th>
+                                <th style="text-align: right;">Recycled Qty</th>
+                                <th style="text-align: right;">Recycled Amount</th>
+                                <th style="text-align: right;">Total Spend</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {{#each this.details}}
+                            {{#each this.rows}}
                             <tr>
                                 <td>{{this.skuCode}}</td>
+                                <td>{{this.skuDescription}}</td>
                                 <td>{{this.componentName}}</td>
-                                <td>{{this.category}}</td>
                                 <td>{{this.polymerName}}</td>
-                                <td style="text-align: right;">{{this.recycledQty}}</td>
-                                <td style="text-align: right;">₹{{this.recycledAmount}}</td>
+                                <td>{{this.recycledPolymerUsed}}</td>
+                                <td style="text-align: right;">{{this.annualPurchaseMt}}</td>
                                 <td style="text-align: right;">{{this.virginQty}}</td>
-                                <td style="text-align: right;">₹{{this.virginAmount}}</td>
-                                <td style="text-align: right; font-weight: 800;">₹{{this.totalSpend}}</td>
+                                <td style="text-align: right;">{{this.virginAmount}}</td>
+                                <td style="text-align: right;">{{this.recycledQty}}</td>
+                                <td style="text-align: right;">{{this.recycledAmount}}</td>
+                                <td style="text-align: right;">{{this.totalSpend}}</td>
                             </tr>
                             {{/each}}
+                            <tr style="background: #fde68a; font-weight: 800;">
+                                <td colspan="5">Total</td>
+                                <td style="text-align: right;">{{this.totals.annualPurchaseMt}}</td>
+                                <td style="text-align: right;">{{this.totals.virginQty}}</td>
+                                <td style="text-align: right;">{{this.totals.virginAmount}}</td>
+                                <td style="text-align: right;">{{this.totals.recycledQty}}</td>
+                                <td style="text-align: right;">{{this.totals.recycledAmount}}</td>
+                                <td style="text-align: right;">{{this.totals.totalSpend}}</td>
+                            </tr>
                         </tbody>
                     </table>
+                    {{/each}}
                 </div>
                 {{/each}}
             {{else}}
-            <div class="card" style="text-align: center;">No Supplier Wise Cost Analysis Data Available</div>
+            <div class="card" style="text-align: center;">No Category Wise Supplier Details Available</div>
             {{/if}}
         </div>
 
         <div class="footer" style="position: absolute; bottom: 20px;">
             <span>AnantTattva EPR Kavach System</span>
-            <span>Cost Analysis</span>
+            <span>Detailed Analysis</span>
         </div>
     </div>
-    {{/if}}
 
 </body>
 </html>

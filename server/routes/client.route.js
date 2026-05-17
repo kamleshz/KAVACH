@@ -56,6 +56,7 @@ import {
 } from '../controllers/eWasteCompliance.controller.js';
 import { validate } from '../middleware/validate.js';
 import { paginationMiddleware } from '../middleware/pagination.middleware.js';
+import logger from '../utils/logger.js';
 import {
     assignClientSchema,
     clientIdParamsSchema,
@@ -137,7 +138,7 @@ router.post('/:clientId/product-compliance/upload-row', auth, restrictClientScop
         { name: 'additionalDocument', maxCount: 1 }
     ])(req, res, (err) => {
         if (err) {
-            console.error("[Multer Upload Error]", err);
+            logger.error({ err }, "[Multer Upload Error]");
             return res.status(500).json({ 
                 message: "File upload failed: " + (err.message || "Unknown error"), 
                 error: true, 

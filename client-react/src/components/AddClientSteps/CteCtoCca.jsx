@@ -300,6 +300,7 @@ const CteCtoCca = ({
                                                                     : 'bg-green-500 text-white hover:bg-green-600 hover:shadow-md'
                                                             }`}
                                                             title={row.isEditing ? "Save" : "Edit"}
+                                                            aria-label={row.isEditing ? `Save CTE detail row ${index + 1}` : `Edit CTE detail row ${index + 1}`}
                                                         >
                                                             {row.isEditing ? <FaSave /> : <FaEdit />}
                                                         </button>
@@ -310,6 +311,7 @@ const CteCtoCca = ({
                                                             onClick={() => resetCteDetailRow(index)}
                                                             className="h-8 w-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-200 hover:text-gray-800 transition-all duration-200 shadow-sm"
                                                             title="Reset"
+                                                            aria-label={`Reset CTE detail row ${index + 1}`}
                                                         >
                                                             <FaUndo />
                                                         </button>
@@ -320,6 +322,7 @@ const CteCtoCca = ({
                                                             onClick={() => deleteLocationRow(index)}
                                                             className="h-8 w-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all duration-200 shadow-sm"
                                                             title="Delete Location"
+                                                            aria-label={`Delete CTE location row ${index + 1}`}
                                                         >
                                                             <FaTrashAlt />
                                                         </button>
@@ -688,6 +691,7 @@ const CteCtoCca = ({
                                                                     : 'bg-green-500 text-white hover:bg-green-600 hover:shadow-md'
                                                             }`}
                                                             title={row.isEditing ? "Save" : "Edit"}
+                                                            aria-label={row.isEditing ? `Save CTO detail row ${index + 1}` : `Edit CTO detail row ${index + 1}`}
                                                         >
                                                             {row.isEditing ? <FaSave /> : <FaEdit />}
                                                         </button>
@@ -698,6 +702,7 @@ const CteCtoCca = ({
                                                             onClick={() => resetCtoDetailRow(index)}
                                                             className="h-8 w-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-200 hover:text-gray-800 transition-all duration-200 shadow-sm"
                                                             title="Reset"
+                                                            aria-label={`Reset CTO detail row ${index + 1}`}
                                                         >
                                                             <FaUndo />
                                                         </button>
@@ -708,6 +713,7 @@ const CteCtoCca = ({
                                                             onClick={() => deleteLocationRow(index)}
                                                             className="h-8 w-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all duration-200 shadow-sm"
                                                             title="Delete Location"
+                                                            aria-label={`Delete CTO location row ${index + 1}`}
                                                         >
                                                             <FaTrashAlt />
                                                         </button>
@@ -1095,6 +1101,7 @@ const CteCtoCca = ({
                                                             onClick={() => toggleEditCtoProductionCapacityValidationRow(index)}
                                                             className="h-8 w-8 rounded-lg bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition-all duration-200 shadow-sm"
                                                             title={row.isEditing ? "Save" : "Edit"}
+                                                            aria-label={row.isEditing ? `Save CTO production capacity row ${index + 1}` : `Edit CTO production capacity row ${index + 1}`}
                                                         >
                                                             {row.isEditing ? <FaSave /> : <FaEdit />}
                                                         </button>
@@ -1103,6 +1110,7 @@ const CteCtoCca = ({
                                                             onClick={() => resetCtoProductionCapacityValidationRow(index)}
                                                             className="h-8 w-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-200 hover:text-gray-800 transition-all duration-200 shadow-sm"
                                                             title="Reset"
+                                                            aria-label={`Reset CTO production capacity row ${index + 1}`}
                                                         >
                                                             <FaUndo />
                                                         </button>
@@ -1111,6 +1119,7 @@ const CteCtoCca = ({
                                                             onClick={() => deleteCtoProductionCapacityValidationRow(index)}
                                                             className="h-8 w-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all duration-200 shadow-sm"
                                                             title="Delete"
+                                                            aria-label={`Delete CTO production capacity row ${index + 1}`}
                                                         >
                                                             <FaTrashAlt />
                                                         </button>
@@ -1184,6 +1193,7 @@ const CteCtoCca = ({
                                                     onClick={() => deleteCtoAdditionalDetailRow(idx)}
                                                     className="h-8 w-8 rounded-lg bg-red-50 text-red-500 inline-flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all duration-200 shadow-sm"
                                                     title="Delete Row"
+                                                    aria-label={`Delete CTO additional detail row ${idx + 1}`}
                                                 >
                                                     <FaTrashAlt />
                                                 </button>
@@ -1473,6 +1483,7 @@ const CteCtoCca = ({
                                                                     onClick={() => deleteWaterRegulationRow(idx)}
                                                                     className="h-8 w-8 rounded-lg bg-red-50 text-red-500 inline-flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all duration-200 shadow-sm"
                                                                     title="Delete Row"
+                                                                    aria-label={`Delete water regulation row ${idx + 1}`}
                                                                 >
                                                                     <FaTrashAlt />
                                                                 </button>
@@ -1606,6 +1617,7 @@ const CteCtoCca = ({
                                                                     onClick={() => deleteAirRegulationRow(idx)}
                                                                     className="h-8 w-8 rounded-lg bg-red-50 text-red-500 inline-flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all duration-200 shadow-sm"
                                                                     title="Delete Row"
+                                                                    aria-label={`Delete air regulation row ${idx + 1}`}
                                                                 >
                                                                     <FaTrashAlt />
                                                                 </button>

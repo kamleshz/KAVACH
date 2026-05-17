@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import logger from "./logger.js";
 
 export const generateAccessToken = (userId) => {
   const secret =
@@ -11,8 +12,7 @@ export const generateAccessToken = (userId) => {
     !process.env.SECRET_KEY_ACCESS_TOKEN &&
     process.env.NODE_ENV !== "production"
   ) {
-    // eslint-disable-next-line no-console
-    console.warn("[Auth] Using development fallback for ACCESS token secret");
+    logger.warn("[Auth] Using development fallback for ACCESS token secret");
   }
   return jwt.sign({ id: userId }, secret, { expiresIn: "6h" });
 };
@@ -28,8 +28,7 @@ export const generateRefreshToken = (userId) => {
     !process.env.SECRET_KEY_REFRESH_TOKEN &&
     process.env.NODE_ENV !== "production"
   ) {
-    // eslint-disable-next-line no-console
-    console.warn("[Auth] Using development fallback for REFRESH token secret");
+    logger.warn("[Auth] Using development fallback for REFRESH token secret");
   }
   return jwt.sign({ id: userId }, secret, { expiresIn: "7d" });
 };

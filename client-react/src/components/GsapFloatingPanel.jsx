@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
+import usePrefersReducedMotion from "../hooks/usePrefersReducedMotion";
 
 const GsapFloatingPanel = ({
   children,
@@ -8,13 +9,10 @@ const GsapFloatingPanel = ({
   origin = "top right",
 }) => {
   const panelRef = useRef(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useLayoutEffect(() => {
     if (!panelRef.current || typeof window === "undefined") return undefined;
-
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
     if (prefersReducedMotion) return undefined;
 
     const ctx = gsap.context(() => {
@@ -33,7 +31,7 @@ const GsapFloatingPanel = ({
     }, panelRef);
 
     return () => ctx.revert();
-  }, [animateKey, origin]);
+  }, [animateKey, origin, prefersReducedMotion]);
 
   return (
     <div ref={panelRef} className={className}>

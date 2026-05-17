@@ -1,10 +1,21 @@
 import { verifyAccessToken } from "../utils/generateToken.js";
 import logger from "../utils/logger.js";
 
+const getTokenFromRequest = (req) => {
+  const cookieToken = req.cookies?.accessToken;
+  if (cookieToken) return cookieToken;
+
+  const authorizationHeader = String(req.headers?.authorization || "").trim();
+  if (!authorizationHeader) return "";
+
+  const [scheme, token] = authorizationHeader.split(/\s+/);
+  if (scheme !== "Bearer" || !token) return "";
+  return token;
+};
+
 export const auth = async (req, res, next) => {
   try {
-    const token =
-      req.cookies?.accessToken || req.headers?.authorization?.split(" ")[1];
+    const token = getTokenFromRequest(req);
 
     const isDev = process.env.NODE_ENV !== "production";
     if (isDev) {
@@ -16,6 +27,7 @@ export const auth = async (req, res, next) => {
         message: "Authentication required",
         error: true,
         success: false,
+        correlationId: req.correlationId,
       });
     }
 
@@ -26,6 +38,7 @@ export const auth = async (req, res, next) => {
         message: "Invalid token structure",
         error: true,
         success: false,
+        correlationId: req.correlationId,
       });
     }
 
@@ -40,12 +53,17 @@ export const auth = async (req, res, next) => {
       message: error.message || "Invalid authentication token",
       error: true,
       success: false,
+      correlationId: req.correlationId,
     });
   }
 };
 
 export const admin = async (req, res, next) => {
   return requireRoles("ADMIN", "SUPER ADMIN")(req, res, next);
+};
+
+export const superAdmin = async (req, res, next) => {
+  return requireRoles("SUPER ADMIN")(req, res, next);
 };
 
 export const requireRoles =
@@ -71,6 +89,7 @@ export const requireRoles =
           message: "Access denied. Insufficient privileges.",
           error: true,
           success: false,
+          correlationId: req.correlationId,
         });
       }
 
@@ -80,6 +99,7 @@ export const requireRoles =
         message: error.message || "Authorization error",
         error: true,
         success: false,
+        correlationId: req.correlationId,
       });
     }
   };

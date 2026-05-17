@@ -649,13 +649,13 @@ const AdminPanel = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-8">
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6 2xl:p-8">
+      <div className="mb-5 md:mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-purple-500">
             Admin Dashboard
           </p>
-          <h1 className="mt-2 text-3xl md:text-4xl font-semibold text-gray-900">
+          <h1 className="mt-2 text-2xl md:text-3xl 2xl:text-4xl font-semibold text-gray-900">
             Welcome, {user?.name || 'Admin'}
           </h1>
           <p className="mt-1 text-sm text-gray-600">
@@ -670,14 +670,14 @@ const AdminPanel = () => {
         </div>
       </div>
 
-      <div className="space-y-6 mb-6">
-        <div className="space-y-6">
+      <div className="space-y-5 md:space-y-6 mb-5 md:mb-6">
+        <div className="space-y-5 md:space-y-6">
           {loadingStats ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={index}
-                  className="relative flex flex-col justify-between rounded-2xl border border-gray-100 bg-gray-50 p-5 shadow-sm animate-pulse"
+                  className="relative flex flex-col justify-between rounded-2xl border border-gray-100 bg-gray-50 p-4 md:p-5 shadow-sm animate-pulse"
                 >
                   <div className="mb-3 h-4 w-24 rounded-full bg-gray-100" />
                   <div className="mb-2 h-8 w-16 rounded-full bg-gray-100" />
@@ -686,8 +686,8 @@ const AdminPanel = () => {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="group relative flex flex-col justify-between rounded-2xl border border-amber-100 bg-amber-50 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              <div className="group relative flex flex-col justify-between rounded-2xl border border-amber-100 bg-amber-50 p-4 md:p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
@@ -699,14 +699,14 @@ const AdminPanel = () => {
                   </div>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <p className="text-3xl font-semibold text-gray-900">
+                  <p className="text-2xl md:text-3xl font-semibold text-gray-900">
                     {pending}
                   </p>
                   <span className="text-xs text-gray-400">Awaiting kickoff</span>
                 </div>
               </div>
 
-              <div className="group relative flex flex-col justify-between rounded-2xl border border-sky-100 bg-sky-50 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+              <div className="group relative flex flex-col justify-between rounded-2xl border border-sky-100 bg-sky-50 p-4 md:p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
@@ -718,14 +718,14 @@ const AdminPanel = () => {
                   </div>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <p className="text-3xl font-semibold text-gray-900">
+                  <p className="text-2xl md:text-3xl font-semibold text-gray-900">
                     {inProgress}
                   </p>
                   <span className="text-xs text-gray-400">Audits started</span>
                 </div>
               </div>
 
-              <div className="group relative flex flex-col justify-between rounded-2xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+              <div className="group relative flex flex-col justify-between rounded-2xl border border-emerald-100 bg-emerald-50 p-4 md:p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
@@ -737,14 +737,14 @@ const AdminPanel = () => {
                   </div>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <p className="text-3xl font-semibold text-gray-900">
+                  <p className="text-2xl md:text-3xl font-semibold text-gray-900">
                     {completed}
                   </p>
                   <span className="text-xs text-gray-400">Closed audits</span>
                 </div>
               </div>
 
-              <div className="group relative flex flex-col justify-between rounded-2xl border border-rose-100 bg-rose-50 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+              <div className="group relative flex flex-col justify-between rounded-2xl border border-rose-100 bg-rose-50 p-4 md:p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
@@ -756,7 +756,7 @@ const AdminPanel = () => {
                   </div>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <p className="text-3xl font-semibold text-gray-900">
+                  <p className="text-2xl md:text-3xl font-semibold text-gray-900">
                     {onHold}
                   </p>
                   <span className="text-xs text-gray-400">Requires attention</span>
@@ -765,8 +765,8 @@ const AdminPanel = () => {
             </div>
           )}
 
-          <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <div className="p-5 border-b border-gray-100">
+            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div className="p-4 md:p-5 border-b border-gray-100">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -782,7 +782,7 @@ const AdminPanel = () => {
                      <select
                         value={selectedRoleFilter}
                         onChange={(e) => setSelectedRoleFilter(e.target.value)}
-                        className="appearance-none pl-3 pr-8 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors"
+                    className="appearance-none pl-3 pr-8 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors"
                      >
                         <option value="All">All Roles</option>
                         {allRoles.map(role => (
@@ -800,7 +800,7 @@ const AdminPanel = () => {
                     <input
                       type="text"
                       placeholder="Search users..."
-                      className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-64"
+                      className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-60 md:w-64"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -819,11 +819,11 @@ const AdminPanel = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">User Profile</th>
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Role</th>
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Last Activity</th>
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                    <th className="px-5 py-3.5 md:px-6 md:py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">User Profile</th>
+                    <th className="px-5 py-3.5 md:px-6 md:py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Role</th>
+                    <th className="px-5 py-3.5 md:px-6 md:py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-5 py-3.5 md:px-6 md:py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Last Activity</th>
+                    <th className="px-5 py-3.5 md:px-6 md:py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -845,7 +845,7 @@ const AdminPanel = () => {
                     
                     return (
                       <tr key={u._id} className="hover:bg-gray-50/80 transition-all duration-200 group">
-                        <td className="px-6 py-4">
+                        <td className="px-5 py-3.5 md:px-6 md:py-4">
                           <div className="flex items-center gap-4">
                             <div className="relative">
                                 {u.last_login_photo ? (
@@ -873,12 +873,12 @@ const AdminPanel = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-5 py-3.5 md:px-6 md:py-4">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold shadow-sm ${getRoleBadgeColor(roleName)}`}>
                             {roleName}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-5 py-3.5 md:px-6 md:py-4">
                            <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${
                               u.status === 'Active'
@@ -892,7 +892,7 @@ const AdminPanel = () => {
                             {u.status || 'Active'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
+                        <td className="px-5 py-3.5 md:px-6 md:py-4 text-sm text-gray-600">
                             <div className="flex flex-col">
                                 <span className="text-xs font-medium text-gray-900">
                                     {u.last_login_date ? new Date(u.last_login_date).toLocaleDateString() : 'Never'}
@@ -902,7 +902,7 @@ const AdminPanel = () => {
                                 </span>
                             </div>
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-5 py-3.5 md:px-6 md:py-4 text-right">
                           <div className="flex items-center justify-end gap-2 relative">
                              {canActivate && (
                                 <button
@@ -973,7 +973,7 @@ const AdminPanel = () => {
                   })}
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan="5" className="px-6 py-12 text-center text-gray-500 bg-white">
+                      <td colSpan="5" className="px-6 py-10 md:py-12 text-center text-gray-500 bg-white">
                         <div className="flex flex-col items-center justify-center">
                             <div className="h-12 w-12 rounded-full bg-gray-50 flex items-center justify-center mb-3">
                                 <FaSearch className="text-gray-300" />
@@ -988,7 +988,7 @@ const AdminPanel = () => {
               </table>
             </div>
             
-             <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
+             <div className="px-5 py-3.5 md:px-6 md:py-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
                 <span className="text-xs text-gray-500">
                   Showing {users.length} users
                 </span>

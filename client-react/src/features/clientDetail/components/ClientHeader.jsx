@@ -1,9 +1,9 @@
 import {
-  ArrowLeftOutlined,
   CalendarOutlined,
   AuditOutlined,
   EditOutlined,
 } from "@ant-design/icons";
+import BackButton from "../../../components/BackButton";
 
 const ClientHeader = ({
   embedded,
@@ -18,13 +18,11 @@ const ClientHeader = ({
   <div className="mb-6 flex justify-between items-center">
     <div className="flex items-center gap-4">
       {!embedded && (
-        <button
+        <BackButton
           onClick={onBack}
-          className="group flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-500 shadow-md transition-all hover:bg-primary-600 hover:text-white"
-          title="Back to Clients"
-        >
-          <ArrowLeftOutlined className="transition-transform group-hover:-translate-x-1" />
-        </button>
+          title="Back to previous page"
+          className="bg-white shadow-md"
+        />
       )}
       {initialViewMode !== "client-connect" && (
         <div>

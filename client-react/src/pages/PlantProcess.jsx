@@ -18,6 +18,7 @@ import {
   FileExcelOutlined,
   SaveOutlined,
   DeleteOutlined,
+  PlusOutlined,
   CheckOutlined,
   LoadingOutlined,
   ArrowLeftOutlined,
@@ -45,6 +46,7 @@ import {
 } from "../hooks/queries/usePlantProcessQueries";
 import {
   PACKAGING_TYPES,
+  INDUSTRY_CATEGORY_OPTIONS,
   POLYMER_TYPES,
   CATEGORIES,
   CATEGORY_II_TYPE_OPTIONS,
@@ -232,9 +234,16 @@ const PlantProcess = ({
   const [activeTab, setActiveTab] = useState("verification");
   const [subTab, setSubTab] = useState("product-compliance");
   const [notifications, setNotifications] = useState([]);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
   const notify = (type, text, duration = 4000) => {
     const id = `${Date.now()}-${Math.random()}`;
     const entry = { id, type, text, duration, started: false };
+    if (
+      type === "success" &&
+      /saved|uploaded|imported|exported/i.test((text || "").toString())
+    ) {
+      setLastSavedAt(new Date());
+    }
     setNotifications((prev) => [...prev, entry]);
     setTimeout(() => {
       setNotifications((prev) =>
@@ -710,6 +719,113 @@ const PlantProcess = ({
     return `${prefix}${nextNum.toString().padStart(3, "0")}`;
   };
 
+  const MONTH_NAMES = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const normalizeInvoiceDateInput = (value) => {
+    if (value === undefined || value === null || value === "") {
+      return {
+        displayValue: "",
+        monthName: "",
+        quarter: "",
+        yearlyQuarter: "",
+      };
+    }
+
+    const rawValue = typeof value === "string" ? value.trim() : value;
+    if (rawValue === "Not Applicable") {
+      return {
+        displayValue: "Not Applicable",
+        monthName: "Not Applicable",
+        quarter: "Not Applicable",
+        yearlyQuarter: "Not Applicable",
+      };
+    }
+
+    let day;
+    let month;
+    let year;
+
+    if (typeof rawValue === "number") {
+      const parsed = XLSX.SSF.parse_date_code(rawValue);
+      if (parsed) {
+        day = parsed.d;
+        month = parsed.m;
+        year = parsed.y;
+      }
+    } else if (rawValue instanceof Date && !Number.isNaN(rawValue.getTime())) {
+      day = rawValue.getUTCDate();
+      month = rawValue.getUTCMonth() + 1;
+      year = rawValue.getUTCFullYear();
+    } else {
+      const text = String(rawValue).trim();
+      const dayFirstMatch = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+      const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+
+      if (dayFirstMatch) {
+        day = parseInt(dayFirstMatch[1], 10);
+        month = parseInt(dayFirstMatch[2], 10);
+        year = parseInt(dayFirstMatch[3], 10);
+      } else if (isoMatch) {
+        year = parseInt(isoMatch[1], 10);
+        month = parseInt(isoMatch[2], 10);
+        day = parseInt(isoMatch[3], 10);
+      } else {
+        const parsed = new Date(text);
+        if (!Number.isNaN(parsed.getTime())) {
+          day = parsed.getUTCDate();
+          month = parsed.getUTCMonth() + 1;
+          year = parsed.getUTCFullYear();
+        }
+      }
+    }
+
+    if (
+      !Number.isInteger(day) ||
+      !Number.isInteger(month) ||
+      !Number.isInteger(year) ||
+      month < 1 ||
+      month > 12 ||
+      day < 1 ||
+      day > 31
+    ) {
+      return {
+        displayValue:
+          typeof rawValue === "string" ? rawValue : String(rawValue ?? ""),
+        monthName: "",
+        quarter: "",
+        yearlyQuarter: "",
+      };
+    }
+
+    const displayValue = `${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}-${year}`;
+    return {
+      displayValue,
+      monthName: MONTH_NAMES[month - 1] || "",
+      quarter:
+        month >= 4 && month <= 6
+          ? "Q1"
+          : month >= 7 && month <= 9
+            ? "Q2"
+            : month >= 10 && month <= 12
+              ? "Q3"
+              : "Q4",
+      yearlyQuarter: month >= 4 && month <= 9 ? "H1" : "H2",
+    };
+  };
+
   // Backfill systemCode for existing rows
   useEffect(() => {
     if (!client || !productRows.length) return;
@@ -952,6 +1068,8 @@ const PlantProcess = ({
   const [isBulkSaving, setIsBulkSaving] = useState(false);
   const [isSupplierBulkSaving, setIsSupplierBulkSaving] = useState(false);
   const [isComponentBulkSaving, setIsComponentBulkSaving] = useState(false);
+  const [isMonthlyBulkSaving, setIsMonthlyBulkSaving] = useState(false);
+  const [isCompleteWorkbookSaving, setIsCompleteWorkbookSaving] = useState(false);
 
   const handleProductDeleteAll = async () => {
     setIsBulkSaving(true);
@@ -1171,11 +1289,29 @@ const PlantProcess = ({
       };
 
       const generateRef = getColRef("Generate Component Code");
+      const packagingTypeRef = getColRef("Packaging Type");
+      const industryCategoryRef = getColRef("Industry Category");
       const supplierTypeRef = getColRef("Supplier Type");
       const supplierCategoryRef = getColRef("Supplier Category");
       const generateSupplierRef = getColRef("Generate Supplier Code");
 
       ws["!dataValidation"] = [
+        packagingTypeRef
+          ? {
+              type: "list",
+              allowBlank: true,
+              sqref: packagingTypeRef,
+              formulae: [`"${PACKAGING_TYPES.join(",")}"`],
+            }
+          : null,
+        industryCategoryRef
+          ? {
+              type: "list",
+              allowBlank: true,
+              sqref: industryCategoryRef,
+              formulae: [`"${INDUSTRY_CATEGORY_OPTIONS.join(",")}"`],
+            }
+          : null,
         generateRef
           ? {
               type: "list",
@@ -1190,7 +1326,7 @@ const PlantProcess = ({
               allowBlank: true,
               sqref: supplierTypeRef,
               formulae: [
-                '"Manufacture,Importer of raw material,Importer,Producer,Brand Owner,Seller"',
+                '"Manufacture,Importer of raw material,Importer,Producer,Brand Owner,PWP,Seller"',
               ],
             }
           : null,
@@ -1399,8 +1535,8 @@ const PlantProcess = ({
           return "";
         };
 
-        let packagingType = getValue([/packaging.*type/i]);
-        let industryCategory = getValue([/industry.*cat/i, /category/i]);
+        let packagingType = getValue([/^packaging\s*type$/i, /packaging.*type/i]);
+        let industryCategory = getValue([/^industry\s*category$/i, /industry.*cat/i]);
         let skuCode = getValue([/sku.*code/i, /^sku$/i]);
         let skuDescription = getValue([/sku.*desc/i]);
         let skuUom = getValue([/sku.*uom/i, /uom/i]);
@@ -1442,9 +1578,9 @@ const PlantProcess = ({
         let supplierName = getValue([/supplier.*name/i]);
         let supplierState = getValue([/supplier.*state/i]);
         let supplierType = getValue([/supplier.*type/i]);
-        let supplierCategory = getValue([/supplier.*cat/i, /category/i]);
-        let generateSupplierCode = getValue([/generate.*supplier/i]) || "No";
-        let supplierCode = getValue([/supplier.*code/i]);
+        let supplierCategory = getValue([/^supplier\s*category$/i, /supplier.*cat/i]);
+        let generateSupplierCode = getValue([/^generate\s*supplier\s*code$/i, /generate.*supplier/i]) || "No";
+        let supplierCode = getValue([/^supplier\s*code$/i, /supplier.*code/i]);
         let clientName = getValue([/client.*name/i]);
         let clientState = getValue([/client.*state/i, /^state$/i]);
 
@@ -1482,7 +1618,7 @@ const PlantProcess = ({
           }
         }
 
-        if (generateSupplierCode === "No") {
+        if (generateSupplierCode === "Yes") {
           const stateShort = getStateShortName(supplierState);
           const supplierShort = getSupplierShortName(supplierName);
           const companyShort = getCompanyShortName(client?.clientName);
@@ -1568,6 +1704,8 @@ const PlantProcess = ({
         if (isProducer) {
           if (!row.clientName) missing.push("Client Name");
           if (!row.clientState) missing.push("State");
+          if (!row.industryCategory) missing.push("Industry Category");
+          if (!row.skuCode) missing.push("SKU Code");
         } else {
           if (!row.skuCode) missing.push("SKU Code");
           if (!row.skuDescription) missing.push("SKU Description");
@@ -1590,8 +1728,8 @@ const PlantProcess = ({
         return { ...r, supplierCode };
       });
 
-      const validRows = validatedRows.filter((r) => !r._validationError);
-      const invalidRows = validatedRows.filter((r) => r._validationError);
+      const validRows = normalizedRows.filter((r) => !r?._validationError);
+      const invalidRows = normalizedRows.filter((r) => r?._validationError);
 
       if (validatedRows.length === 0) {
         notify("warning", "No rows to save.");
@@ -1607,7 +1745,7 @@ const PlantProcess = ({
         setProductRows(normalizedRows);
       }
 
-      const payload = normalizedRows.map((r) => {
+      const payload = validRows.map((r) => {
         const { _validationError, ...rest } = r;
         return {
           ...rest,
@@ -1617,6 +1755,11 @@ const PlantProcess = ({
             typeof rest.componentImage === "string" ? rest.componentImage : "",
         };
       });
+
+      if (payload.length === 0) {
+        notify("warning", "No valid product compliance rows to save.");
+        return false;
+      }
 
       const res = await api.post(
         API_ENDPOINTS.CLIENT.PRODUCT_COMPLIANCE(clientId),
@@ -1676,7 +1819,7 @@ const PlantProcess = ({
       }
     } catch (err) {
       console.error(err);
-      notify("error", "Failed to save rows");
+      notify("error", err?.response?.data?.message || "Failed to save rows");
       return false;
     } finally {
       setIsBulkSaving(false);
@@ -2642,8 +2785,8 @@ const PlantProcess = ({
         let supplierName = getValue([/supplier.*name/i]);
         let supplierType = getValue([/supplier.*type/i]);
         let supplierCategory = getValue([/supplier.*cat/i, /category/i]);
-        let generateSupplierCode = getValue([/generate.*supplier/i]) || "No";
-        let supplierCode = getValue([/supplier.*code/i]);
+        let generateSupplierCode = getValue([/^generate\s*supplier\s*code$/i, /generate.*supplier/i]) || "No";
+        let supplierCode = getValue([/^supplier\s*code$/i, /supplier.*code/i]);
 
         if (generate === "Yes") {
           const match = currentAllRows.find(
@@ -3948,13 +4091,52 @@ const PlantProcess = ({
         type: "list",
         allowBlank: true,
         sqref: "G2:G500",
-        formulae: ['"MT,KG,Units,Roll,Nos,Not Applicable"'],
+        formulae: ['"MT,KG,Units,Roll,Nos,Pcs,Not Applicable"'],
       },
     ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Recycled Quantity Template");
     XLSX.writeFile(wb, "Recycled_Quantity_Used_Template.xlsx");
+  };
+
+  const normalizeMonthlyUom = (value) => {
+    const normalized = (value || "").toString().trim();
+    switch (normalized.toUpperCase()) {
+      case "MT":
+        return "MT";
+      case "KG":
+        return "KG";
+      case "UNITS":
+        return "Units";
+      case "ROLL":
+        return "Roll";
+      case "NOS":
+        return "Nos";
+      case "PCS":
+        return "Pcs";
+      case "NOT APPLICABLE":
+        return "Not Applicable";
+      default:
+        return normalized;
+    }
+  };
+  const normalizeMonthlyPpwUom = (value) => {
+    const normalized = (value || "").toString().trim();
+    switch (normalized.toUpperCase()) {
+      case "GM":
+      case "G":
+      case "GMS":
+      case "GRAM":
+      case "GRAMS":
+        return "GM";
+      case "KG":
+      case "KGS":
+      case "KILOGRAM":
+      case "KILOGRAMS":
+      default:
+        return "KG";
+    }
   };
 
   const handleMonthlyExcelUpload = (e) => {
@@ -3989,6 +4171,10 @@ const PlantProcess = ({
           "purchase qty": "purchaseQty",
           uom: "uom",
           "per piece weight": "perPieceWeightKg",
+          "ppw uom": "ppwUom",
+          ppwuom: "ppwUom",
+          "ppw_uom": "ppwUom",
+          "ppw-uom": "ppwUom",
           "monthly purchase mt": "monthlyPurchaseMt",
           "rc % mentioned": "rcPercentMentioned",
           "recycled %": "recycledPercent",
@@ -4023,6 +4209,7 @@ const PlantProcess = ({
             purchaseQty: "",
             uom: "",
             perPieceWeightKg: "",
+            ppwUom: "KG",
             monthlyPurchaseMt: "",
             rcPercentMentioned: "",
             recycledPercent: "",
@@ -4061,6 +4248,8 @@ const PlantProcess = ({
               }
             }
           });
+          newRow.uom = normalizeMonthlyUom(newRow.uom);
+          newRow.ppwUom = normalizeMonthlyPpwUom(newRow.ppwUom);
           // Calculate date derived fields
           if (newRow.dateOfInvoice) {
             const dateVal = newRow.dateOfInvoice.trim();
@@ -4138,13 +4327,16 @@ const PlantProcess = ({
                 ).toString();
             }
           }
-          const uom = newRow.uom;
+          const uom = normalizeMonthlyUom(newRow.uom);
+          newRow.uom = uom;
           const qty = parseFloat(newRow.purchaseQty) || 0;
           const wt = parseFloat(newRow.perPieceWeightKg) || 0;
+          const ppwUom = normalizeMonthlyPpwUom(newRow.ppwUom);
+          newRow.ppwUom = ppwUom;
           let monthlyMt = parseFloat(newRow.monthlyPurchaseMt) || 0;
           if (!monthlyMt) {
-            if (uom === "Units" || uom === "Nos" || uom === "Roll")
-              monthlyMt = (qty * wt) / 1000;
+            if (uom === "Units" || uom === "Nos" || uom === "Roll" || uom === "Pcs")
+              monthlyMt = ppwUom === "GM" ? (qty * wt) / 1000000 : (qty * wt) / 1000;
             else if (uom === "KG") monthlyMt = qty / 1000;
             else if (uom === "MT") monthlyMt = qty;
           }
@@ -4189,6 +4381,115 @@ const PlantProcess = ({
     e.target.value = null;
   };
 
+  const handleMonthlyBulkSave = async () => {
+    setIsMonthlyBulkSaving(true);
+    try {
+      if (!Array.isArray(monthlyRows) || monthlyRows.length === 0) {
+        notify("warning", "No monthly procurement rows to save");
+        return true;
+      }
+
+      const resolvedRows = isProducer
+        ? monthlyRows.map((row) => {
+            const curr = { ...row };
+            const sc = (curr.systemCode || "").toString().trim();
+            if (!sc) return curr;
+
+            const productMatch = systemCodeOptions.find((opt) => opt.code === sc);
+            const supplierMatch = (Array.isArray(supplierRows) ? supplierRows : []).find(
+              (entry) => (entry?.systemCode || "").toString().trim() === sc,
+            );
+            const compMatch =
+              (Array.isArray(componentRows) ? componentRows : []).find(
+                (entry) => (entry?.systemCode || "").toString().trim() === sc,
+              ) ||
+              (Array.isArray(componentRows) ? componentRows : []).find(
+                (entry) =>
+                  (entry?.componentCode || "").toString().trim() ===
+                  (curr?.componentCode || "").toString().trim(),
+              );
+
+            curr.supplierCategory = (
+              productMatch?.data?.supplierCategory ||
+              curr.supplierCategory ||
+              ""
+            ).toString();
+            curr.foodGrade = (
+              supplierMatch?.foodGrade ||
+              compMatch?.foodGrade ||
+              curr.foodGrade ||
+              ""
+            ).toString();
+            curr.recycledPolymerUsed = (
+              compMatch?.recycledPolymerUsed ||
+              curr.recycledPolymerUsed ||
+              ""
+            ).toString();
+            if (compMatch) {
+              curr.polymerType = compMatch.polymerType || curr.polymerType || "";
+            }
+            curr.componentPolymer = "";
+            return curr;
+          })
+        : monthlyRows;
+
+      const payload = {
+        type,
+        itemId,
+        rows: resolvedRows,
+      };
+
+      const res = await api.post(
+        API_ENDPOINTS.CLIENT.MONTHLY_PROCUREMENT(clientId),
+        payload,
+      );
+      const rows = res.data?.data || resolvedRows;
+      setMonthlyRows(rows);
+      setLastSavedMonthlyRows(rows);
+      setInitialMonthlyRows(rows);
+      notify("success", "Saved all monthly procurement rows");
+      return true;
+    } catch (err) {
+      notify("error", err.response?.data?.message || "Save failed");
+      return false;
+    } finally {
+      setIsMonthlyBulkSaving(false);
+    }
+  };
+
+  const handleSaveCompleteWorkbook = async () => {
+    if (isCompleteWorkbookSaving) return;
+
+    const sections = [
+      { name: "Product Compliance", hasRows: productRows.length > 0, save: handleBulkSave },
+      { name: "Supplier Compliance", hasRows: supplierRows.length > 0, save: handleSupplierBulkSave },
+      { name: "Component Compliance", hasRows: componentRows.length > 0, save: handleComponentBulkSave },
+      { name: "Monthly Procurement Data", hasRows: monthlyRows.length > 0, save: handleMonthlyBulkSave },
+      { name: "Recycled Quantity Used", hasRows: recycledRows.length > 0, save: handleRecycledBulkSave },
+    ];
+
+    const activeSections = sections.filter((section) => section.hasRows);
+    if (activeSections.length === 0) {
+      notify("warning", "No imported workbook data is available to save");
+      return;
+    }
+
+    setIsCompleteWorkbookSaving(true);
+    try {
+      for (const section of activeSections) {
+        const result = await section.save();
+        if (!result) {
+          notify("error", `Save Complete Workbook stopped at ${section.name}`);
+          return;
+        }
+      }
+
+      notify("success", "Complete workbook saved successfully");
+    } finally {
+      setIsCompleteWorkbookSaving(false);
+    }
+  };
+
   const handleMonthlyExport = () => {
     try {
       if (monthlyRows.length === 0) {
@@ -4207,8 +4508,9 @@ const PlantProcess = ({
           Quarter: row.quarter || "",
           "Half Year": row.yearlyQuarter || "",
           "Purchase Qty": row.purchaseQty || "",
-          UOM: row.uom || "",
+          UOM: normalizeMonthlyUom(row.uom) || "",
           "Per Piece Weight": row.perPieceWeightKg || "",
+          "PPW UOM": normalizeMonthlyPpwUom(row.ppwUom) || "KG",
           "Monthly purchase MT": row.monthlyPurchaseMt || "",
           "RC % Mentioned": row.rcPercentMentioned || "",
           "Recycled %":
@@ -4256,6 +4558,7 @@ const PlantProcess = ({
       "Purchase Qty",
       "UOM",
       "Per Piece Weight",
+      "PPW UOM",
       "Monthly purchase MT",
       "Recycled %",
       "Recycled QTY",
@@ -4268,24 +4571,791 @@ const PlantProcess = ({
     ].filter(Boolean);
 
     const ws = XLSX.utils.aoa_to_sheet([headers]);
-    ws["!dataValidation"] = [
-      {
+    const uomCol = headers.indexOf("UOM");
+    const ppwUomCol = headers.indexOf("PPW UOM");
+    const validations = [];
+    if (uomCol >= 0) {
+      validations.push({
         type: "list",
         allowBlank: true,
-        sqref: "J2:J500",
-        formulae: ['"MT,KG,Units,Roll,Nos,Not Applicable"'],
-      },
-      {
+        sqref: `${XLSX.utils.encode_col(uomCol)}2:${XLSX.utils.encode_col(uomCol)}500`,
+        formulae: ['"MT,KG,Units,Roll,Nos,Pcs,Not Applicable"'],
+      });
+    }
+    if (ppwUomCol >= 0) {
+      validations.push({
         type: "list",
         allowBlank: true,
-        sqref: "O2:O500",
-        formulae: ['"Yes,No"'],
-      },
-    ];
+        sqref: `${XLSX.utils.encode_col(ppwUomCol)}2:${XLSX.utils.encode_col(ppwUomCol)}500`,
+        formulae: ['"KG,GM"'],
+      });
+    }
+    ws["!dataValidation"] = validations;
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Monthly Procurement Template");
     XLSX.writeFile(wb, "Monthly_Procurement_Template.xlsx");
+  };
+
+  const getMasterSheetValue = (row, patterns, { raw = false } = {}) => {
+    const rowKeys = Object.keys(row || {});
+    for (const pattern of patterns) {
+      const match = rowKeys.find((key) => pattern.test(key));
+      if (!match) continue;
+      const value = row[match];
+      if (value === undefined || value === null) return raw ? value : "";
+      return raw ? value : String(value).trim();
+    }
+    return raw ? undefined : "";
+  };
+
+  const hasImportData = (...values) =>
+    values.some((value) => {
+      if (value === undefined || value === null) return false;
+      if (typeof value === "number") return !Number.isNaN(value);
+      return String(value).trim() !== "";
+    });
+
+  const normalizeImportKey = (...parts) =>
+    parts
+      .map((part) => (part || "").toString().trim().toLowerCase())
+      .filter(Boolean)
+      .join("||");
+
+  const handleCompleteTemplateDownload = () => {
+    const headers = [
+      "System Code",
+      "Packaging Type",
+      isProducer ? "Client Name" : null,
+      isProducer ? "State" : null,
+      "Industry Category",
+      "SKU Code",
+      "SKU Description",
+      "SKU UOM",
+      "Generate Component Code",
+      "Component Code",
+      "Component Description",
+      "Supplier Name",
+      "Supplier State",
+      "Supplier Type",
+      "Supplier Category",
+      "Generate Supplier Code",
+      "Supplier Code",
+      "Supplier Status",
+      isProducer ? "Application Type" : null,
+      "Food Grade",
+      "EPR Certificate Number",
+      "FSSAI Lic No",
+      !isProducer ? "FSSAI Valid Upto" : null,
+      "Polymer Type",
+      !isProducer ? "Component Polymer" : null,
+      isProducer ? "Recycled Polymer Used" : null,
+      isProducer ? "Polymer Code" : null,
+      "Category of EPR",
+      "Category II Type",
+      "Container Capacity",
+      "Monolayer / Multilayer",
+      "Thickness (Micron)",
+      "Annual Consumption",
+      "Recycled UOM",
+      "Recycled Per Piece Weight",
+      "Annual Consumption (MT)",
+      "Used Recycled %",
+      "Used Recycled Qty (MT)",
+      "Date of invoice",
+      "Monthly Purchase Qty",
+      "Monthly UOM",
+      "Monthly Per Piece Weight",
+      "PPW UOM",
+      "Monthly purchase MT",
+      "RC % Mentioned",
+      "Monthly Recycled %",
+      "Monthly Recycled QTY",
+      "Monthly Recycled Rate",
+      "Monthly Recycled Qty Amount",
+      "Monthly Virgin Rate",
+      "Monthly Virgin Qty",
+      "Monthly Virgin Qty Amount",
+    ].filter(Boolean);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    const getColumnRef = (label) => {
+      const columnIndex = headers.indexOf(label);
+      if (columnIndex < 0) return null;
+      const col = XLSX.utils.encode_col(columnIndex);
+      return `${col}2:${col}500`;
+    };
+
+    const validations = [
+      {
+        label: "Generate Component Code",
+        formulae: ['"Yes,No"'],
+      },
+      {
+        label: "Generate Supplier Code",
+        formulae: ['"Yes,No"'],
+      },
+      {
+        label: "Supplier Status",
+        formulae: ['"Registered,Unregistered"'],
+      },
+      {
+        label: "Food Grade",
+        formulae: ['"Food,Non Food"'],
+      },
+      {
+        label: "RC % Mentioned",
+        formulae: ['"Yes,No"'],
+      },
+      {
+        label: "Monthly UOM",
+        formulae: ['"MT,KG,Units,Roll,Nos,Pcs,Not Applicable"'],
+      },
+      {
+        label: "Recycled UOM",
+        formulae: ['"MT,KG,Units,Roll,Nos,Pcs,Not Applicable"'],
+      },
+      {
+        label: "PPW UOM",
+        formulae: ['"KG,GM"'],
+      },
+      {
+        label: "Monolayer / Multilayer",
+        formulae: ['"Monolayer,Multilayer"'],
+      },
+    ];
+
+    if (isProducer) {
+      validations.push(
+        {
+          label: "Supplier Type",
+          formulae: [
+            '"Manufacture,Importer of raw material,Importer,Producer,Brand Owner,PWP,Seller"',
+          ],
+        },
+        {
+          label: "Supplier Category",
+          formulae: ['"PIBO,SIMP,PWP"'],
+        },
+        {
+          label: "Application Type",
+          formulae: ['"Liquid,Solid"'],
+        },
+        {
+          label: "Polymer Code",
+          formulae: ['"1,2,3,4,5,6,7"'],
+        },
+      );
+    } else {
+      validations.push(
+        {
+          label: "Supplier Type",
+          formulae: [
+            '"Contract Manufacture,Co-Processer,Co-Packaging,Not Applicable"',
+          ],
+        },
+        {
+          label: "Supplier Category",
+          formulae: ['"Producer,Importer,Brand Owner"'],
+        },
+      );
+    }
+
+    ws["!dataValidation"] = validations
+      .map(({ label, formulae }) => {
+        const sqref = getColumnRef(label);
+        if (!sqref) return null;
+        return {
+          type: "list",
+          allowBlank: true,
+          sqref,
+          formulae,
+        };
+      })
+      .filter(Boolean);
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Complete Compliance Template");
+    XLSX.writeFile(wb, "Complete_Compliance_Template.xlsx");
+  };
+
+  const handleCompleteExcelUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (!Array.isArray(data) || data.length === 0) {
+          notify("error", "Excel file is empty");
+          return;
+        }
+
+        const workingProductRows = [...(Array.isArray(productRows) ? productRows : [])];
+        const existingSupplierRows = Array.isArray(supplierRows) ? supplierRows : [];
+        const existingComponentRows = Array.isArray(componentRows) ? componentRows : [];
+        const existingRecycledRows = Array.isArray(recycledRows) ? recycledRows : [];
+
+        const importedProductRows = [];
+        const importedSupplierRows = [];
+        const importedComponentRows = [];
+        const importedRecycledRows = [];
+        const importedMonthlyRows = [];
+
+        const importedSupplierKeys = new Set();
+        const importedComponentKeys = new Set();
+        const importedRecycledKeys = new Set();
+
+        const findExistingProductRow = ({
+          rawSystemCode,
+          componentCode,
+          skuCode,
+          componentDescription,
+          supplierName,
+          clientName,
+          clientState,
+        }) => {
+          const normalizedSystemCode = normalizeImportKey(rawSystemCode);
+          if (normalizedSystemCode) {
+            return workingProductRows.find(
+              (row) => normalizeImportKey(row?.systemCode) === normalizedSystemCode,
+            );
+          }
+
+          const normalizedComponentCode = normalizeImportKey(componentCode);
+          if (normalizedComponentCode) {
+            const byComponent = workingProductRows.find(
+              (row) => normalizeImportKey(row?.componentCode) === normalizedComponentCode,
+            );
+            if (byComponent) return byComponent;
+          }
+
+          const compositeKey = normalizeImportKey(
+            skuCode,
+            componentDescription,
+            supplierName,
+            isProducer ? clientName : "",
+            isProducer ? clientState : "",
+          );
+
+          if (!compositeKey) return null;
+
+          return workingProductRows.find(
+            (row) =>
+              normalizeImportKey(
+                row?.skuCode,
+                row?.componentDescription,
+                row?.supplierName,
+                isProducer ? row?.clientName : "",
+                isProducer ? row?.clientState : "",
+              ) === compositeKey,
+          );
+        };
+
+        data.forEach((row, index) => {
+          const rawSystemCode = getMasterSheetValue(row, [/^system\s*code$/i]);
+          const packagingType = getMasterSheetValue(row, [/^packaging\s*type$/i, /packaging.*type/i]);
+          const industryCategory = getMasterSheetValue(row, [/^industry\s*category$/i, /industry.*cat/i]);
+          const skuCode = getMasterSheetValue(row, [/^sku\s*code$/i, /^sku$/i, /sku.*code/i]);
+          const skuDescription = getMasterSheetValue(row, [/^sku\s*description$/i, /sku.*desc/i]);
+          const skuUom = getMasterSheetValue(row, [/^sku\s*uom$/i, /sku.*uom/i]);
+          const generate = getMasterSheetValue(row, [
+            /^generate\s*component\s*code$/i,
+            /^generate(?!.*supplier)/i,
+          ]) || "No";
+          const rawComponentCode = getMasterSheetValue(row, [/^component\s*code$/i, /^componentCode$/i]);
+          const componentDescription = getMasterSheetValue(row, [/^component\s*description$/i, /component.*desc/i]);
+          const supplierName = getMasterSheetValue(row, [/^name\s*of\s*supplier$/i, /supplier.*name/i]);
+          const supplierState = getMasterSheetValue(row, [/^supplier\s*state$/i, /supplier.*state/i]);
+          const supplierType = getMasterSheetValue(row, [/^supplier\s*type$/i, /supplier.*type/i]);
+          const supplierCategory = getMasterSheetValue(row, [/^supplier\s*category$/i, /supplier.*cat/i]);
+          const generateSupplierCode = getMasterSheetValue(row, [/^generate\s*supplier\s*code$/i, /generate.*supplier/i]) || "No";
+          const rawSupplierCode = getMasterSheetValue(row, [/^supplier\s*code$/i, /supplier.*code/i]);
+          const clientName = getMasterSheetValue(row, [/^client\s*name$/i, /client.*name/i]);
+          const clientState = getMasterSheetValue(row, [/^state$/i, /^client\s*state$/i, /client.*state/i]);
+          const supplierStatus = getMasterSheetValue(row, [/^supplier\s*status$/i]);
+          const applicationType = getMasterSheetValue(row, [/^application\s*type$/i]);
+          const foodGradeRaw = getMasterSheetValue(row, [/^food\s*grade$/i]);
+          const foodGrade = (() => {
+            const raw = (foodGradeRaw || "").toString().trim();
+            const lower = raw.toLowerCase();
+            if (!raw) return "";
+            if (lower === "yes" || lower === "food") return "Food";
+            if (lower === "no" || lower === "non food" || lower === "non-food" || lower === "nonfood") return "Non Food";
+            return raw;
+          })();
+          const eprCertificateNumber = getMasterSheetValue(row, [/^epr.*cert/i, /^epr.*no/i]);
+          const fssaiLicNo = getMasterSheetValue(row, [/^fssai.*lic/i, /^fssai.*no/i]);
+          const fssaiValidUpto = getMasterSheetValue(row, [/^fssai.*valid/i, /valid.*upto/i]);
+
+          const polymerType = getMasterSheetValue(row, [/^polymer\s*type$/i, /polymer.*type/i]);
+          const componentPolymer = getMasterSheetValue(row, [/^component\s*polymer$/i, /component.*polymer/i]);
+          const recycledPolymerUsed = isProducer
+            ? getMasterSheetValue(row, [/^recycled\s*polymer\s*used$/i, /recycled.*polymer.*used/i])
+            : "";
+          const polymerCode = isProducer
+            ? getMasterSheetValue(row, [/^polymer\s*code$/i, /polymer.*code/i])
+            : "";
+          const category = getMasterSheetValue(row, [/^category\s*of\s*epr$/i, /^category$/i, /category.*epr/i]);
+          const categoryIIType = getMasterSheetValue(row, [/^category\s*ii\s*type$/i, /category.*2/i]);
+          const containerCapacity = getMasterSheetValue(row, [/^container\s*capacity$/i, /capacity/i]);
+          const layerType = getMasterSheetValue(row, [/^monolayer\s*\/\s*multilayer$/i, /layer.*type/i, /monolayer/i, /multilayer/i]);
+          const thickness = getMasterSheetValue(row, [/^thickness/i, /micron/i]);
+
+          const annualConsumption = getMasterSheetValue(row, [/^annual\s*consumption$/i]);
+          const recycledUomExplicit = getMasterSheetValue(row, [/^recycled\s*uom$/i]);
+          const recycledPerPieceWeightExplicit = getMasterSheetValue(row, [/^recycled\s*per\s*piece\s*weight$/i]);
+          const annualConsumptionMt = getMasterSheetValue(row, [/^annual\s*consumption\s*\(mt\)$/i, /annual.*consumption.*mt/i]);
+          const usedRecycledPercent = getMasterSheetValue(row, [/^used\s*recycled\s*%$/i]);
+          const usedRecycledQtyMt = getMasterSheetValue(row, [/^used\s*recycled\s*qty\s*\(mt\)$/i, /used.*recycled.*qty/i]);
+
+          const rawInvoiceDate = getMasterSheetValue(
+            row,
+            [/^date\s*of\s*invoice$/i],
+            { raw: true },
+          );
+          const monthlyPurchaseQty = getMasterSheetValue(row, [/^monthly\s*purchase\s*qty$/i, /^purchase\s*qty$/i]);
+          const monthlyUomExplicit = getMasterSheetValue(row, [/^monthly\s*uom$/i]);
+          const monthlyPerPieceWeightExplicit = getMasterSheetValue(row, [/^monthly\s*per\s*piece\s*weight$/i, /^per\s*piece\s*weight$/i]);
+          const monthlyPpwUom = getMasterSheetValue(row, [/^ppw\s*uom$/i, /^ppwuom$/i, /^ppw_uom$/i, /^ppw-uom$/i]);
+          const monthlyPurchaseMtRaw = getMasterSheetValue(row, [/^monthly\s*purchase\s*mt$/i]);
+          const rcPercentMentioned = getMasterSheetValue(row, [/^rc\s*%\s*mentioned$/i]);
+          const monthlyRecycledPercentRaw = getMasterSheetValue(row, [/^monthly\s*recycled\s*%$/i, /^recycled\s*%$/i]);
+          const monthlyRecycledQty = getMasterSheetValue(row, [/^monthly\s*recycled\s*qty$/i, /^recycled\s*qty$/i]);
+          const monthlyRecycledRate = getMasterSheetValue(row, [/^monthly\s*recycled\s*rate$/i, /^recycled\s*rate$/i]);
+          const monthlyRecycledAmount = getMasterSheetValue(row, [/^monthly\s*recycled\s*qty\s*amount$/i, /^monthly\s*recycled\s*qrt\s*amount$/i, /^recycled\s*qty\s*amount$/i, /^recycled\s*qrt\s*amount$/i]);
+          const monthlyVirginRate = getMasterSheetValue(row, [/^monthly\s*virgin\s*rate$/i, /^virgin\s*rate$/i]);
+          const monthlyVirginQty = getMasterSheetValue(row, [/^monthly\s*virgin\s*qty$/i, /^virgin\s*qty$/i]);
+          const monthlyVirginAmount = getMasterSheetValue(row, [/^monthly\s*virgin\s*qty\s*amount$/i, /^virgin\s*qty\s*amount$/i]);
+
+          const monthlyInputPresent = hasImportData(
+            rawInvoiceDate,
+            monthlyPurchaseQty,
+            monthlyUomExplicit,
+            monthlyPerPieceWeightExplicit,
+            monthlyPurchaseMtRaw,
+            monthlyRecycledPercentRaw,
+            monthlyRecycledQty,
+            monthlyRecycledRate,
+            monthlyVirginRate,
+            monthlyVirginQty,
+          );
+
+          const recycledInputPresent = hasImportData(
+            annualConsumption,
+            recycledUomExplicit,
+            recycledPerPieceWeightExplicit,
+            annualConsumptionMt,
+            usedRecycledPercent,
+            usedRecycledQtyMt,
+          );
+
+          const recycledUom = recycledUomExplicit || (!monthlyInputPresent ? getMasterSheetValue(row, [/^uom$/i]) : "");
+          const recycledPerPieceWeight =
+            recycledPerPieceWeightExplicit ||
+            (!monthlyInputPresent ? getMasterSheetValue(row, [/^per\s*piece\s*weight$/i]) : "");
+          const monthlyUom = monthlyUomExplicit || (!recycledInputPresent ? getMasterSheetValue(row, [/^uom$/i]) : "");
+
+          const existingProductRow = findExistingProductRow({
+            rawSystemCode,
+            componentCode: rawComponentCode,
+            skuCode,
+            componentDescription,
+            supplierName,
+            clientName,
+            clientState,
+          });
+
+          let componentCode = rawComponentCode || existingProductRow?.componentCode || "";
+          let supplierCode = rawSupplierCode || existingProductRow?.supplierCode || "";
+          let systemCode = rawSystemCode || existingProductRow?.systemCode || "";
+
+          if (!componentCode && generate === "Yes") {
+            componentCode = generateComponentCodeForBulk(
+              workingProductRows,
+              client?.clientName,
+              item?.plantName,
+              existingComponentRows,
+            );
+          }
+
+          if (!systemCode) {
+            systemCode = generateSystemCode(workingProductRows);
+          }
+
+          if (!supplierCode && generateSupplierCode === "Yes" && supplierName) {
+            supplierCode = generateSupplierCodeForBulk(
+              [
+                ...workingProductRows,
+                {
+                  supplierName,
+                  supplierState,
+                  supplierCode: "",
+                },
+              ],
+              supplierName,
+              client?.clientName,
+            );
+          }
+
+          const resolvedProductRow =
+            existingProductRow ||
+            {
+              packagingType,
+              clientName,
+              clientState,
+              industryCategory,
+              skuCode,
+              skuDescription,
+              skuUom,
+              productImage: null,
+              generate: generate || "No",
+              componentCode,
+              systemCode,
+              componentDescription,
+              supplierName,
+              supplierState,
+              supplierType,
+              supplierCategory,
+              generateSupplierCode: generateSupplierCode || "No",
+              supplierCode,
+              componentImage: null,
+              id: `complete-excel-${Date.now()}-${index}`,
+            };
+
+          if (!existingProductRow) {
+            const productHasIdentity = hasImportData(
+              resolvedProductRow.systemCode,
+              resolvedProductRow.skuCode,
+              resolvedProductRow.componentCode,
+              resolvedProductRow.componentDescription,
+              resolvedProductRow.supplierName,
+            );
+
+            if (productHasIdentity) {
+              importedProductRows.push(resolvedProductRow);
+              workingProductRows.push(resolvedProductRow);
+            }
+          }
+
+          const supplierKey = normalizeImportKey(
+            resolvedProductRow.systemCode || systemCode,
+            resolvedProductRow.componentCode || componentCode,
+            resolvedProductRow.supplierName || supplierName,
+          );
+          const supplierExists =
+            supplierKey &&
+            (importedSupplierKeys.has(supplierKey) ||
+              existingSupplierRows.some(
+                (existing) =>
+                  normalizeImportKey(
+                    existing?.systemCode,
+                    existing?.componentCode,
+                    existing?.supplierName,
+                  ) === supplierKey,
+              ));
+
+          if (
+            supplierKey &&
+            !supplierExists &&
+            hasImportData(
+              resolvedProductRow.systemCode,
+              resolvedProductRow.componentCode,
+              resolvedProductRow.supplierName,
+            )
+          ) {
+            importedSupplierKeys.add(supplierKey);
+            importedSupplierRows.push({
+              systemCode: resolvedProductRow.systemCode || systemCode,
+              componentCode: resolvedProductRow.componentCode || componentCode,
+              componentDescription:
+                resolvedProductRow.componentDescription || componentDescription,
+              supplierName: resolvedProductRow.supplierName || supplierName,
+              supplierState:
+                supplierState || resolvedProductRow.supplierState || "",
+              supplierType: supplierType || resolvedProductRow.supplierType || "",
+              supplierStatus,
+              applicationType: isProducer ? applicationType : "",
+              foodGrade,
+              eprCertificateNumber,
+              fssaiLicNo,
+              fssaiValidUpto,
+              _validationError: null,
+            });
+          }
+
+          const componentKey = normalizeImportKey(
+            resolvedProductRow.systemCode || systemCode,
+            resolvedProductRow.componentCode || componentCode,
+          );
+          const componentExists =
+            componentKey &&
+            (importedComponentKeys.has(componentKey) ||
+              existingComponentRows.some(
+                (existing) =>
+                  normalizeImportKey(
+                    existing?.systemCode,
+                    existing?.componentCode,
+                  ) === componentKey,
+              ));
+
+          if (
+            componentKey &&
+            !componentExists &&
+            hasImportData(
+              resolvedProductRow.systemCode,
+              resolvedProductRow.componentCode,
+              resolvedProductRow.componentDescription,
+            )
+          ) {
+            importedComponentKeys.add(componentKey);
+            importedComponentRows.push({
+              systemCode: resolvedProductRow.systemCode || systemCode,
+              skuCode: resolvedProductRow.skuCode || skuCode,
+              componentCode: resolvedProductRow.componentCode || componentCode,
+              componentDescription:
+                resolvedProductRow.componentDescription || componentDescription,
+              supplierName: resolvedProductRow.supplierName || supplierName,
+              polymerType,
+              componentPolymer: isProducer ? "" : componentPolymer,
+              recycledPolymerUsed,
+              polymerCode,
+              category,
+              categoryIIType,
+              containerCapacity,
+              layerType,
+              thickness,
+              foodGrade,
+            });
+          }
+
+          const recycledKey = normalizeImportKey(
+            resolvedProductRow.systemCode || systemCode,
+            resolvedProductRow.componentCode || componentCode,
+          );
+          const recycledExists =
+            recycledKey &&
+            (importedRecycledKeys.has(recycledKey) ||
+              existingRecycledRows.some(
+                (existing) =>
+                  normalizeImportKey(
+                    existing?.systemCode,
+                    existing?.componentCode,
+                  ) === recycledKey,
+              ));
+
+          if (recycledInputPresent && recycledKey && !recycledExists) {
+            let annualConsumptionMtValue = parseFloat(annualConsumptionMt) || 0;
+            const annualConsumptionValue = parseFloat(annualConsumption) || 0;
+            const normalizedRecycledUom = normalizeMonthlyUom(recycledUom);
+
+            if (!annualConsumptionMtValue) {
+              if (normalizedRecycledUom === "KG") {
+                annualConsumptionMtValue = annualConsumptionValue / 1000;
+              } else if (normalizedRecycledUom === "MT") {
+                annualConsumptionMtValue = annualConsumptionValue;
+              } else if (
+                normalizedRecycledUom === "Units" ||
+                normalizedRecycledUom === "Roll" ||
+                normalizedRecycledUom === "Nos" ||
+                normalizedRecycledUom === "Pcs"
+              ) {
+                annualConsumptionMtValue =
+                  (annualConsumptionValue *
+                    (parseFloat(recycledPerPieceWeight) || 0)) /
+                  1000;
+              }
+            }
+
+            const usedPercentRaw = parseFloat(usedRecycledPercent) || 0;
+            const usedPercentFraction =
+              usedPercentRaw > 1 ? usedPercentRaw / 100 : usedPercentRaw;
+            const usedQtyValue =
+              parseFloat(usedRecycledQtyMt) ||
+              annualConsumptionMtValue * usedPercentFraction;
+
+            importedRecycledKeys.add(recycledKey);
+            importedRecycledRows.push({
+              systemCode: resolvedProductRow.systemCode || systemCode,
+              componentCode: resolvedProductRow.componentCode || componentCode,
+              componentDescription:
+                resolvedProductRow.componentDescription || componentDescription,
+              supplierName: resolvedProductRow.supplierName || supplierName,
+              category:
+                category ||
+                importedComponentRows.find(
+                  (componentRow) =>
+                    normalizeImportKey(componentRow.systemCode, componentRow.componentCode) === recycledKey,
+                )?.category ||
+                "",
+              annualConsumption,
+              uom: normalizedRecycledUom,
+              perPieceWeight: recycledPerPieceWeight,
+              annualConsumptionMt: annualConsumptionMtValue
+                ? annualConsumptionMtValue.toFixed(3)
+                : "",
+              usedRecycledPercent: hasImportData(usedRecycledPercent)
+                ? usedPercentFraction.toFixed(3)
+                : "",
+              usedRecycledQtyMt: hasImportData(usedRecycledQtyMt, usedRecycledPercent)
+                ? usedQtyValue.toFixed(3)
+                : "",
+            });
+          }
+
+          if (monthlyInputPresent) {
+            const invoiceMeta = normalizeInvoiceDateInput(rawInvoiceDate);
+            const normalizedMonthlyUom = normalizeMonthlyUom(monthlyUom);
+            const normalizedPpwUom = normalizeMonthlyPpwUom(monthlyPpwUom);
+            const purchaseQtyValue = parseFloat(monthlyPurchaseQty) || 0;
+            const perPieceWeightValue = parseFloat(monthlyPerPieceWeightExplicit) || 0;
+            let monthlyMtValue = parseFloat(monthlyPurchaseMtRaw) || 0;
+
+            if (!monthlyMtValue) {
+              if (
+                normalizedMonthlyUom === "Units" ||
+                normalizedMonthlyUom === "Nos" ||
+                normalizedMonthlyUom === "Roll" ||
+                normalizedMonthlyUom === "Pcs"
+              ) {
+                monthlyMtValue =
+                  normalizedPpwUom === "GM"
+                    ? (purchaseQtyValue * perPieceWeightValue) / 1000000
+                    : (purchaseQtyValue * perPieceWeightValue) / 1000;
+              } else if (normalizedMonthlyUom === "KG") {
+                monthlyMtValue = purchaseQtyValue / 1000;
+              } else if (normalizedMonthlyUom === "MT") {
+                monthlyMtValue = purchaseQtyValue;
+              }
+            }
+
+            const monthlyPercentRaw = parseFloat(monthlyRecycledPercentRaw) || 0;
+            const monthlyPercentFraction =
+              monthlyPercentRaw > 1 ? monthlyPercentRaw / 100 : monthlyPercentRaw;
+            const monthlyRecycledQtyValue =
+              parseFloat(monthlyRecycledQty) || monthlyMtValue * monthlyPercentFraction;
+            const monthlyRecycledRateValue = parseFloat(monthlyRecycledRate) || 0;
+            const monthlyVirginQtyValue =
+              parseFloat(monthlyVirginQty) || monthlyMtValue - monthlyRecycledQtyValue;
+            const monthlyVirginRateValue = parseFloat(monthlyVirginRate) || 0;
+
+            importedMonthlyRows.push({
+              systemCode: resolvedProductRow.systemCode || systemCode,
+              supplierName: resolvedProductRow.supplierName || supplierName,
+              supplierCategory:
+                resolvedProductRow.supplierCategory || supplierCategory || "",
+              skuCode: resolvedProductRow.skuCode || skuCode,
+              componentCode: resolvedProductRow.componentCode || componentCode,
+              componentDescription:
+                resolvedProductRow.componentDescription || componentDescription,
+              foodGrade,
+              polymerType,
+              recycledPolymerUsed,
+              componentPolymer: isProducer ? "" : componentPolymer,
+              category,
+              dateOfInvoice: invoiceMeta.displayValue,
+              monthName: invoiceMeta.monthName,
+              quarter: invoiceMeta.quarter,
+              yearlyQuarter: invoiceMeta.yearlyQuarter,
+              purchaseQty: monthlyPurchaseQty,
+              uom: normalizedMonthlyUom,
+              perPieceWeightKg: monthlyPerPieceWeightExplicit,
+              ppwUom: normalizedPpwUom,
+              monthlyPurchaseMt: monthlyMtValue ? monthlyMtValue.toFixed(3) : "",
+              rcPercentMentioned,
+              recycledPercent: hasImportData(monthlyRecycledPercentRaw)
+                ? monthlyPercentFraction.toFixed(3)
+                : "",
+              recycledQty: hasImportData(monthlyRecycledQty, monthlyRecycledPercentRaw)
+                ? monthlyRecycledQtyValue.toFixed(3)
+                : "",
+              recycledRate: monthlyRecycledRate,
+              recycledQrtAmount: hasImportData(monthlyRecycledAmount)
+                ? monthlyRecycledAmount
+                : monthlyRecycledRateValue && monthlyRecycledQtyValue
+                  ? (monthlyRecycledQtyValue * monthlyRecycledRateValue).toFixed(3)
+                  : "",
+              virginRate: monthlyVirginRate,
+              virginQty: hasImportData(monthlyVirginQty, monthlyRecycledQty, monthlyRecycledPercentRaw)
+                ? monthlyVirginQtyValue.toFixed(3)
+                : "",
+              virginQtyAmount: hasImportData(monthlyVirginAmount)
+                ? monthlyVirginAmount
+                : monthlyVirginRateValue && monthlyVirginQtyValue
+                  ? (monthlyVirginQtyValue * monthlyVirginRateValue).toFixed(3)
+                  : "",
+            });
+          }
+        });
+
+        if (
+          importedProductRows.length === 0 &&
+          importedSupplierRows.length === 0 &&
+          importedComponentRows.length === 0 &&
+          importedRecycledRows.length === 0 &&
+          importedMonthlyRows.length === 0
+        ) {
+          notify("warning", "No recognizable rows found in the complete Excel file");
+          return;
+        }
+
+        if (importedProductRows.length > 0) {
+          setProductRows((prev) => [...prev, ...importedProductRows]);
+        }
+
+        if (importedSupplierRows.length > 0) {
+          setSupplierRows((prev) => {
+            const nextRows = [...prev, ...importedSupplierRows];
+            setSupplierPage(Math.max(1, Math.ceil(nextRows.length / supplierItemsPerPage)));
+            return nextRows;
+          });
+        }
+
+        if (importedComponentRows.length > 0) {
+          setComponentRows((prev) => {
+            const base =
+              prev?.length === 1 && isComponentRowEmpty(prev[0]) ? [] : prev || [];
+            const nextRows = [...base, ...importedComponentRows];
+            setComponentPage(Math.max(1, Math.ceil(nextRows.length / componentItemsPerPage)));
+            return nextRows;
+          });
+        }
+
+        if (importedRecycledRows.length > 0) {
+          setRecycledRows((prev) => {
+            const nextRows = [...prev, ...importedRecycledRows];
+            setRecycledPage(Math.max(1, Math.ceil(nextRows.length / recycledItemsPerPage)));
+            return nextRows;
+          });
+        }
+
+        if (importedMonthlyRows.length > 0) {
+          setMonthlyRows((prev) => {
+            const nextRows = [...prev, ...importedMonthlyRows];
+            setMonthlyPage(Math.max(1, Math.ceil(nextRows.length / monthlyItemsPerPage)));
+            return nextRows;
+          });
+        }
+
+        notify(
+          "success",
+          `Imported Product ${importedProductRows.length}, Supplier ${importedSupplierRows.length}, Component ${importedComponentRows.length}, Monthly ${importedMonthlyRows.length}, Recycled ${importedRecycledRows.length} rows`,
+        );
+      } catch (err) {
+        console.error("Complete Excel upload error:", err);
+        notify("error", "Failed to parse complete Excel file");
+      } finally {
+        e.target.value = null;
+      }
+    };
+
+    reader.readAsBinaryString(file);
   };
 
   const handleRecycledCodeSelect = (index, code) => {
@@ -5609,6 +6679,18 @@ const PlantProcess = ({
   };
 
   const liveChangeSummaryData = getChangeSummary();
+  const hasUnsavedChanges = liveChangeSummaryData.length > 0;
+
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (!hasUnsavedChanges || isSaving) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges, isSaving]);
 
   // Combine normalizedDbHistory and persistedHistory, prioritizing DB history but keeping unique local ones
   const combinedHistory = useMemo(() => {
@@ -5803,14 +6885,28 @@ const PlantProcess = ({
     recycledRows.length / recycledItemsPerPage,
   );
 
+  const formatLastSavedText = () => {
+    if (!lastSavedAt) return "No save recorded in this session";
+    const diffMs = Date.now() - lastSavedAt.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+    if (diffMinutes <= 0) return "Saved just now";
+    if (diffMinutes === 1) return "Saved 1 minute ago";
+    if (diffMinutes < 60) return `Saved ${diffMinutes} minutes ago`;
+    return `Saved at ${lastSavedAt.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  };
+
   return (
-    <div className={`min-h-screen bg-gray-50 pb-12 ${onBack ? "" : "-m-6"}`}>
+    <div className={`min-h-screen bg-gray-50 pb-8 md:pb-10 ${onBack ? "" : "-m-4 lg:-m-6"}`}>
       {/* Header Section */}
       <div className="bg-white shadow-sm border-b">
-        <div className="w-full mx-auto px-2 py-3">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+        <div className="w-full mx-auto px-2 py-2.5 md:px-3 md:py-3">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4">
+            <div className="flex items-start md:items-center gap-3 md:gap-4">
               <button
+                type="button"
                 onClick={() => {
                   if (!isSaving) {
                     if (onBack) {
@@ -5830,6 +6926,11 @@ const PlantProcess = ({
                 title={
                   isSaving ? "Saving progress..." : "Back to Client Details"
                 }
+                aria-label={
+                  isSaving
+                    ? "Saving progress"
+                    : "Back to client details"
+                }
                 disabled={isSaving}
               >
                 {isSaving ? (
@@ -5840,14 +6941,41 @@ const PlantProcess = ({
               </button>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold text-gray-900 m-0 leading-tight">
+                  <h1 className="text-xl md:text-2xl font-bold text-gray-900 m-0 leading-tight">
                     {item.plantName || client.clientName}
                   </h1>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex w-full md:w-auto items-center justify-end gap-3">
+              <div className="hidden lg:flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2">
+                <div
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    isSaving
+                      ? "bg-amber-500"
+                      : hasUnsavedChanges
+                        ? "bg-red-500"
+                        : "bg-emerald-500"
+                  }`}
+                />
+                <div className="text-left">
+                  <p className="text-xs font-semibold text-gray-800">
+                    {isSaving
+                      ? "Saving changes"
+                      : hasUnsavedChanges
+                        ? "Unsaved changes"
+                        : "All changes saved"}
+                  </p>
+                  <p className="text-[11px] text-gray-500">
+                    {isSaving
+                      ? "Please wait before leaving this page."
+                      : hasUnsavedChanges
+                        ? "Review and save edited rows before navigating away."
+                        : formatLastSavedText()}
+                  </p>
+                </div>
+              </div>
               <Tooltip title="View Change History">
                 <Button
                   type="primary"
@@ -5855,6 +6983,7 @@ const PlantProcess = ({
                   icon={<HistoryOutlined />}
                   onClick={() => setShowHistoryModal(true)}
                   className="flex items-center gap-2 font-medium"
+                  aria-label="Open change history"
                 >
                   History
                 </Button>
@@ -5882,9 +7011,11 @@ const PlantProcess = ({
               <span className="text-sm font-medium">{n.text}</span>
             </div>
             <button
+              type="button"
               onClick={() => dismissNotification(n.id)}
               className={`text-white/90 hover:text-white`}
               title="Dismiss"
+              aria-label={`Dismiss ${n.type} notification`}
             >
               <CloseOutlined />
             </button>
@@ -5899,12 +7030,12 @@ const PlantProcess = ({
         ))}
       </div>
 
-      <div className="w-full mx-auto px-2 py-8">
+      <div className="w-full mx-auto px-2 md:px-3 py-5 md:py-6 lg:py-7 2xl:py-8">
         {/* Progress Stepper */}
-        <div className="mb-8">
+        <div className="mb-6 md:mb-7">
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
             {/* Mobile Compact Stepper */}
-            <div className="md:hidden p-4">
+            <div className="lg:hidden p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-semibold text-gray-700">
                   Step {currentStepIndex + 1} of {steps.length}:{" "}
@@ -5927,7 +7058,7 @@ const PlantProcess = ({
             </div>
 
             {/* Desktop Full Stepper */}
-            <div className="hidden md:flex flex-row">
+            <div className="hidden lg:flex flex-row">
               {steps.map((step, index) => {
                 const isCurrent = index === currentStepIndex;
                 const isCompleted = completedSteps.includes(step.id);
@@ -5938,10 +7069,12 @@ const PlantProcess = ({
                     className="flex-1 flex items-center relative group"
                   >
                     <button
+                      type="button"
                       onClick={() => setActiveTab(step.id)}
                       className={`flex-1 flex items-center px-6 py-4 transition-colors relative ${
                         isCurrent ? "bg-white" : "hover:bg-gray-50"
                       }`}
+                      aria-label={`Open ${step.title}`}
                     >
                       <div
                         className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border-2 text-sm font-bold transition-colors ${
@@ -6026,12 +7159,42 @@ const PlantProcess = ({
         )}
         {activeTab === "tab2" && (
           <SupplierCompliance>
+            {subTab === "product-compliance" && productRows.length === 0 && (
+              <div className="mb-4 rounded-2xl border border-dashed border-orange-200 bg-gradient-to-r from-orange-50 via-white to-emerald-50 p-4 md:p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      Start with your SKU and component master data
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Add rows manually or import your Excel sheet to begin product compliance mapping for this plant.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      type="default"
+                      icon={<FileExcelOutlined />}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Import Excel
+                    </Button>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={addRow}>
+                      Add Row
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
             <ProductCompliance
               subSteps={subSteps}
               completedSubSteps={completedSubSteps}
               subTab={subTab}
               setSubTab={setSubTab}
               isManager={isManager}
+              handleCompleteExcelUpload={handleCompleteExcelUpload}
+              handleCompleteTemplateDownload={handleCompleteTemplateDownload}
+              handleSaveCompleteWorkbook={handleSaveCompleteWorkbook}
+              isSavingCompleteWorkbook={isCompleteWorkbookSaving}
               fileInputRef={fileInputRef}
               handleExcelUpload={handleExcelUpload}
               handleProductTemplateDownload={handleProductTemplateDownload}
@@ -6105,8 +7268,10 @@ const PlantProcess = ({
               setComponentPage={setComponentPage}
               setComponentItemsPerPage={setComponentItemsPerPage}
               handleMonthlyExcelUpload={handleMonthlyExcelUpload}
+              handleMonthlyBulkSave={handleMonthlyBulkSave}
               handleMonthlyTemplateDownload={handleMonthlyTemplateDownload}
               handleMonthlyExport={handleMonthlyExport}
+              isMonthlyBulkSaving={isMonthlyBulkSaving}
               monthlyRows={monthlyRows}
               setMonthlyRows={setMonthlyRows}
               lastSavedMonthlyRows={lastSavedMonthlyRows}

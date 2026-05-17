@@ -834,6 +834,7 @@ const PostAuditCheck = ({
                       type="button"
                       onClick={handleAddPostValidationRow}
                       className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                      aria-label="Add a new post-validation row"
                     >
                       <FaPlus /> Add Row
                     </button>
@@ -847,6 +848,7 @@ const PostAuditCheck = ({
                         type="button"
                         disabled={loading || !postValidationData.length}
                         className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                        aria-label="Delete all post-validation rows"
                       >
                         <FaTrashAlt /> Delete All
                       </button>
@@ -856,6 +858,7 @@ const PostAuditCheck = ({
                       onClick={handleBulkSavePostValidation}
                       disabled={loading || !postValidationData.length}
                       className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-semibold bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                      aria-label="Save all post-validation rows"
                     >
                       <FaSave /> Save All
                     </button>
@@ -864,6 +867,7 @@ const PostAuditCheck = ({
                       onClick={handleMarkingLabellingReport}
                       disabled={loading || !postValidationData.length}
                       className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-semibold bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50"
+                      aria-label="Generate marking and labelling report"
                     >
                       <FaFilePdf /> Download Report
                     </button>
@@ -1960,22 +1964,26 @@ const PostAuditCheck = ({
                                 </p>
                                 <div className="inline-flex items-center rounded-lg bg-gray-100 p-0.5">
                                   <button
+                                    type="button"
                                     onClick={() => setPolymerViewMode("table")}
                                     className={`px-2 py-0.5 text-[10px] font-medium rounded transition-all flex items-center ${
                                       polymerViewMode === "table"
                                         ? "bg-white text-gray-800 shadow-sm"
                                         : "text-gray-500 hover:text-gray-700"
                                     }`}
+                                    aria-label="Show polymer procurement as table"
                                   >
                                     <TableOutlined className="mr-1" /> Table
                                   </button>
                                   <button
+                                    type="button"
                                     onClick={() => setPolymerViewMode("graph")}
                                     className={`px-2 py-0.5 text-[10px] font-medium rounded transition-all flex items-center ${
                                       polymerViewMode === "graph"
                                         ? "bg-white text-gray-800 shadow-sm"
                                         : "text-gray-500 hover:text-gray-700"
                                     }`}
+                                    aria-label="Show polymer procurement as graph"
                                   >
                                     <BarChartOutlined className="mr-1" /> Graph
                                   </button>
@@ -2129,22 +2137,26 @@ const PostAuditCheck = ({
                                 </p>
                                 <div className="inline-flex items-center rounded-lg bg-gray-100 p-0.5">
                                   <button
+                                    type="button"
                                     onClick={() => setCategoryViewMode("table")}
                                     className={`px-2 py-0.5 text-[10px] font-medium rounded transition-all flex items-center ${
                                       categoryViewMode === "table"
                                         ? "bg-white text-gray-800 shadow-sm"
                                         : "text-gray-500 hover:text-gray-700"
                                     }`}
+                                    aria-label="Show category procurement as table"
                                   >
                                     <TableOutlined className="mr-1" /> Table
                                   </button>
                                   <button
+                                    type="button"
                                     onClick={() => setCategoryViewMode("graph")}
                                     className={`px-2 py-0.5 text-[10px] font-medium rounded transition-all flex items-center ${
                                       categoryViewMode === "graph"
                                         ? "bg-white text-gray-800 shadow-sm"
                                         : "text-gray-500 hover:text-gray-700"
                                     }`}
+                                    aria-label="Show category procurement as graph"
                                   >
                                     <BarChartOutlined className="mr-1" /> Graph
                                   </button>
@@ -3086,12 +3098,14 @@ const PostAuditCheck = ({
                   </div>
                   <div className="flex bg-gray-100 p-1 rounded-lg">
                     <button
+                      type="button"
                       className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
                         plasticAnalysisTab === "prePostValidation"
                           ? "bg-white text-primary-600 shadow-sm"
                           : "text-gray-500 hover:text-gray-700"
                       }`}
                       onClick={() => setPlasticAnalysisTab("prePostValidation")}
+                      aria-label="Show pre and post validation plastic analysis"
                     >
                       Pre/Post Validation
                     </button>

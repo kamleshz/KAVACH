@@ -20,17 +20,82 @@ import {
   RightOutlined
 } from '@ant-design/icons';
 import useAuth from '../hooks/useAuth';
+import useTheme from '../hooks/useTheme';
 import { WASTE_TYPES } from '../constants/wasteTypes';
+
+const SIDEBAR_POPUP_CLASS = 'sidebar-nav-popup';
 
 const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, isSuperAdmin } = useAuth();
+  const { isDark } = useTheme();
   const roleName = typeof user?.role === 'string' ? user.role : user?.role?.name;
   const isClientUser = roleName === 'CLIENT';
   const linkedClientId = user?.linkedClient?._id;
   const [openKeys, setOpenKeys] = useState([]);
   const sidebarRef = useRef(null);
+
+  const resolvedWasteType = (() => {
+    const searchParams = new URLSearchParams(location.search);
+    const wasteType = searchParams.get('wasteType');
+    return Object.values(WASTE_TYPES).includes(wasteType)
+      ? wasteType
+      : WASTE_TYPES.PLASTIC;
+  })();
+
+  const routeState = location.state || {};
+  const isClientWorkflowRoute = location.pathname.startsWith('/dashboard/client/');
+  const workflowSourceRoute = (() => {
+    const from = (routeState.from || '').toString();
+    if (!from) return '';
+    if (from.startsWith('/dashboard/clients')) return from;
+    if (from.startsWith('/dashboard/admin')) return from.split('?')[0];
+    if (from.startsWith('/dashboard/client-connect')) return '/dashboard/client-connect';
+    if (from.startsWith('/dashboard')) return from.split('?')[0];
+    return '';
+  })();
+  const workflowBackRoute =
+    workflowSourceRoute ||
+    (isClientUser ? '/dashboard/client-connect' : '/dashboard/clients');
+  const workflowContextTitle =
+    routeState.clientName || (isClientUser ? 'My Client' : 'Client Workflow');
+  const workflowContextLabel = (() => {
+    const pathParts = location.pathname.split('/').filter(Boolean);
+    const processType = (pathParts[pathParts.indexOf('process-plant') + 1] || pathParts[pathParts.indexOf('process-ewaste') + 1] || '').toUpperCase();
+    if (location.pathname.includes('/process-ewaste/')) {
+      return processType ? `${processType} E-Waste audit process` : 'E-Waste audit process';
+    }
+    if (location.pathname.includes('/process-plant/')) {
+      return processType ? `${processType} plant audit process` : 'Plant audit process';
+    }
+    if (location.pathname.endsWith('/edit') && routeState.activeTab) {
+      return `${routeState.activeTab} workflow`;
+    }
+    if (location.pathname.endsWith('/audit')) return 'Audit workflow';
+    if (location.pathname.endsWith('/edit')) return 'Edit client';
+    return 'Client details';
+  })();
+  const workflowSourceLabel = (() => {
+    if (workflowBackRoute.startsWith('/dashboard/admin/kpi')) return 'Back to KPI Dashboard';
+    if (workflowBackRoute.startsWith('/dashboard/admin')) return 'Back to Administration';
+    if (workflowBackRoute.startsWith('/dashboard/client-connect')) return 'Back to Client Connect';
+    if (workflowBackRoute.startsWith('/dashboard/clients')) return 'Back to Clients';
+    return 'Back';
+  })();
+
+  const selectedMenuKey = (() => {
+    if (isClientWorkflowRoute && workflowSourceRoute) {
+      return workflowSourceRoute;
+    }
+    if (isClientWorkflowRoute && isClientUser && linkedClientId) {
+      return `/dashboard/client/${linkedClientId}`;
+    }
+    if (location.pathname.startsWith('/dashboard/clients')) {
+      return `/dashboard/clients?wasteType=${resolvedWasteType}`;
+    }
+    return location.pathname;
+  })();
 
   const onOpenChange = (keys) => {
     setOpenKeys(keys);
@@ -78,6 +143,7 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
           key: 'clients',
           icon: <TeamOutlined />,
           label: 'KAVACH Audit',
+          popupClassName: SIDEBAR_POPUP_CLASS,
           children: [
             {
               key: `/dashboard/clients?wasteType=${WASTE_TYPES.PLASTIC}`,
@@ -119,6 +185,7 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
       key: 'admin',
       icon: <CrownOutlined />,
       label: 'Administration',
+      popupClassName: SIDEBAR_POPUP_CLASS,
       children: [
         {
           key: '/dashboard/admin',
@@ -154,11 +221,18 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
       return;
     }
 
-    if (location.pathname.startsWith('/dashboard/clients')) {
+    if (selectedMenuKey.startsWith('/dashboard/clients')) {
       setOpenKeys(['clients']);
       return;
     }
-  }, [isSuperAdmin, location.pathname]);
+
+    if (selectedMenuKey.startsWith('/dashboard/admin')) {
+      setOpenKeys(['admin']);
+      return;
+    }
+
+    setOpenKeys([]);
+  }, [isSuperAdmin, selectedMenuKey]);
 
   useLayoutEffect(() => {
     if (!sidebarRef.current || typeof window === 'undefined') return undefined;
@@ -194,53 +268,98 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
   return (
     <div
       ref={sidebarRef}
-      className="flex h-full w-full flex-col bg-gradient-to-b from-orange-500 via-orange-600 to-orange-700"
+      className="flex h-full w-full flex-col"
+      style={{
+        background: 'var(--sidebar-gradient)',
+        color: 'var(--sidebar-text)',
+      }}
     >
       <div
         data-sidebar-animate
         className="flex items-center justify-between px-3 pt-3 pb-1"
       >
         {!collapsed && (
-          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-orange-50/90">
+          <span
+            className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: 'var(--sidebar-muted)' }}
+          >
             Navigation
           </span>
         )}
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex h-7 w-7 items-center justify-center rounded-md border border-white/30 bg-white/10 text-orange-50 shadow-sm transition-colors hover:bg-white/20"
+          className="flex h-7 w-7 items-center justify-center rounded-md border shadow-sm transition-colors"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{
+            borderColor: 'var(--sidebar-border)',
+            background: isDark ? 'rgba(15, 23, 42, 0.26)' : 'rgba(255, 255, 255, 0.12)',
+            color: 'var(--sidebar-text)',
+          }}
         >
           {collapsed ? <RightOutlined className="text-xs" /> : <LeftOutlined className="text-xs" />}
         </button>
       </div>
-      <div data-sidebar-animate className="flex-1 overflow-y-auto">
+      {!collapsed && isClientWorkflowRoute && (
+        <div
+          data-sidebar-animate
+          className="mx-3 mb-2 rounded-2xl border px-3 py-3"
+          style={{
+            borderColor: 'var(--sidebar-border)',
+            background: isDark ? 'rgba(15, 23, 42, 0.22)' : 'rgba(255, 255, 255, 0.12)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => navigate(workflowBackRoute)}
+            className="mb-2 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: 'var(--sidebar-muted)' }}
+          >
+            <LeftOutlined className="text-[10px]" />
+            {workflowSourceLabel}
+          </button>
+          <div className="text-sm font-semibold" style={{ color: 'var(--sidebar-text)' }}>
+            {workflowContextTitle}
+          </div>
+          <div className="mt-1 text-xs" style={{ color: 'var(--sidebar-muted)' }}>
+            {workflowContextLabel}
+          </div>
+        </div>
+      )}
+      <div
+        data-sidebar-animate
+        className={`flex-1 overflow-x-visible ${collapsed ? 'overflow-y-visible' : 'overflow-y-auto'}`}
+      >
         <ConfigProvider
           theme={{
             token: {
-              colorBgElevated: '#ea580c',
+              colorBgElevated: 'transparent',
               borderRadiusLG: 12,
             },
             components: {
               Menu: {
-                itemColor: 'rgba(255,255,255,0.9)',
-                itemHoverColor: '#ffffff',
-                itemSelectedColor: '#ea580c',
-                itemSelectedBg: '#ffffff',
+                itemColor: 'var(--sidebar-text)',
+                itemHoverColor: 'var(--sidebar-text)',
+                itemSelectedColor: isDark ? '#f8fafc' : 'var(--brand-primary)',
+                itemSelectedBg: isDark ? 'rgba(251, 146, 60, 0.18)' : 'rgba(255, 255, 255, 0.96)',
                 itemBg: 'transparent',
                 subMenuItemBg: 'transparent',
-                groupTitleColor: 'rgba(255,255,255,0.7)',
+                groupTitleColor: 'var(--sidebar-muted)',
                 iconSize: 16,
                 itemBorderRadius: 8,
                 itemMarginInline: 12,
                 itemPaddingInline: 12,
+                colorSplit: 'var(--sidebar-border)',
+                subMenuItemSelectedColor: isDark ? '#f8fafc' : 'var(--brand-primary)',
               },
             },
           }}
         >
           <Menu
             mode="inline"
-            selectedKeys={[location.pathname]}
+            selectedKeys={[selectedMenuKey]}
             inlineCollapsed={collapsed}
+            className="sidebar-nav-menu"
             {...(!collapsed && {
               openKeys,
               onOpenChange,
@@ -252,6 +371,7 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
               paddingBottom: 12,
               fontSize: 15,
               fontWeight: 500,
+              color: 'var(--sidebar-text)',
             }}
             items={items}
           />

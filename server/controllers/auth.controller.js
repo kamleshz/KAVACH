@@ -3,6 +3,20 @@ import AuthService from '../services/auth.service.js';
 import ApiError from '../utils/ApiError.js';
 import { registerAuthAttemptFailure, registerAuthAttemptSuccess } from '../middleware/rateLimiter.js';
 
+const getCookieOptions = (req) => {
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const isHttps =
+        req.secure ||
+        (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) === 'https';
+
+    return {
+        httpOnly: true,
+        secure: isHttps,
+        sameSite: isHttps ? 'none' : 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+    };
+};
+
 export const registerController = asyncHandler(async (req, res) => {
     try {
         const result = await AuthService.registerUser(req.body);
@@ -86,23 +100,13 @@ export const verifyLoginOtpController = asyncHandler(async (req, res) => {
             userAgent
         });
 
-        const forwardedProto = req.headers['x-forwarded-proto'];
-        const isHttps =
-            req.secure ||
-            (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) === 'https';
-
-        const cookieOptions = {
-            httpOnly: true,
-            secure: isHttps,
-            sameSite: isHttps ? 'none' : 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        };
+        const cookieOptions = getCookieOptions(req);
 
         try {
             res.cookie('accessToken', accessToken, cookieOptions);
             res.cookie('refreshToken', refreshToken, cookieOptions);
         } catch (cookieError) {
-            console.error("[Login Verification Cookie Error]", cookieError);
+            req.log?.error({ err: cookieError }, "[Login Verification Cookie Error]");
         }
 
         return res.status(200).json({
@@ -117,14 +121,25 @@ export const verifyLoginOtpController = asyncHandler(async (req, res) => {
     } catch (error) {
         // Check if headers already sent to avoid crashing
         if (res.headersSent) {
+             req.log?.warn({ err: error }, "verifyLoginOtpController headers already sent");
              return;
         }
-        if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message, success: false, error: true });
+        if (error instanceof ApiError) {
+            req.log?.warn({ err: error }, "verifyLoginOtpController handled ApiError");
+            return res.status(error.statusCode).json({
+                message: error.message,
+                success: false,
+                error: true,
+                correlationId: req.correlationId
+            });
+        }
         
+        req.log?.error({ err: error }, "verifyLoginOtpController unexpected error");
         return res.status(500).json({ 
             message: "OTP verification failed: " + (error.message || "Unknown error"),
             error: true, 
-            success: false 
+            success: false,
+            correlationId: req.correlationId
         });
     }
 });
@@ -134,16 +149,7 @@ export const logoutController = asyncHandler(async (req, res) => {
         const userId = req.userId;
         await AuthService.logoutUser(userId);
 
-        const forwardedProto = req.headers['x-forwarded-proto'];
-        const isHttps =
-            req.secure ||
-            (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) === 'https';
-
-        const cookieOptions = {
-            httpOnly: true,
-            secure: isHttps,
-            sameSite: isHttps ? 'none' : 'lax'
-        };
+        const cookieOptions = getCookieOptions(req);
 
         res.clearCookie('accessToken', cookieOptions);
         res.clearCookie('refreshToken', cookieOptions);
@@ -166,17 +172,7 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
 
         const { accessToken, refreshToken } = await AuthService.refreshToken(token);
 
-        const forwardedProto = req.headers['x-forwarded-proto'];
-        const isHttps =
-            req.secure ||
-            (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) === 'https';
-
-        const cookieOptions = {
-            httpOnly: true,
-            secure: isHttps,
-            sameSite: isHttps ? 'none' : 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        };
+        const cookieOptions = getCookieOptions(req);
 
         res.cookie('accessToken', accessToken, cookieOptions);
         res.cookie('refreshToken', refreshToken, cookieOptions);

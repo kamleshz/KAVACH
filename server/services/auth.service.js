@@ -24,6 +24,25 @@ import {
 import ApiError from "../utils/ApiError.js";
 import mongoose from "mongoose";
 import UploadService from "./upload.service.js";
+import logger from "../utils/logger.js";
+
+const shouldLogDevOtpFallback = process.env.NODE_ENV !== "production";
+
+const logOtpFallback = (label, email, otp, error) => {
+  logger.warn(
+    {
+      email,
+      err: error,
+    },
+    `${label} email delivery failed`,
+  );
+
+  if (!shouldLogDevOtpFallback) return;
+
+  logger.warn("---------------------------------------------------");
+  logger.warn(`[DEV] ${label} OTP for ${email}: ${otp}`);
+  logger.warn("---------------------------------------------------");
+};
 
 class AuthService {
   static ensureDbReady() {
@@ -78,9 +97,7 @@ class AuthService {
         html: verifyEmailTemplate({ name, otp }),
       });
     } catch (emailError) {
-      console.log("---------------------------------------------------");
-      console.log(`[DEV] Registration OTP for ${email}: ${otp}`);
-      console.log("---------------------------------------------------");
+      logOtpFallback("Registration", email, otp, emailError);
     }
 
     return {
@@ -163,9 +180,7 @@ class AuthService {
         html: verifyEmailTemplate({ name: user.name, otp }),
       });
     } catch (emailError) {
-      console.log("---------------------------------------------------");
-      console.log(`[DEV] Verification OTP for ${email}: ${otp}`);
-      console.log("---------------------------------------------------");
+      logOtpFallback("Verification", email, otp, emailError);
     }
 
     return true;
@@ -233,7 +248,7 @@ class AuthService {
     try {
       await user.save();
     } catch (saveError) {
-      console.error("User save failed:", saveError);
+      logger.error({ err: saveError, email }, "User save failed during login OTP creation");
       if (saveError.name === "ValidationError") {
         const messages = Object.values(saveError.errors).map(
           (val) => val.message,
@@ -249,10 +264,7 @@ class AuthService {
       subject: "Login OTP - EPR Kavach Audit",
       html: loginOtpTemplate({ name: user.name, otp }),
     }).catch((emailError) => {
-      console.error("❌ Failed to send login OTP email (async):", emailError);
-      console.log("---------------------------------------------------");
-      console.log(`[DEV] Login OTP for ${email}: ${otp}`);
-      console.log("---------------------------------------------------");
+      logOtpFallback("Login", email, otp, emailError);
     });
 
     return {
@@ -307,15 +319,17 @@ class AuthService {
             const isBlack = channels.every((c) => c.mean < 10);
 
             if (isBlack) {
-              console.warn(
-                `[AUTH] Login blocked: Black screen detected for ${email}`,
+              logger.warn(
+                { email },
+                "[AUTH] Black screen detected during login photo verification",
               );
-              console.log(
-                "Allowing black screen for now (User request to skip photo)",
+              logger.info(
+                { email },
+                "Allowing black screen login photo based on current fallback behavior",
               );
             }
           } catch (imgError) {
-            console.error("Image analysis failed:", imgError);
+            logger.error({ err: imgError, email }, "Image analysis failed during login OTP verification");
           }
         }
 
@@ -341,7 +355,7 @@ class AuthService {
 
           await LoginLogModel.create(logData);
         } catch (logError) {
-          console.error("Failed to save login photo log:", logError);
+          logger.error({ err: logError, email, userId: user._id }, "Failed to save login photo log");
         }
       } else {
         try {
@@ -357,10 +371,12 @@ class AuthService {
           }
           await LoginLogModel.create(logData);
         } catch (logError) {
-          console.error("Failed to save login log:", logError);
+          logger.error({ err: logError, email, userId: user._id }, "Failed to save login log");
         }
       }
-    })().catch((err) => console.error("Async login logging failed:", err));
+    })().catch((err) =>
+      logger.error({ err, email, userId: user._id }, "Async login logging failed"),
+    );
 
     if (location && location.latitude && location.longitude) {
       user.last_login_latitude = location.latitude;
@@ -396,10 +412,13 @@ class AuthService {
         region: geo?.region || "",
         country: geo?.country || "",
       }).catch((logError) => {
-        console.error("Failed to record login activity (async):", logError);
+        logger.error(
+          { err: logError, email, userId: user._id },
+          "Failed to record login activity asynchronously",
+        );
       });
     } catch (error) {
-      console.error("Error in login activity setup:", error);
+      logger.error({ err: error, email, userId: user._id }, "Error in login activity setup");
     }
 
     return {

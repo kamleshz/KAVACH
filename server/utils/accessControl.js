@@ -11,6 +11,8 @@ export const getRoleName = (user) => {
 export const isAdminRole = (roleName) =>
   ["ADMIN", "SUPER ADMIN"].includes(roleName);
 
+export const isManagerRole = (roleName) => roleName === "MANAGER";
+
 export const isClientRole = (roleName) => roleName === "CLIENT";
 
 export const normalizeObjectId = (value) => {

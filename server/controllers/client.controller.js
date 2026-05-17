@@ -20,6 +20,15 @@ import {
 import UploadService from "../services/upload.service.js";
 import HistoryService from "../services/history.service.js";
 import CacheService from "../services/cache.service.js";
+import AuditLogService from "../services/auditLog.service.js";
+import logger from "../utils/logger.js";
+import {
+  applyClientStatusTransition,
+  buildClientWorkflowSnapshot,
+  getClientBusinessValidationErrors,
+  normalizeClientBusinessFields,
+} from "../utils/clientBusinessRules.js";
+import { redactSensitiveClientData } from "../utils/clientSecurity.js";
 
 const CLIENT_ANALYTICS_CACHE_PREFIX = "dashboard:client-stats:";
 const COMPLIANCE_SNAPSHOT_CACHE_PREFIX = "compliance:snapshot:";
@@ -43,6 +52,107 @@ const invalidateComplianceSnapshotCache = async (clientId, type, itemId) => {
   ]);
 };
 
+const formatDateOnly = (value) => {
+  if (!value) return "";
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    const dayFirstMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (dayFirstMatch) {
+      return `${dayFirstMatch[1].padStart(2, "0")}-${dayFirstMatch[2].padStart(
+        2,
+        "0",
+      )}-${dayFirstMatch[3]}`;
+    }
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return typeof value === "string" ? value : "";
+
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  return `${day}-${month}-${year}`;
+};
+
+const serializeMonthlyProcurementRows = (rows = []) =>
+  (Array.isArray(rows) ? rows : []).map((row) => {
+    const baseRow = row?.toObject ? row.toObject() : row;
+    return {
+      ...baseRow,
+      dateOfInvoice: formatDateOnly(baseRow?.dateOfInvoice),
+    };
+  });
+
+const recordClientAuditLog = async ({
+  actorId,
+  clientId,
+  module,
+  action,
+  message,
+  status = "success",
+  metadata = {},
+}) =>
+  AuditLogService.record({
+    actorId,
+    clientId,
+    module,
+    action,
+    entityType: "client",
+    entityId: clientId,
+    status,
+    message,
+    metadata,
+  });
+
+const findDuplicateIdentifierRecord = async ({
+  pan = "",
+  cin = "",
+  excludeId = null,
+}) => {
+  const normalizedExcludeId = excludeId ? String(excludeId) : null;
+  const checks = [
+    {
+      field: "PAN",
+      value: pan,
+      queryKey: "companyDetails.pan",
+    },
+    {
+      field: "CIN",
+      value: cin,
+      queryKey: "companyDetails.cin",
+    },
+  ].filter((entry) => entry.value);
+
+  for (const check of checks) {
+    const [clientMatch, pwpMatch] = await Promise.all([
+      ClientModel.findOne({
+        [check.queryKey]: check.value,
+        ...(normalizedExcludeId ? { _id: { $ne: normalizedExcludeId } } : {}),
+      })
+        .select("_id clientName entityType")
+        .lean(),
+      PWPModel.findOne({
+        [check.queryKey]: check.value,
+        ...(normalizedExcludeId ? { _id: { $ne: normalizedExcludeId } } : {}),
+      })
+        .select("_id clientName entityType")
+        .lean(),
+    ]);
+
+    const match = clientMatch || pwpMatch;
+    if (match) {
+      return {
+        field: check.field,
+        record: match,
+      };
+    }
+  }
+
+  return null;
+};
+
 export const uploadClientDocumentController = asyncHandler(async (req, res) => {
   try {
     const { clientId } = req.params;
@@ -58,6 +168,17 @@ export const uploadClientDocumentController = asyncHandler(async (req, res) => {
       documentName,
       certificateNumber,
       certificateDate,
+    });
+    await recordClientAuditLog({
+      actorId: req.userId,
+      clientId,
+      module: "client-document",
+      action: "upload",
+      message: "Client document uploaded",
+      metadata: {
+        documentType: result?.newDoc?.documentType || documentType || "",
+        documentName: result?.newDoc?.documentName || documentName || "",
+      },
     });
 
     return res.status(200).json({
@@ -79,7 +200,19 @@ export const deleteClientDocumentController = asyncHandler(async (req, res) => {
   try {
     const { clientId, docId } = req.params;
 
-    await ClientService.deleteDocument(clientId, docId);
+    const result = await ClientService.deleteDocument(clientId, docId);
+    await recordClientAuditLog({
+      actorId: req.userId,
+      clientId,
+      module: "client-document",
+      action: "delete",
+      message: "Client document deleted",
+      metadata: {
+        documentId: docId,
+        documentType: result?.deletedDocument?.documentType || "",
+        documentName: result?.deletedDocument?.documentName || "",
+      },
+    });
 
     return res.status(200).json({
       message: "Document deleted successfully",
@@ -206,16 +339,49 @@ export const createClientController = asyncHandler(async (req, res) => {
     ...clientData,
     financialYear: financialYearRaw ? String(financialYearRaw) : "",
   };
+  const businessReadyClientData =
+    normalizeClientBusinessFields(normalizedClientData);
+  const validationErrors =
+    getClientBusinessValidationErrors(businessReadyClientData);
+  if (validationErrors.length > 0) {
+    throw new ApiError(400, validationErrors[0]);
+  }
+
+  const duplicateRecord = await findDuplicateIdentifierRecord({
+    pan: businessReadyClientData.companyDetails?.pan,
+    cin: businessReadyClientData.companyDetails?.cin,
+  });
+  if (duplicateRecord) {
+    throw new ApiError(
+      409,
+      `${duplicateRecord.field} already exists for '${duplicateRecord.record.clientName}'`,
+    );
+  }
 
   const isPWP =
-    normalizedClientData.category === "PWP" ||
-    normalizedClientData.entityType === "PWP";
+    businessReadyClientData.category === "PWP" ||
+    businessReadyClientData.entityType === "PWP";
   const Model = isPWP ? PWPModel : ClientModel;
 
   const newClient = new Model({
-    ...normalizedClientData,
+    ...businessReadyClientData,
     createdBy: userId,
   });
+
+  if (businessReadyClientData.clientStatus) {
+    try {
+      applyClientStatusTransition({
+        client: newClient,
+        targetStatus: businessReadyClientData.clientStatus,
+        changedBy: userId,
+        reason:
+          businessReadyClientData.statusChangeReason ||
+          "Initial lifecycle status set during client creation",
+      });
+    } catch (error) {
+      throw new ApiError(400, error.message);
+    }
+  }
 
   try {
     await newClient.save();
@@ -433,6 +599,19 @@ export const verifyFacilityController = asyncHandler(async (req, res) => {
     // -----------------------------
 
     await client.save();
+    await recordClientAuditLog({
+      actorId: req.userId,
+      clientId,
+      module: "facility-verification",
+      action: "update",
+      message: "Facility verification updated",
+      metadata: {
+        type,
+        itemId,
+        verificationStatus: item.verification?.status || "",
+        changeCount: changes.length,
+      },
+    });
 
     return res.status(200).json({
       message: "Verification updated successfully",
@@ -576,16 +755,23 @@ export const getAllProductComplianceRowsController = async (req, res) => {
 
 export const uploadProductComplianceRowController = async (req, res) => {
   try {
-    console.log(
-      `[Product Compliance Upload] Request received. ClientID: ${req.params.clientId}, Type: ${req.body.type}, ItemID: ${req.body.itemId}, RowIndex: ${req.body.rowIndex}`,
+    logger.debug(
+      {
+        clientId: req.params.clientId,
+        type: req.body.type,
+        itemId: req.body.itemId,
+        rowIndex: req.body.rowIndex,
+      },
+      "[Product Compliance Upload] Request received",
     );
 
     const { clientId } = req.params;
     const { type, itemId, rowIndex, row } = req.body;
 
     if (!clientId || !type || !itemId || rowIndex === undefined) {
-      console.error(
-        `[Product Compliance Upload] Missing required fields: clientId=${clientId}, type=${type}, itemId=${itemId}, rowIndex=${rowIndex}`,
+      logger.error(
+        { clientId, type, itemId, rowIndex },
+        "[Product Compliance Upload] Missing required fields",
       );
       return res.status(400).json({
         message: "Missing required fields",
@@ -596,9 +782,7 @@ export const uploadProductComplianceRowController = async (req, res) => {
 
     const clientExists = await ClientService.findClientOrPwp(clientId);
     if (!clientExists) {
-      console.error(
-        `[Product Compliance Upload] Client not found: ${clientId}`,
-      );
+      logger.error({ clientId }, "[Product Compliance Upload] Client not found");
       return res
         .status(404)
         .json({ message: "Client not found", error: true, success: false });
@@ -615,8 +799,9 @@ export const uploadProductComplianceRowController = async (req, res) => {
       clientExists.productionFacility[listKey] &&
       !itemFound
     ) {
-      console.error(
-        `[Product Compliance Upload] Facility Item not found: ${itemId} in ${listKey}`,
+      logger.error(
+        { clientId, itemId, listKey },
+        "[Product Compliance Upload] Facility item not found",
       );
       return res.status(404).json({
         message: `${type} detail not found`,
@@ -625,39 +810,18 @@ export const uploadProductComplianceRowController = async (req, res) => {
       });
     }
 
-    let doc = await ProductComplianceModel.findOne({
-      client: clientId,
-      type,
-      itemId,
-    });
-    if (!doc) {
-      console.log(
-        `[Product Compliance Upload] Document not found, creating new one for Client: ${clientId}`,
-      );
-      doc = new ProductComplianceModel({
-        client: clientId,
-        type,
-        itemId,
-        rows: [],
-      });
-    }
     let single = row;
     if (typeof single === "string") {
       try {
         single = JSON.parse(single);
       } catch (e) {
-        console.error(
-          `[Product Compliance Upload] JSON Parse Error for row:`,
-          e,
-        );
+        logger.error({ err: e, clientId, itemId }, "[Product Compliance Upload] JSON parse error for row");
         single = {};
       }
     }
     const idx = parseInt(rowIndex, 10);
     if (Number.isNaN(idx) || idx < 0) {
-      console.error(
-        `[Product Compliance Upload] Invalid Row Index: ${rowIndex}`,
-      );
+      logger.error({ rowIndex, clientId, itemId }, "[Product Compliance Upload] Invalid row index");
       return res
         .status(400)
         .json({ message: "Invalid rowIndex", error: true, success: false });
@@ -718,142 +882,39 @@ export const uploadProductComplianceRowController = async (req, res) => {
       componentImage: componentImageUrl || "",
       thickness: single.thickness ? Number(single.thickness) : 0,
       rcPercent: single.rcPercent ? Number(single.rcPercent) : 0,
+      auditorRemarks: single.auditorRemarks || "",
+      managerRemarks: single.managerRemarks || "",
       componentComplianceStatus:
         single.componentComplianceStatus || single.complianceStatus || "",
+      productComplianceStatus: single.productComplianceStatus || "",
       clientRemarks: single.clientRemarks || "",
       additionalDocument: additionalDocumentUrl || "",
+      rowKey: single.rowKey || "",
+      skuKey: single.skuKey || "",
+      componentKey: single.componentKey || "",
+      supplierKey: single.supplierKey || "",
     };
-
-    // Check uniqueness of componentCode
-    const newCode = (rowData.componentCode || "").trim();
-    if (newCode) {
-      const isDuplicate = doc.rows.some((r, i) => {
-        if (i === idx) return false;
-        const otherCode = (r.componentCode || "").trim();
-        if (otherCode !== newCode) return false;
-
-        const sameSku =
-          (r.skuCode || "").trim() === (rowData.skuCode || "").trim();
-        const sameDesc =
-          (r.componentDescription || "").trim() ===
-          (rowData.componentDescription || "").trim();
-        return !(sameSku && sameDesc);
-      });
-
-      if (isDuplicate) {
-        console.warn(
-          `[Product Compliance Upload] Duplicate Component Code detected: ${newCode}`,
-        );
-        return res.status(400).json({
-          message: `Component Code '${newCode}' must be unique (or match existing SKU/Description)`,
-          error: true,
-          success: false,
-        });
-      }
-    }
-
-    // Check uniqueness of supplierCode
-    const newSupplierCode = (rowData.supplierCode || "").trim();
-    const newSupplierName = (rowData.supplierName || "").trim().toLowerCase();
-
-    if (newSupplierCode) {
-      const isSupplierDuplicate = doc.rows.some((r, i) => {
-        if (i === idx) return false;
-        const otherCode = (r.supplierCode || "").trim();
-        if (otherCode !== newSupplierCode) return false;
-
-        // If Code is same, Supplier Name MUST be same
-        const otherName = (r.supplierName || "").trim().toLowerCase();
-        return otherName !== newSupplierName;
-      });
-
-      if (isSupplierDuplicate) {
-        return res.status(400).json({
-          message: `Supplier Code '${newSupplierCode}' must be unique (or reused for the same Supplier)`,
-          error: true,
-          success: false,
-        });
-      }
-    }
-
-    const beforeRow = doc.rows[idx] || {};
-    const toText = (v) => {
-      if (v === null || v === undefined) return "";
-      if (typeof v === "string") return v;
-      return String(v);
-    };
-    const humanize = (field) =>
-      field
-        .replace(/([A-Z])/g, " $1")
-        .replace(/^./, (str) => str.toUpperCase());
-    const at = new Date();
-    const fields = [
-      "generate",
-      "systemCode",
-      "packagingType",
-      "clientName",
-      "clientState",
-      "skuCode",
-      "skuDescription",
-      "skuUom",
-      "productImage",
-      "componentCode",
-      "componentDescription",
-      "supplierName",
-      "supplierState",
-      "supplierType",
-      "supplierCategory",
-      "generateSupplierCode",
-      "supplierCode",
-      "componentImage",
-    ];
-
-    fields.forEach((field) => {
-      const prevVal = toText(beforeRow?.[field]);
-      const currVal = toText(rowData[field]);
-      if (prevVal !== currVal) {
-        doc.changeHistory.push({
-          table: "Product Compliance",
-          row: idx + 1,
-          field: humanize(field),
-          prev: prevVal || "-",
-          curr: currVal || "-",
-          user: req.userId || null,
-          userName: "",
-          at,
-        });
-      }
-    });
-    if (doc.changeHistory.length > 5000)
-      doc.changeHistory = doc.changeHistory.slice(-5000);
-
-    if (idx >= doc.rows.length) {
-      doc.rows.push(rowData);
-    } else {
-      doc.rows[idx] = rowData;
-    }
-    doc.updatedBy = req.userId;
-    await doc.save();
-
-    const emitter = req.app.get("realtimeEmitter");
-    if (emitter) {
-      emitter.emit("markingLabellingUpdate", {
-        clientId,
-        type,
-        itemId,
-        operation: "upsert",
-        source: "productComplianceUpload",
-      });
-    }
+    const savedRows = await ClientService.saveProductCompliance(
+      clientId,
+      type,
+      itemId,
+      undefined,
+      idx,
+      rowData,
+      req.userId,
+      req.app.get("realtimeEmitter"),
+      undefined,
+    );
+    await invalidateComplianceSnapshotCache(clientId, type, itemId);
 
     return res.status(200).json({
       message: "Row saved",
       error: false,
       success: true,
-      data: { index: idx, row: doc.rows[idx] },
+      data: { index: idx, row: savedRows?.[idx] || rowData },
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error?.statusCode || 500).json({
       message: error.message || "Internal server error",
       error: true,
       success: false,
@@ -1192,15 +1253,16 @@ export const saveProductSupplierComplianceController = asyncHandler(
       const { clientId } = req.params;
       const { type, itemId, rows, rowIndex, row, plantName } = req.body;
 
-      console.log(
-        `[Save Supplier Compliance] Client: ${clientId}, Type: ${type}, Item: ${itemId}`,
+      logger.debug(
+        { clientId, type, itemId, rowIndex, plantName },
+        "[Save Supplier Compliance] Request received",
       );
       if (rows && Array.isArray(rows)) {
-        console.log(`[Save Supplier Compliance] Rows count: ${rows.length}`);
+        logger.debug({ clientId, rowsCount: rows.length }, "[Save Supplier Compliance] Rows count");
         if (rows.length > 0) {
-          console.log(
-            `[Save Supplier Compliance] First row sample:`,
-            JSON.stringify(rows[0]),
+          logger.debug(
+            { clientId, firstRowSample: JSON.stringify(rows[0]) },
+            "[Save Supplier Compliance] First row sample",
           );
         }
       }
@@ -1531,7 +1593,7 @@ export const saveMonthlyProcurementController = asyncHandler(
         message: "Monthly procurement saved",
         error: false,
         success: true,
-        data: result,
+        data: serializeMonthlyProcurementRows(result),
       });
     } catch (error) {
       req.log?.error?.(
@@ -1581,7 +1643,7 @@ export const getMonthlyProcurementController = asyncHandler(
         message: "Monthly procurement fetched",
         error: false,
         success: true,
-        data: doc?.rows || [],
+        data: serializeMonthlyProcurementRows(doc?.rows || []),
       };
       await CacheService.setCache(
         cacheKey,
@@ -1653,6 +1715,7 @@ export const cleanupProductComplianceFieldsController = asyncHandler(
 export const getClientByIdController = async (req, res) => {
   try {
     const { clientId } = req.params;
+    const viewMode = (req.query?.view || "").toString().trim().toLowerCase();
 
     let client = await ClientModel.findById(clientId)
       .populate("createdBy", "name email")
@@ -1743,11 +1806,54 @@ export const getClientByIdController = async (req, res) => {
       client.documents = merged;
     }
 
+    const safeClient = redactSensitiveClientData(client, user);
+    const compactClient =
+      viewMode === "audit"
+        ? {
+            ...safeClient,
+            productionFacility: safeClient?.productionFacility
+              ? {
+                  ...safeClient.productionFacility,
+                  cteDetailsList: Array.isArray(
+                    safeClient.productionFacility.cteDetailsList,
+                  )
+                    ? safeClient.productionFacility.cteDetailsList.map(
+                        (item) => ({
+                          ...item,
+                          productComplianceRows: [],
+                          productComponentDetails: [],
+                          productSupplierCompliance: [],
+                          productRecycledQuantity: [],
+                        }),
+                      )
+                    : [],
+                  ctoDetailsList: Array.isArray(
+                    safeClient.productionFacility.ctoDetailsList,
+                  )
+                    ? safeClient.productionFacility.ctoDetailsList.map(
+                        (item) => ({
+                          ...item,
+                          productComplianceRows: [],
+                          productComponentDetails: [],
+                          productSupplierCompliance: [],
+                          productRecycledQuantity: [],
+                        }),
+                      )
+                    : [],
+                }
+              : safeClient.productionFacility,
+          }
+        : safeClient;
+    const workflow = buildClientWorkflowSnapshot(client);
+
     return res.status(200).json({
       message: "Client details fetched successfully",
       error: false,
       success: true,
-      data: client,
+      data: {
+        ...compactClient,
+        workflow,
+      },
     });
   } catch (error) {
     return res.status(500).json({
@@ -1761,7 +1867,7 @@ export const getClientByIdController = async (req, res) => {
 export const updateClientController = async (req, res) => {
   try {
     const { clientId } = req.params;
-    const updateData = req.body || {};
+    const updateData = { ...(req.body || {}) };
     if (
       updateData.financialYear === undefined &&
       updateData.financial_year !== undefined
@@ -1780,6 +1886,19 @@ export const updateClientController = async (req, res) => {
       updateData.financialYear = updateData.financialYear
         ? String(updateData.financialYear)
         : "";
+    }
+    const statusChangeReason = updateData.statusChangeReason || "";
+    delete updateData.statusChangeReason;
+    delete updateData.statusHistory;
+    const businessReadyUpdateData = normalizeClientBusinessFields(updateData);
+    const validationErrors =
+      getClientBusinessValidationErrors(businessReadyUpdateData);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        message: validationErrors[0],
+        error: true,
+        success: false,
+      });
     }
 
     // Check permissions first
@@ -1813,13 +1932,66 @@ export const updateClientController = async (req, res) => {
       });
     }
 
-    const client = await Model.findByIdAndUpdate(
-      clientId,
-      { $set: updateData },
-      { new: true, runValidators: true },
-    );
+    const duplicateRecord = await findDuplicateIdentifierRecord({
+      pan: businessReadyUpdateData.companyDetails?.pan,
+      cin: businessReadyUpdateData.companyDetails?.cin,
+      excludeId: clientId,
+    });
+    if (duplicateRecord) {
+      return res.status(409).json({
+        message: `${duplicateRecord.field} already exists for '${duplicateRecord.record.clientName}'`,
+        error: true,
+        success: false,
+      });
+    }
+
+    const requestedStatus = businessReadyUpdateData.clientStatus;
+    delete businessReadyUpdateData.clientStatus;
+
+    // Remove undefined keys to prevent Mongoose from unsetting fields
+    Object.keys(businessReadyUpdateData).forEach((key) => {
+      if (businessReadyUpdateData[key] === undefined) {
+        delete businessReadyUpdateData[key];
+      }
+    });
+
+    clientToCheck.set(businessReadyUpdateData);
+
+    let statusTransition = null;
+    if (requestedStatus !== undefined) {
+      try {
+        statusTransition = applyClientStatusTransition({
+          client: clientToCheck,
+          targetStatus: requestedStatus,
+          changedBy: req.userId,
+          reason: statusChangeReason,
+        });
+      } catch (error) {
+        return res.status(400).json({
+          message: error.message,
+          error: true,
+          success: false,
+        });
+      }
+    }
+
+    const client = await clientToCheck.save();
 
     await invalidateClientStatsCache();
+    if (statusTransition?.changed) {
+      await recordClientAuditLog({
+        actorId: req.userId,
+        clientId,
+        module: "client-lifecycle",
+        action: "transition",
+        message: `Client moved from ${statusTransition.from} to ${statusTransition.to}`,
+        metadata: {
+          from: statusTransition.from,
+          to: statusTransition.to,
+          reason: statusChangeReason,
+        },
+      });
+    }
 
     return res.status(200).json({
       message: "Client updated successfully",
@@ -2118,8 +2290,54 @@ export const validateClientController = async (req, res) => {
       }
     }
 
+    let statusTransition = null;
+    if (client.clientStatus === "SUBMITTED") {
+      try {
+        statusTransition = applyClientStatusTransition({
+          client,
+          targetStatus: "PRE_VALIDATION",
+          changedBy: userId,
+          reason: "Validation review started",
+        });
+      } catch (error) {
+        return res.status(400).json({
+          message: error.message,
+          error: true,
+          success: false,
+        });
+      }
+    }
+
     await client.save();
     await invalidateClientStatsCache();
+    await recordClientAuditLog({
+      actorId: userId,
+      clientId,
+      module: "client-validation",
+      action: "update",
+      message: "Client validation updated",
+      metadata: {
+        validationStatus,
+        verifiedItemCount: Array.isArray(verifiedItemIds)
+          ? verifiedItemIds.length
+          : 0,
+        lifecycleStatus: client.clientStatus,
+      },
+    });
+    if (statusTransition?.changed) {
+      await recordClientAuditLog({
+        actorId: userId,
+        clientId,
+        module: "client-lifecycle",
+        action: "transition",
+        message: `Client moved from ${statusTransition.from} to ${statusTransition.to}`,
+        metadata: {
+          from: statusTransition.from,
+          to: statusTransition.to,
+          reason: "Validation review started",
+        },
+      });
+    }
 
     return res.status(200).json({
       message: "Client validation status updated successfully",
@@ -2296,7 +2514,7 @@ export const saveSkuComplianceController = async (req, res) => {
       error: false,
     });
   } catch (error) {
-    console.error("Save SKU Compliance Error:", error);
+    logger.error({ err: error }, "Save SKU Compliance Error");
     return res.status(500).json({
       message: error.message || "Internal Server Error",
       error: true,
@@ -2326,7 +2544,7 @@ export const getSkuComplianceController = async (req, res) => {
       error: false,
     });
   } catch (error) {
-    console.error("Get SKU Compliance Error:", error);
+    logger.error({ err: error }, "Get SKU Compliance Error");
     return res.status(500).json({
       message: error.message || "Internal Server Error",
       error: true,
@@ -2367,7 +2585,7 @@ export const uploadSkuComplianceRowController = async (req, res) => {
       error: false,
     });
   } catch (error) {
-    console.error("Upload SKU Compliance Images Error:", error);
+    logger.error({ err: error }, "Upload SKU Compliance Images Error");
     return res.status(500).json({
       message: error.message || "Internal Server Error",
       error: true,

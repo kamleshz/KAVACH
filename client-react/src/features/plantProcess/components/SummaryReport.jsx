@@ -35,6 +35,14 @@ const SummaryReport = ({
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
 
+  const resolveProducerSkuKey = React.useCallback((product = {}) => {
+    return (
+      (product.skuCode || "").trim() ||
+      (product.systemCode || "").trim() ||
+      (product.componentCode || "").trim()
+    );
+  }, []);
+
   const handleDownloadReport = async () => {
     try {
       setIsDownloading(true);
@@ -57,25 +65,25 @@ const SummaryReport = ({
 
   // Process and aggregate data
   const tableData = useMemo(() => {
-    // 1. Group productRows by SKU Code (or Component Code for Producer)
+    // 1. Group productRows by SKU Code
     const groupedBySku = new Map();
 
     productRows.forEach((product) => {
       const groupKey = isProducer
-        ? (product.componentCode || "").trim()
+        ? resolveProducerSkuKey(product)
         : (product.skuCode || "").trim();
       if (!groupKey) return; // Skip invalid rows
 
       if (!groupedBySku.has(groupKey)) {
         groupedBySku.set(groupKey, {
           key: groupKey,
-          skuCode: isProducer ? product.componentCode : product.skuCode, // For Producer, use Component Code
+          skuCode: isProducer ? groupKey : product.skuCode,
           skuDescription: isProducer
-            ? product.componentDescription
+            ? product.skuDescription || product.componentDescription || "-"
             : product.skuDescription || "-",
           industryCategory: product.industryCategory || "-",
           productImage: isProducer
-            ? product.componentImage
+            ? product.productImage || product.componentImage
             : product.productImage,
           componentCodes: new Set(),
           products: [], // Store original product rows for this SKU/Component
@@ -335,13 +343,8 @@ const SummaryReport = ({
     componentRows,
     recycledRows,
     isProducer,
+    resolveProducerSkuKey,
   ]);
-
-  // Flatten data for Producer
-  const flatTableData = useMemo(() => {
-    if (!isProducer) return [];
-    return tableData.flatMap((group) => group.details);
-  }, [tableData, isProducer]);
 
   // Sync derived Product Compliance Status to parent state (productRows)
   // This ensures that the derived status is saved to the database when the user clicks Finish/Save
@@ -351,8 +354,10 @@ const SummaryReport = ({
     tableData.forEach((group) => {
       const { skuCode, productComplianceStatus } = group;
       // Find the first product row for this SKU to check current status
-      const productRow = productRows.find(
-        (p) => (p.skuCode || "").trim() === skuCode,
+      const productRow = productRows.find((p) =>
+        isProducer
+          ? resolveProducerSkuKey(p) === skuCode
+          : (p.skuCode || "").trim() === skuCode,
       );
 
       if (productRow) {
@@ -367,7 +372,7 @@ const SummaryReport = ({
         }
       }
     });
-  }, [tableData, productRows, handleSummaryChange]);
+  }, [tableData, productRows, handleSummaryChange, isProducer, resolveProducerSkuKey]);
 
   const columns = [
     {
@@ -564,10 +569,7 @@ const SummaryReport = ({
           </div>
         ),
     },
-  ].filter((col) => {
-    if (isProducer && col.key === "industryCategory") return false;
-    return true;
-  });
+  ];
 
   // Columns for the nested detailed table
   const detailColumns = [
@@ -1053,21 +1055,17 @@ const SummaryReport = ({
     <>
       <div className="border border-gray-200 rounded-lg overflow-hidden">
         <Table
-          columns={isProducer ? detailColumns : columns}
-          dataSource={isProducer ? flatTableData : tableData}
+          columns={columns}
+          dataSource={tableData}
           pagination={false}
           size="middle"
           scroll={{ x: 1200 }}
           rowClassName="hover:bg-gray-50"
-          expandable={
-            isProducer
-              ? undefined
-              : {
-                  expandedRowRender,
-                  rowExpandable: (record) =>
-                    record.details && record.details.length > 0,
-                }
-          }
+          expandable={{
+            expandedRowRender,
+            rowExpandable: (record) =>
+              record.details && record.details.length > 0,
+          }}
         />
       </div>
 

@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Table, Select, Input, Button, Upload, message, ConfigProvider, Modal, Popover, Tabs } from 'antd';
+import { Table, Select, Input, Button, Upload, message, ConfigProvider, Modal, Popover, Tabs, Steps } from 'antd';
 import { UploadOutlined, DeleteOutlined, PlusOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { 
-  FaArrowLeft, FaCheck, FaChevronRight, FaBuilding, FaGavel, FaTrademark, FaLayerGroup, 
+  FaCheck, FaChevronRight, FaBuilding, FaGavel, FaTrademark, FaLayerGroup, 
   FaCalendarAlt, FaChevronDown, FaIndustry, FaUserShield, FaUser, FaPhone, FaEnvelope, 
   FaUserTie, FaCheckCircle, FaSave, FaEdit, FaUndo, FaTrashAlt, FaSpinner, FaArrowRight,
   FaFileContract, FaMapMarkerAlt, FaPencilAlt, FaFilePdf, FaCheckDouble, FaFolderOpen, FaShieldAlt, FaLock, FaClipboardCheck, FaExclamationCircle, FaChartLine, FaFilter, FaSearch
@@ -29,7 +29,8 @@ import { generateMarkingLabellingReport, generateSkuComplianceReport } from '../
 import { parseRemarksToItems } from '../utils/pdfHelpers';
 import { calculateCapacityMetrics } from '../utils/numberUtils';
 import DocumentViewerModal from '../components/DocumentViewerModal';
-import GsapStepTransition from '../components/GsapStepTransition';
+import GsapPageTransition from '../components/GsapPageTransition';
+import BackButton from '../components/BackButton';
 import { resolveClientFileUrl } from '../utils/fileAccess';
 
 import { 
@@ -102,6 +103,7 @@ const AddClientContent = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const navigate = useNavigate();
   const location = useLocation();
+  const returnTo = location.state?.from || '/dashboard';
   const isViewMode = !!location.state?.viewMode;
   const isAuditMode = location.pathname.includes('/audit');
   const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
@@ -167,6 +169,7 @@ const AddClientContent = () => {
   const [success, setSuccess] = useState('');
   const [clientDocuments, setClientDocuments] = useState([]);
   const [fullClientData, setFullClientData] = useState(null);
+  const [currentClientStatus, setCurrentClientStatus] = useState(id ? 'DRAFT' : '');
   const [postValidationData, setPostValidationData] = useState([]);
   const [postValidationSearch, setPostValidationSearch] = useState('');
   const [postValidationPagination, setPostValidationPagination] = useState({
@@ -359,7 +362,9 @@ const AddClientContent = () => {
   useEffect(() => {
     if (id) {
       setLoading(true);
-      api.get(API_ENDPOINTS.CLIENT.GET_BY_ID(id))
+      api.get(API_ENDPOINTS.CLIENT.GET_BY_ID(id), {
+        params: isAuditMode ? { view: 'audit' } : undefined,
+      })
         .then(response => {
           if (response.data.success) {
             const client = response.data.data;
@@ -380,6 +385,7 @@ const AddClientContent = () => {
             
             // --- RESUME & PROGRESS LOGIC ---
             const status = client.clientStatus || 'DRAFT';
+            setCurrentClientStatus(status);
             const lastStep = (client.lastCompletedStep !== undefined && client.lastCompletedStep !== null) 
                 ? client.lastCompletedStep 
                 : (id ? 4 : 0);
@@ -682,7 +688,7 @@ const AddClientContent = () => {
         })
         .finally(() => setLoading(false));
     }
-  }, [id]);
+  }, [id, isAuditMode]);
 
   // Form State is now managed by ClientContext
 
@@ -1352,6 +1358,14 @@ const AddClientContent = () => {
             .map(normalizeCtoRegulationValue)
             .filter(Boolean);
 
+        const submitTargetStatus = processPreValidation
+            ? (clientId
+                ? (currentClientStatus === 'PRE_VALIDATION' || currentClientStatus === 'AUDIT'
+                    ? undefined
+                    : 'SUBMITTED')
+                : 'SUBMITTED')
+            : (!clientId ? 'DRAFT' : undefined);
+
         const clientData = {
             clientName: formData.clientName,
             tradeName: formData.tradeName,
@@ -1515,7 +1529,7 @@ const AddClientContent = () => {
                 })
             },
             lastCompletedStep: 4,
-            ...(processPreValidation ? { clientStatus: 'SUBMITTED' } : (!clientId ? { clientStatus: 'DRAFT' } : {}))
+            ...(submitTargetStatus ? { clientStatus: submitTargetStatus } : {})
         };
 
         let response;
@@ -1528,6 +1542,7 @@ const AddClientContent = () => {
         if (response.data.success) {
             setIsSubmitModalOpen(false);
             const id = clientId || response.data.data._id;
+            setCurrentClientStatus(response.data?.data?.clientStatus || submitTargetStatus || currentClientStatus);
             // Handle File Uploads
             const upload = (file, type, num, date) => {
                 if (!file) return;
@@ -2401,24 +2416,18 @@ const AddClientContent = () => {
       }
 
       try {
-          const results = [];
           const consentConfigs = [
               // { type: 'CTE', list: fullClientData.productionFacility.cteDetailsList || [] }, // CTE excluded as per requirement
               { type: 'CTO', list: fullClientData.productionFacility.ctoDetailsList || [] }
           ];
 
-          for (const config of consentConfigs) {
-              const consentType = config.type;
-              const consents = config.list;
+          const facilityPromises = consentConfigs.flatMap(({ type: consentType, list }) =>
+              (list || []).map((facility) =>
+                  buildPostValidationRowsForFacility(consentType, facility)
+              )
+          );
 
-              for (const facility of consents) {
-                  const facilityRows = await buildPostValidationRowsForFacility(consentType, facility);
-                  facilityRows.forEach((rowData) => {
-                      results.push(rowData);
-                  });
-              }
-          }
-
+          const results = (await Promise.all(facilityPromises)).flat();
           const deduped = dedupePostValidationRows(results);
           setPostValidationData(deduped);
           setPostValidationPagination((prev) => ({
@@ -2570,61 +2579,57 @@ const AddClientContent = () => {
               { type: 'CTO', list: fullClientData.productionFacility.ctoDetailsList || [] }
           ];
 
-          const allRows = [];
+          const procurementPromises = consentConfigs.flatMap(({ type: consentType, list }) =>
+              (list || [])
+                  .filter((facility) => facility && facility._id)
+                  .map((facility) =>
+                      api.get(API_ENDPOINTS.CLIENT.MONTHLY_PROCUREMENT(clientId), {
+                          params: { type: consentType, itemId: facility._id }
+                      })
+                  )
+          );
 
-          for (const config of consentConfigs) {
-              const consentType = config.type;
-              const consents = config.list || [];
+          const responses = await Promise.all(procurementPromises);
+          const allRows = responses.flatMap((res) => {
+              const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+              return rows.map((row) => {
+                  const rawMonth = (row.monthName || '').toString().trim();
+                  const monthLabel = rawMonth || 'Unknown';
+                  const monthIndex = getMonthIndexForLabel(monthLabel);
+                  const purchase = Number(row.monthlyPurchaseMt) || 0;
+                  const recycled = Number(row.recycledQty) || 0;
+                  const category = (row.category || '').toString().trim() || 'Unknown';
+                  
+                  let polymer = '';
+                  if (isProducer) {
+                      polymer = (row.polymerType || row.componentPolymer || '').toString().trim() || 'Unknown';
+                  } else {
+                      polymer = (row.componentPolymer || row.polymerType || '').toString().trim() || 'Unknown';
+                  }
+                  
+                  const recycledPolymerUsed = (row.recycledPolymerUsed || '').toString().trim() || 'Unknown';
+                  const quarter = (row.quarter || '').toString().trim() || 'Unknown';
+                  const yearlyQuarter = (row.yearlyQuarter || '').toString().trim() || 'Unknown';
+                  let half = 'Unknown';
+                  if (monthIndex !== 99) {
+                      half = monthIndex <= 5 ? 'H1' : 'H2';
+                  }
 
-              for (const facility of consents) {
-                  if (!facility || !facility._id) continue;
-                  const itemId = facility._id;
-                  const res = await api.get(API_ENDPOINTS.CLIENT.MONTHLY_PROCUREMENT(clientId), {
-                      params: { type: consentType, itemId }
-                  });
-                  const rows = Array.isArray(res.data?.data) ? res.data.data : [];
-
-                  rows.forEach((row) => {
-                      const rawMonth = (row.monthName || '').toString().trim();
-                      const monthLabel = rawMonth || 'Unknown';
-                      const monthIndex = getMonthIndexForLabel(monthLabel);
-                      const purchase = Number(row.monthlyPurchaseMt) || 0;
-                      const recycled = Number(row.recycledQty) || 0;
-                      const category = (row.category || '').toString().trim() || 'Unknown';
-                      
-                      // For Producer, prefer the matching component's polymerType or the row's polymerType
-                      let polymer = '';
-                      if (isProducer) {
-                          polymer = (row.polymerType || row.componentPolymer || '').toString().trim() || 'Unknown';
-                      } else {
-                          polymer = (row.componentPolymer || row.polymerType || '').toString().trim() || 'Unknown';
-                      }
-                      
-                      const recycledPolymerUsed = (row.recycledPolymerUsed || '').toString().trim() || 'Unknown';
-                      
-                      const quarter = (row.quarter || '').toString().trim() || 'Unknown';
-                      const yearlyQuarter = (row.yearlyQuarter || '').toString().trim() || 'Unknown';
-                      let half = 'Unknown';
-                      if (monthIndex !== 99) {
-                          half = monthIndex <= 5 ? 'H1' : 'H2';
-                      }
-
-                      allRows.push({
-                          ...row,
-                          monthLabel,
-                          monthIndex,
-                          monthlyPurchaseMt: purchase,
-                          recycledQty: recycled,
-                          category,
-                          polymer,
-                          recycledPolymerUsed,
-                          quarter,
-                          yearlyQuarter,
-                          half,
-                      });
-                  });
-              }
-          }
+                  return {
+                      ...row,
+                      monthLabel,
+                      monthIndex,
+                      monthlyPurchaseMt: purchase,
+                      recycledQty: recycled,
+                      category,
+                      polymer,
+                      recycledPolymerUsed,
+                      quarter,
+                      yearlyQuarter,
+                      half,
+                  };
+              });
+          });
 
           setMonthlyProcurementRaw(allRows);
         const summaryArray = buildMonthlyProcurementSummary(allRows, monthlyProcurementFilters, monthlyProcurementViewMode);
@@ -2682,9 +2687,10 @@ const AddClientContent = () => {
   };
 
   useEffect(() => {
+      if (activeTab !== 'Post -Audit Check') return;
       fetchPostValidationData();
       fetchMonthlyProcurementSummary();
-  }, [clientId, fullClientData]);
+  }, [activeTab, clientId, fullClientData]);
 
   useEffect(() => {
       if (!clientId) return;
@@ -3605,6 +3611,7 @@ const AddClientContent = () => {
                         onClick={() => handleSaveSkuCompliance(record)}
                         className="bg-green-600 hover:bg-green-700 border-green-600 h-8 w-8 flex items-center justify-center rounded-md shadow-sm"
                         title="Save Row"
+                        aria-label={`Save SKU compliance row for ${record?.skuCode || 'current item'}`}
                     />
                 </div>
             )
@@ -3742,6 +3749,23 @@ const AddClientContent = () => {
       { id: 'Company Documents', label: 'Company Documents' },
       { id: 'CTE & CTO/CCA', label: 'CTE & CTO/CCA' }
   ]), []);
+  const currentClientStepMeta = clientSteps[Math.max(currentStep - 1, 0)] || clientSteps[0];
+  const clientStepItems = useMemo(
+    () =>
+      clientSteps.map((step, index) => {
+        const stepNumber = index + 1;
+        let status = "wait";
+        if (stepNumber < currentStep || stepNumber <= completedStep) status = "finish";
+        if (stepNumber === currentStep) status = "process";
+        if (stepNumber > completedStep + 1) status = "wait";
+        return {
+          title: step.label,
+          status,
+        };
+      }),
+    [clientSteps, completedStep, currentStep],
+  );
+  const progressPercent = Math.round((Math.min(completedStep, clientSteps.length) / clientSteps.length) * 100);
 
   return (
     <div className="-mt-2 md:-mt-4 px-2 md:px-4 pb-2 md:pb-4 bg-gray-50 min-h-screen">
@@ -3828,9 +3852,7 @@ const AddClientContent = () => {
         <div className="sticky top-0 z-30 bg-white pt-0 pb-3 space-y-3">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3 flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                  <button onClick={() => navigate('/dashboard')} className="group flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-all hover:bg-primary-600 hover:text-white">
-                    <FaArrowLeft />
-                  </button>
+                  <BackButton onClick={() => navigate(returnTo)} title="Back to previous page" />
                   {clientId && formData.clientName && (
                       <div className="hidden md:block text-left px-1 border-l border-gray-200 pl-4 ml-2">
                           <div>
@@ -3930,13 +3952,49 @@ const AddClientContent = () => {
           </div>
         </div>
 
-        <GsapStepTransition
+        <GsapPageTransition
           className="mt-4 space-y-6"
           transitionKey={`${activeTab}-${currentStep}-${postValidationActiveTab}`}
         >
 
         {activeTab === 'Client Data' ? (
             <>
+            <div className="mb-6 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-orange-50 via-white to-emerald-50">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-orange-600">
+                                Client Onboarding Progress
+                            </p>
+                            <h3 className="mt-1 text-lg font-bold text-gray-900">
+                                Step {currentStep} of {clientSteps.length}: {currentClientStepMeta?.label}
+                            </h3>
+                            <p className="mt-1 text-sm text-gray-600">
+                                Complete each section in order to unlock pre-validation and audit workflows.
+                            </p>
+                        </div>
+                        <div className="rounded-xl border border-orange-100 bg-white px-4 py-3 text-left shadow-sm">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">
+                                Overall Completion
+                            </p>
+                            <p className="mt-1 text-2xl font-bold text-gray-900">
+                                {progressPercent}%
+                            </p>
+                            <p className="text-xs text-gray-500">
+                                {Math.min(completedStep, clientSteps.length)} of {clientSteps.length} steps completed
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div className="px-4 py-5 md:px-6">
+                    <Steps
+                        current={Math.max(currentStep - 1, 0)}
+                        responsive
+                        items={clientStepItems}
+                        className="client-onboarding-steps"
+                    />
+                </div>
+            </div>
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-8">
                 <div className="border-b border-gray-200 px-6 py-4 bg-white">
                     <div className="flex w-full space-x-1 bg-gray-100 p-1 rounded-lg">
@@ -4126,6 +4184,7 @@ const AddClientContent = () => {
         ) : activeTab === 'Audit' ? (
             <Audit 
                 clientId={clientId}
+                clientData={fullClientData}
                 setIsAuditComplete={setIsAuditComplete}
                 setActiveTab={setActiveTab}
                 wasteType={formData.wasteType}
@@ -4203,7 +4262,7 @@ const AddClientContent = () => {
                 <div className="text-xl">Content for {activeTab} is coming soon.</div>
             </div>
         )}
-      </GsapStepTransition>
+      </GsapPageTransition>
 
       <Modal
         open={remarkModal.visible}

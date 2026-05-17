@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Table, Button, Tooltip, Upload, Popconfirm, Select, Input, Card, Tag, Modal } from 'antd';
 import { SaveOutlined, DeleteOutlined, CheckCircleFilled, FileExcelOutlined, LoadingOutlined, PlusOutlined, FileImageOutlined, UploadOutlined, UndoOutlined, CodeSandboxOutlined, DownloadOutlined, SyncOutlined, DownOutlined, RightOutlined, HistoryOutlined, ArrowRightOutlined, ExclamationCircleFilled } from '@ant-design/icons';
 import Pagination from '../../../components/Pagination';
@@ -9,6 +9,7 @@ import BulkUploadControl from '../../../components/common/BulkUploadControl';
 
 import { 
   PACKAGING_TYPES, 
+  INDUSTRY_CATEGORY_OPTIONS,
   POLYMER_TYPES, 
   CATEGORIES, 
   CATEGORY_II_TYPE_OPTIONS, 
@@ -23,6 +24,10 @@ const ProductCompliance = ({
     subTab,
     setSubTab,
     isManager,
+    handleCompleteExcelUpload,
+    handleCompleteTemplateDownload,
+    handleSaveCompleteWorkbook,
+    isSavingCompleteWorkbook,
     handleExcelUpload,
     handleProductTemplateDownload,
     handleProductExport,
@@ -93,8 +98,10 @@ const ProductCompliance = ({
     setComponentItemsPerPage,
 
     handleMonthlyExcelUpload,
+    handleMonthlyBulkSave,
     handleMonthlyTemplateDownload,
     handleMonthlyExport,
+    isMonthlyBulkSaving,
     monthlyRows,
     setMonthlyRows,
     lastSavedMonthlyRows,
@@ -149,6 +156,111 @@ const ProductCompliance = ({
 }) => {
     const isProducer = client?.entityType === 'Producer';
     const inputValue = (value, fallback = '') => (value ?? fallback);
+    const monthlyProcurementMonthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const parseFlexibleDate = (value) => {
+        if (!value) return null;
+        if (value instanceof Date && !Number.isNaN(value.getTime())) {
+            return value;
+        }
+
+        const text = String(value).trim();
+        if (!text || text === '-') return null;
+
+        const dayFirstMatch = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+        const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+
+        if (dayFirstMatch) {
+            const [, day, month, year] = dayFirstMatch;
+            const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        if (isoMatch) {
+            const [, year, month, day] = isoMatch;
+            const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        const parsed = new Date(text);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+    const isPastDate = (value) => {
+        const parsedDate = parseFlexibleDate(value);
+        if (!parsedDate) return false;
+
+        const compareDate = new Date(parsedDate);
+        compareDate.setHours(0, 0, 0, 0);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        return compareDate.getTime() < today.getTime();
+    };
+    const normalizeInvoiceDateInput = (value) => {
+        if (value === undefined || value === null || value === '') {
+            return { displayValue: '', monthName: '', quarter: '', yearlyQuarter: '' };
+        }
+        const rawValue = typeof value === 'string' ? value.trim() : value;
+        if (rawValue === 'Not Applicable') {
+            return {
+                displayValue: 'Not Applicable',
+                monthName: 'Not Applicable',
+                quarter: 'Not Applicable',
+                yearlyQuarter: 'Not Applicable'
+            };
+        }
+
+        let day;
+        let month;
+        let year;
+        const text = String(rawValue).trim();
+        const dayFirstMatch = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+        const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+
+        if (dayFirstMatch) {
+            day = parseInt(dayFirstMatch[1], 10);
+            month = parseInt(dayFirstMatch[2], 10);
+            year = parseInt(dayFirstMatch[3], 10);
+        } else if (isoMatch) {
+            year = parseInt(isoMatch[1], 10);
+            month = parseInt(isoMatch[2], 10);
+            day = parseInt(isoMatch[3], 10);
+        } else {
+            const parsed = new Date(text);
+            if (!Number.isNaN(parsed.getTime())) {
+                day = parsed.getUTCDate();
+                month = parsed.getUTCMonth() + 1;
+                year = parsed.getUTCFullYear();
+            }
+        }
+
+        if (
+            !Number.isInteger(day) ||
+            !Number.isInteger(month) ||
+            !Number.isInteger(year) ||
+            month < 1 ||
+            month > 12 ||
+            day < 1 ||
+            day > 31
+        ) {
+            return {
+                displayValue: text,
+                monthName: '',
+                quarter: '',
+                yearlyQuarter: ''
+            };
+        }
+
+        return {
+            displayValue: `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}`,
+            monthName: monthlyProcurementMonthNames[month - 1] || '',
+            quarter: month >= 4 && month <= 6 ? 'Q1' : month >= 7 && month <= 9 ? 'Q2' : month >= 10 && month <= 12 ? 'Q3' : 'Q4',
+            yearlyQuarter: month >= 4 && month <= 9 ? 'H1' : 'H2'
+        };
+    };
 
     const supplierComplianceMeta = useMemo(() => {
         const rows = Array.isArray(supplierRows) ? supplierRows : [];
@@ -186,6 +298,27 @@ const ProductCompliance = ({
 
         return meta;
     }, [supplierRows]);
+    const [isCompactViewport, setIsCompactViewport] = useState(() =>
+        typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+    );
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+
+        const mediaQuery = window.matchMedia('(max-width: 1023px)');
+        const updateCompactViewport = (event) => {
+            setIsCompactViewport(event.matches);
+        };
+
+        setIsCompactViewport(mediaQuery.matches);
+
+        if (typeof mediaQuery.addEventListener === 'function') {
+            mediaQuery.addEventListener('change', updateCompactViewport);
+            return () => mediaQuery.removeEventListener('change', updateCompactViewport);
+        }
+
+        mediaQuery.addListener(updateCompactViewport);
+        return () => mediaQuery.removeListener(updateCompactViewport);
+    }, []);
 
     // Document Viewer State
     const [viewerOpen, setViewerOpen] = useState(false);
@@ -209,6 +342,122 @@ const ProductCompliance = ({
     
     const [savingMonthlyRow, setSavingMonthlyRow] = useState(null);
     const [isChangeSummaryExpanded, setIsChangeSummaryExpanded] = useState(false);
+    const productOptionalColumnOptions = useMemo(() => {
+        const labels = [
+            'SKU Description',
+            'SKU UOM',
+            'Product Image',
+            'Generate Component Code',
+            'System Code',
+            'Component Description',
+            'Supplier State',
+            'Supplier Type',
+            'Supplier Category',
+            'Generate Supplier Code',
+            'Supplier Code',
+            'Component Image'
+        ];
+
+        return labels
+            .filter((label) => {
+                if (isProducer && ['SKU Description', 'SKU UOM', 'Product Image'].includes(label)) {
+                    return false;
+                }
+                return !isManager || label !== 'System Code';
+            })
+            .map((label) => ({ label, value: label }));
+    }, [isManager, isProducer]);
+    const monthlyOptionalColumnOptions = useMemo(() => {
+        const labels = [
+            'Supplier Category',
+            'Food Grade',
+            'Component Description',
+            'Polymer Type',
+            'Recycled Polymer Used',
+            'Component Polymer',
+            'Category of EPR',
+            'Date of invoice',
+            'Purchase Qty',
+            'UOM',
+            'Per Piece Weight',
+            'PPW UOM',
+            'Recycled %',
+            'Recycled QTY',
+            'Recycled Rate',
+            'Recycled Qrt Amount',
+            'Virgin Rate',
+            'Virgin Qty',
+            'Virgin Qty Amount',
+            'RC % Mentioned'
+        ];
+
+        return labels
+            .filter((label) => {
+                if (isProducer && label === 'Component Polymer') return false;
+                if (!isProducer && ['Supplier Category', 'Food Grade', 'Recycled Polymer Used'].includes(label)) return false;
+                return !isManager || label !== 'System Code';
+            })
+            .map((label) => ({ label, value: label }));
+    }, [isManager, isProducer]);
+    const componentOptionalColumnOptions = useMemo(() => {
+        const labels = [
+            'Component Descrecption',
+            'Supplier Name',
+            'Food Grade',
+            'Polymer Type',
+            'Recycled Polymer Used',
+            'Component Polymer',
+            'Polymer Code',
+            'Category of EPR',
+            'Category II Type',
+            'Container Capacity',
+            'Monolayer / Multilayer',
+            'Thickness (Micron)'
+        ];
+
+        return labels
+            .filter((label) => {
+                if (isProducer && ['Food Grade', 'Component Polymer'].includes(label)) return false;
+                if (!isProducer && label === 'Recycled Polymer Used') return false;
+                return !isManager || label !== 'System Code';
+            })
+            .map((label) => ({ label, value: label }));
+    }, [isManager, isProducer]);
+    const compactProductColumns = [
+        'SKU Description',
+        'Generate Component Code',
+        'Component Description',
+        'System Code',
+        'Supplier Name'
+    ];
+    const compactMonthlyColumns = [
+        'Component Description',
+        'Category of EPR',
+        'Date of invoice',
+        'Purchase Qty',
+        'UOM',
+        'PPW UOM',
+        'Recycled %'
+    ];
+    const compactComponentColumns = [
+        'Component Descrecption',
+        'Supplier Name',
+        'Polymer Type',
+        'Category of EPR',
+        'Thickness (Micron)'
+    ];
+    const [visibleProductColumns, setVisibleProductColumns] = useState(() =>
+        (isCompactViewport ? compactProductColumns : productOptionalColumnOptions.map((option) => option.value))
+            .filter((value) => productOptionalColumnOptions.some((option) => option.value === value))
+    );
+    const [visibleMonthlyColumns, setVisibleMonthlyColumns] = useState(() =>
+        (isCompactViewport ? compactMonthlyColumns : monthlyOptionalColumnOptions.map((option) => option.value))
+            .filter((value) => monthlyOptionalColumnOptions.some((option) => option.value === value))
+    );
+    const [visibleComponentColumns, setVisibleComponentColumns] = useState(() =>
+        (isCompactViewport ? compactComponentColumns : componentOptionalColumnOptions.map((option) => option.value))
+            .filter((value) => componentOptionalColumnOptions.some((option) => option.value === value))
+    );
     
     // Tab switching logic for unsaved changes
     const [pendingTab, setPendingTab] = useState(null);
@@ -332,6 +581,93 @@ const ProductCompliance = ({
         setPendingTab(null);
     };
 
+    const getStickyColumnProps = (tableKey, label, isHeader = false) => {
+        const stickyMaps = {
+            product: isProducer
+                ? {
+                    '#': { left: 0, minWidth: 48 },
+                    'Packaging Type': { left: 48, minWidth: 150 },
+                    'Industry Category': { left: 198, minWidth: 150 },
+                    'SKU code': { left: 348, minWidth: 120 },
+                    'Client Name': { left: 468, minWidth: 180 },
+                    'State': { left: 648, minWidth: 140, edge: true },
+                }
+                : {
+                    '#': { left: 0, minWidth: 48 },
+                    'Packaging Type': { left: 48, minWidth: 150 },
+                    'Industry Category': { left: 198, minWidth: 150 },
+                    'SKU code': { left: 348, minWidth: 120, edge: true },
+                },
+            supplier: {
+                '#': { left: 0, minWidth: 48 },
+                'System Code': { left: 48, minWidth: 250 },
+                'Component Code': { left: 298, minWidth: 140, edge: true },
+            },
+            component: isProducer
+                ? {
+                    '#': { left: 0, minWidth: 48 },
+                    'System Code': { left: 48, minWidth: 250 },
+                    'SKU Code': { left: 298, minWidth: 150 },
+                    'Component code': { left: 448, minWidth: 140, edge: true },
+                }
+                : {
+                    '#': { left: 0, minWidth: 48 },
+                    'System Code': { left: 48, minWidth: 250 },
+                    'SKU Code': { left: 298, minWidth: 150 },
+                    'Component code': { left: 448, minWidth: 140, edge: true },
+                },
+            monthly: isProducer
+                ? {
+                    '#': { left: 0, minWidth: 48 },
+                    'System Code': { left: 48, minWidth: 220 },
+                    'Supplier Name': { left: 268, minWidth: 180, edge: true },
+                }
+                : {
+                    '#': { left: 0, minWidth: 48 },
+                    'System Code': { left: 48, minWidth: 220 },
+                    'SKU Code': { left: 268, minWidth: 140 },
+                    'Supplier Name': { left: 408, minWidth: 180, edge: true },
+                },
+            recycled: {
+                '#': { left: 0, minWidth: 48 },
+                'System Code': { left: 48, minWidth: 250 },
+                'Component Code': { left: 298, minWidth: 150, edge: true },
+            },
+        };
+
+        const sticky = stickyMaps[tableKey]?.[label];
+        if (!sticky) return { className: '', style: undefined };
+
+        return {
+            className: `sticky ${isHeader ? 'z-30' : 'z-20'} ${sticky.edge ? 'shadow-[4px_0_10px_rgba(15,23,42,0.08)]' : ''}`,
+            style: {
+                left: `${sticky.left}px`,
+                minWidth: `${sticky.minWidth}px`,
+                background: isHeader
+                    ? (isManager ? '#f0fdf4' : '#f9fafb')
+                    : '#ffffff',
+            },
+        };
+    };
+    const productPinnedLabels = isProducer
+        ? ['Packaging Type', 'Industry Category', 'SKU code', 'Client Name', 'State']
+        : ['Packaging Type', 'Industry Category', 'SKU code'];
+    const monthlyPinnedLabels = isProducer
+        ? ['System Code', 'Supplier Name']
+        : ['System Code', 'SKU Code', 'Supplier Name'];
+    const componentPinnedLabels = isProducer
+        ? ['System Code', 'SKU Code', 'Component code']
+        : ['System Code', 'SKU Code', 'Component code'];
+    const isProductColumnVisible = (label) =>
+        !productOptionalColumnOptions.some((option) => option.value === label) ||
+        visibleProductColumns.includes(label);
+    const isMonthlyColumnVisible = (label) =>
+        !monthlyOptionalColumnOptions.some((option) => option.value === label) ||
+        visibleMonthlyColumns.includes(label);
+    const isComponentColumnVisible = (label) =>
+        !componentOptionalColumnOptions.some((option) => option.value === label) ||
+        visibleComponentColumns.includes(label);
+
     return (
             <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-2">
                 {/* Unsaved Changes Modal */}
@@ -398,16 +734,51 @@ const ProductCompliance = ({
                 <>
                 <div className="flex justify-between items-center mb-3">
                     <h2 className="text-lg font-bold text-gray-800">Product Compliance</h2>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        {productRows.length > 0 && (
+                            <div className="min-w-[280px]">
+                                <Select
+                                    mode="multiple"
+                                    size="small"
+                                    value={visibleProductColumns}
+                                    onChange={setVisibleProductColumns}
+                                    options={productOptionalColumnOptions}
+                                    maxTagCount="responsive"
+                                    placeholder="Visible product columns"
+                                    className="w-full text-xs"
+                                />
+                            </div>
+                        )}
                         {!isManager && (
                         <>
+                        {subTab === 'product-compliance' && handleCompleteExcelUpload && (
+                            <BulkUploadControl
+                                onUpload={handleCompleteExcelUpload}
+                                onDownloadTemplate={handleCompleteTemplateDownload}
+                                uploadLabel="Import Complete Excel"
+                                templateLabel="Complete Template"
+                            />
+                        )}
+                        {subTab === 'product-compliance' && handleSaveCompleteWorkbook && (
+                            <button
+                                type="button"
+                                onClick={handleSaveCompleteWorkbook}
+                                disabled={isSavingCompleteWorkbook}
+                                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                aria-label="Save complete workbook"
+                            >
+                                {isSavingCompleteWorkbook ? <LoadingOutlined spin /> : <SaveOutlined />} Save Complete Workbook
+                            </button>
+                        )}
                         <BulkUploadControl 
                             onUpload={handleExcelUpload}
                             onDownloadTemplate={handleProductTemplateDownload}
                         />
                         <button 
+                            type="button"
                             onClick={handleProductExport} 
                             className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
+                            aria-label="Export product compliance rows to Excel"
                         >
                             <FileExcelOutlined /> Export Excel
                         </button>
@@ -418,26 +789,56 @@ const ProductCompliance = ({
                             cancelText="No"
                         >
                             <button 
+                                    type="button"
                                 disabled={isBulkSaving || productRows.length === 0}
                                 className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    aria-label="Delete all product compliance rows"
                             >
                                 <DeleteOutlined /> Delete All
                             </button>
                         </Popconfirm>
                         <button 
+                            type="button"
                             onClick={handleBulkSave} 
                             disabled={isBulkSaving}
                             className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label="Save all product compliance rows"
                         >
                             {isBulkSaving ? <LoadingOutlined spin /> : <SaveOutlined />} Save All
                         </button>
-                        <button onClick={addRow} className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs">
+                        <button
+                            type="button"
+                            onClick={addRow}
+                            className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs"
+                            aria-label="Add a new product compliance row"
+                        >
                             <PlusOutlined /> Add Product
                         </button>
                         </>
                         )}
                     </div>
                 </div>
+                {productRows.length > 0 && (
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-100 bg-primary-50/80 px-3 py-2 text-[11px] backdrop-blur-sm">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold uppercase tracking-[0.16em] text-primary-700">Wide Table Focus</span>
+                            <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-gray-600">
+                                {productRows.length} product rows
+                            </span>
+                            <span className="text-gray-500">Pinned identity columns:</span>
+                            {productPinnedLabels.map((label) => (
+                                <span key={label} className="rounded-full bg-white px-2 py-1 text-[10px] font-medium text-primary-700">
+                                    {label}
+                                </span>
+                            ))}
+                        </div>
+                        <div className="text-[11px] text-gray-500">
+                            {isCompactViewport
+                                ? 'Compact column preset is active for smaller screens. Use the selector to reveal more fields.'
+                                : 'Scroll horizontally for details, or hide non-essential columns from the selector.'}
+                        </div>
+                    </div>
+                )}
                 <div className={`${productRows.length === 0 ? 'hidden' : ''} overflow-x-auto border border-gray-200 rounded-xl shadow-sm`}>
                     <table className="min-w-full text-xs divide-y divide-gray-200 border-separate border-spacing-0">
                         <thead className={isManager ? "bg-green-50" : "bg-gray-50"}>
@@ -445,12 +846,12 @@ const ProductCompliance = ({
                                 {[
                                     { label: '#', width: 'w-12 text-center' },
                                     { label: 'Packaging Type', width: 'min-w-[150px]' },
+                                    { label: 'Industry Category', width: 'min-w-[150px]' },
+                                    { label: 'SKU code', width: 'min-w-[120px]' },
                                     ...(isProducer ? [
                                         { label: 'Client Name', width: 'min-w-[180px]' },
                                         { label: 'State', width: 'min-w-[140px]' }
                                     ] : []),
-                                    { label: 'Industry Category', width: 'min-w-[150px]' },
-                                    { label: 'SKU code', width: 'min-w-[120px]' },
                                     { label: 'SKU Description', width: 'min-w-[200px]' },
                                     { label: 'SKU UOM', width: 'min-w-[120px]' },
                                     { label: 'Product Image', width: 'min-w-[100px]' },
@@ -468,8 +869,6 @@ const ProductCompliance = ({
                                     { label: 'Actions', width: 'min-w-[100px]' }
                                 ].filter(h => {
                                     if (isProducer && [
-                                        'Industry Category',
-                                        'SKU code',
                                         'SKU Description',
                                         'SKU UOM',
                                         'Product Image'
@@ -477,11 +876,17 @@ const ProductCompliance = ({
                                         return false;
                                     }
                                     return !isManager || (h.label !== 'Actions' && h.label !== 'System Code');
-                                }).map((header) => (
-                                    <th key={header.label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 z-10 border-b border-gray-200 ${isManager ? "bg-green-50" : "bg-gray-50"} ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200' : ''}`}>
+                                }).filter((header) => isProductColumnVisible(header.label)).map((header) => {
+                                    const stickyColumn = getStickyColumnProps('product', header.label, true);
+                                    return (
+                                    <th
+                                        key={header.label}
+                                        className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 z-10 border-b border-gray-200 ${isManager ? "bg-green-50" : "bg-gray-50"} ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200' : ''} ${stickyColumn.className}`}
+                                        style={stickyColumn.style}
+                                    >
                                         {header.label}
                                     </th>
-                                ))}
+                                )})}
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -525,8 +930,16 @@ const ProductCompliance = ({
                                     componentImageChanged;
                                 return (
                                 <tr key={globalIndex} className="hover:bg-gray-50 transition-colors duration-150 group">
-                                    <td className="px-2 py-2 text-center text-xs text-black align-middle font-bold">{globalIndex + 1}</td>
-                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                    <td
+                                        className={`px-2 py-2 text-center text-xs text-black align-middle font-bold ${getStickyColumnProps('product', '#').className}`}
+                                        style={getStickyColumnProps('product', '#').style}
+                                    >
+                                        {globalIndex + 1}
+                                    </td>
+                                    <td
+                                        className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('product', 'Packaging Type').className}`}
+                                        style={getStickyColumnProps('product', 'Packaging Type').style}
+                                    >
                                         <div className="flex flex-col">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.packagingType || '-'}</div>
@@ -549,52 +962,10 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
-                                    {isProducer && (
-                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
-                                        <div className="flex flex-col">
-                                            {isManager ? (
-                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.clientName || '-'}</div>
-                                            ) : (
-                                            <input
-                                                className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${clientNameChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
-                                                placeholder="Client Name"
-                                                value={row.clientName || ''}
-                                                onChange={(e)=>handleRowChange(globalIndex,'clientName',e.target.value)}
-                                            />
-                                            )}
-                                            {clientNameChanged && (
-                                                <div className="mt-1 text-[9px] leading-tight">
-                                                    <div className="text-gray-500">Prev: {formatProductFieldValue(prevRow.clientName, 'clientName')}</div>
-                                                    <div className="text-primary-700 font-bold">Now: {formatProductFieldValue(row.clientName, 'clientName')}</div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </td>
-                                    )}
-                                    {isProducer && (
-                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
-                                        <div className="flex flex-col">
-                                            {isManager ? (
-                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.clientState || '-'}</div>
-                                            ) : (
-                                            <input
-                                                className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${clientStateChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
-                                                placeholder="State"
-                                                value={row.clientState || ''}
-                                                onChange={(e)=>handleRowChange(globalIndex,'clientState',e.target.value)}
-                                            />
-                                            )}
-                                            {clientStateChanged && (
-                                                <div className="mt-1 text-[9px] leading-tight">
-                                                    <div className="text-gray-500">Prev: {formatProductFieldValue(prevRow.clientState, 'clientState')}</div>
-                                                    <div className="text-primary-700 font-bold">Now: {formatProductFieldValue(row.clientState, 'clientState')}</div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </td>
-                                    )}
-                                    {!isProducer && (
-                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                    <td
+                                        className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('product', 'Industry Category').className}`}
+                                        style={getStickyColumnProps('product', 'Industry Category').style}
+                                    >
                                         <div className="flex flex-col">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.industryCategory || '-'}</div>
@@ -606,20 +977,7 @@ const ProductCompliance = ({
                                                 disabled={isManager}
                                             >
                                                 <option value="">Select</option>
-                                                {[
-                                                    "Food & Beverage Packaging",
-                                                    "Personal Care & Cosmetics",
-                                                    "Home Care / Household Products",
-                                                    "Pharmaceutical & Healthcare",
-                                                    "Agriculture & Allied Products",
-                                                    "Electrical & Electronics Packaging",
-                                                    "Industrial & Institutional Packaging",
-                                                    "Retail & Carry Bags",
-                                                    "Transport / Secondary / Tertiary Packaging",
-                                                    "Consumer Durables Packaging",
-                                                    "Multi-Layered Plastic (MLP) Packaging",
-                                                    "Others / Miscellaneous Plastics"
-                                                ].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                {INDUSTRY_CATEGORY_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                                             </select>
                                             )}
                                             {industryCategoryChanged && (
@@ -630,9 +988,10 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
-                                    )}
-                                    {!isProducer && (
-                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                    <td
+                                        className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('product', 'SKU code').className}`}
+                                        style={getStickyColumnProps('product', 'SKU code').style}
+                                    >
                                         <div className="flex flex-col">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.skuCode || '-'}</div>
@@ -654,8 +1013,57 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    {isProducer && (
+                                    <td
+                                        className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('product', 'Client Name').className}`}
+                                        style={getStickyColumnProps('product', 'Client Name').style}
+                                    >
+                                        <div className="flex flex-col">
+                                            {isManager ? (
+                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.clientName || '-'}</div>
+                                            ) : (
+                                            <input
+                                                className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${clientNameChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
+                                                placeholder="Client Name"
+                                                value={row.clientName || ''}
+                                                onChange={(e)=>handleRowChange(globalIndex,'clientName',e.target.value)}
+                                            />
+                                            )}
+                                            {clientNameChanged && (
+                                                <div className="mt-1 text-[9px] leading-tight">
+                                                    <div className="text-gray-500">Prev: {formatProductFieldValue(prevRow.clientName, 'clientName')}</div>
+                                                    <div className="text-primary-700 font-bold">Now: {formatProductFieldValue(row.clientName, 'clientName')}</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
                                     )}
-                                    {!isProducer && (
+                                    {isProducer && (
+                                    <td
+                                        className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('product', 'State').className}`}
+                                        style={getStickyColumnProps('product', 'State').style}
+                                    >
+                                        <div className="flex flex-col">
+                                            {isManager ? (
+                                                <div className="text-center text-xs text-gray-700 py-1.5">{row.clientState || '-'}</div>
+                                            ) : (
+                                            <input
+                                                className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${clientStateChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
+                                                placeholder="State"
+                                                value={row.clientState || ''}
+                                                onChange={(e)=>handleRowChange(globalIndex,'clientState',e.target.value)}
+                                            />
+                                            )}
+                                            {clientStateChanged && (
+                                                <div className="mt-1 text-[9px] leading-tight">
+                                                    <div className="text-gray-500">Prev: {formatProductFieldValue(prevRow.clientState, 'clientState')}</div>
+                                                    <div className="text-primary-700 font-bold">Now: {formatProductFieldValue(row.clientState, 'clientState')}</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    )}
+                                    {!isProducer && isProductColumnVisible('SKU Description') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -679,7 +1087,7 @@ const ProductCompliance = ({
                                         </div>
                                     </td>
                                     )}
-                                    {!isProducer && (
+                                    {!isProducer && isProductColumnVisible('SKU UOM') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -703,7 +1111,7 @@ const ProductCompliance = ({
                                         </div>
                                     </td>
                                     )}
-                                    {!isProducer && (
+                                    {!isProducer && isProductColumnVisible('Product Image') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col items-center justify-center">
                                             {!isManager && (
@@ -730,9 +1138,11 @@ const ProductCompliance = ({
                                                     </div>
                                                     <div className="flex flex-col gap-1">
                                                         <button 
+                                                            type="button"
                                                             onClick={() => handleViewDocument(row.productImage, 'Product Image', 'Product Image')}
                                                             className="text-[10px] font-bold text-primary-600 hover:text-primary-800 flex items-center gap-1 leading-none"
                                                             title="View Image"
+                                                            aria-label={`View product image for row ${globalIndex + 1}`}
                                                         >
                                                             View
                                                         </button>
@@ -752,6 +1162,7 @@ const ProductCompliance = ({
                                                 <label 
                                                     htmlFor={`product-image-${globalIndex}`} 
                                                     className={`cursor-pointer flex flex-col items-center justify-center w-20 py-1.5 border border-dashed rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-all group ${productImageChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
+                                                    aria-label={`Upload product image for row ${globalIndex + 1}`}
                                                 >
                                                     <UploadOutlined className="text-gray-400 group-hover:text-primary-500 mb-0.5" />
                                                     <span className="text-[9px] font-medium text-gray-500 group-hover:text-primary-600">Upload</span>
@@ -767,6 +1178,7 @@ const ProductCompliance = ({
                                         </div>
                                     </td>
                                     )}
+                                    {isProductColumnVisible('Generate Component Code') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -784,6 +1196,7 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -805,6 +1218,7 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    {isProductColumnVisible('System Code') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -825,6 +1239,8 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
+                                    {isProductColumnVisible('Component Description') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -845,6 +1261,7 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -865,6 +1282,7 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    {isProductColumnVisible('Supplier State') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -889,6 +1307,8 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
+                                    {isProductColumnVisible('Supplier Type') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -907,6 +1327,7 @@ const ProductCompliance = ({
                                                         <option value="Importer">Importer</option>
                                                         <option value="Producer">Producer</option>
                                                         <option value="Brand Owner">Brand Owner</option>
+                                                        <option value="PWP">PWP</option>
                                                         <option value="Seller">Seller</option>
                                                     </>
                                                 ) : (
@@ -927,6 +1348,8 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
+                                    {isProductColumnVisible('Supplier Category') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -961,6 +1384,8 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
+                                    {isProductColumnVisible('Generate Supplier Code') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -983,6 +1408,8 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
+                                    {isProductColumnVisible('Supplier Code') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col">
                                             {isManager ? (
@@ -1004,6 +1431,8 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
+                                    {isProductColumnVisible('Component Image') && (
                                     <td className="px-2 py-2 whitespace-nowrap align-middle">
                                         <div className="flex flex-col items-center justify-center">
                                             {!isManager && (
@@ -1030,9 +1459,11 @@ const ProductCompliance = ({
                                                     </div>
                                                     <div className="flex flex-col gap-1">
                                                         <button 
+                                                            type="button"
                                                             onClick={() => handleViewDocument(row.componentImage, 'Component Image', 'Component Image')}
                                                             className="text-[10px] font-bold text-primary-600 hover:text-primary-800 flex items-center gap-1 leading-none"
                                                             title="View Image"
+                                                            aria-label={`View component image for row ${globalIndex + 1}`}
                                                         >
                                                             View
                                                         </button>
@@ -1052,6 +1483,7 @@ const ProductCompliance = ({
                                                 <label 
                                                     htmlFor={`component-image-${globalIndex}`} 
                                                     className={`cursor-pointer flex flex-col items-center justify-center w-20 py-1.5 border border-dashed rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-all group ${componentImageChanged ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-white'}`}
+                                                    aria-label={`Upload component image for row ${globalIndex + 1}`}
                                                 >
                                                     <UploadOutlined className="text-gray-400 group-hover:text-primary-500 mb-0.5" />
                                                     <span className="text-[9px] font-medium text-gray-500 group-hover:text-primary-600">Upload</span>
@@ -1066,8 +1498,9 @@ const ProductCompliance = ({
                                             )}
                                         </div>
                                     </td>
+                                    )}
                                     {!isManager && (
-                                    <td className={`px-2 py-2 whitespace-nowrap align-middle sticky right-0 border-l border-gray-100 group-hover:bg-gray-50 ${row._validationError ? 'bg-red-50' : 'bg-white'}`}>
+                                    <td className={`px-2 py-2 whitespace-nowrap align-middle sticky right-0 border-l border-gray-100 group-hover:bg-gray-50 shadow-[-4px_0_10px_rgba(15,23,42,0.08)] ${row._validationError ? 'bg-red-50' : 'bg-white'}`}>
                                         <div className="flex items-center justify-center gap-2">
                                             {row._validationError && (
                                                 <Tooltip title={row._validationError}>
@@ -1082,26 +1515,40 @@ const ProductCompliance = ({
                                                 </span>
                                             )}
                                             <button
+                                                type="button"
                                                 onClick={() => saveRow(globalIndex)}
                                                 className="p-1.5 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all hover:scale-110"
                                                 title="Save Row"
+                                                aria-label={`Save product row ${globalIndex + 1}`}
                                             >
                                                 {savingRow === globalIndex ? <LoadingOutlined spin className="text-xs" /> : <SaveOutlined className="text-xs" />}
                                             </button>
                                             <button
+                                                type="button"
                                                 onClick={() => cancelRow(globalIndex)}
                                                 className="p-1.5 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all hover:scale-110"
                                                 title="Cancel Changes"
+                                                aria-label={`Cancel changes for product row ${globalIndex + 1}`}
                                             >
                                                 <UndoOutlined className="text-xs" />
                                             </button>
-                                            <button 
-                                                onClick={()=>removeRow(globalIndex)} 
-                                                className="p-1.5 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all hover:scale-110"
-                                                title="Remove Row"
+                                            <Popconfirm
+                                                title="Delete this product row?"
+                                                description="This removes the current row from the product compliance table."
+                                                onConfirm={() => removeRow(globalIndex)}
+                                                okText="Delete"
+                                                cancelText="Cancel"
+                                                okButtonProps={{ danger: true }}
                                             >
-                                                <DeleteOutlined className="text-xs" />
-                                            </button>
+                                                <button 
+                                                    type="button"
+                                                    className="p-1.5 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all hover:scale-110"
+                                                    title="Remove Row"
+                                                    aria-label={`Delete product row ${globalIndex + 1}`}
+                                                >
+                                                    <DeleteOutlined className="text-xs" />
+                                                </button>
+                                            </Popconfirm>
                                         </div>
                                     </td>
                                     )}
@@ -1192,12 +1639,14 @@ const ProductCompliance = ({
                                         if (h.label === 'Supplier Type' && !isProducer) return false;
                                         if (h.label === 'Application Type' && !isProducer) return false;
                                         if (h.label === 'FSSAI Valid Upto' && isProducer) return false;
-                                        return !isManager || (h.label !== 'Actions' && h.label !== 'System Code');
-                                    }).map((header) => (
-                                        <th key={header.label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${isManager ? "bg-green-50" : "bg-gray-50"} ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 z-20' : 'z-10'}`}>
+                                    return !isManager || (h.label !== 'Actions' && h.label !== 'System Code');
+                                    }).map((header) => {
+                                        const stickyColumn = getStickyColumnProps('supplier', header.label, true);
+                                        return (
+                                        <th key={header.label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${isManager ? "bg-green-50" : "bg-gray-50"} ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 z-20' : 'z-10'} ${stickyColumn.className}`} style={stickyColumn.style}>
                                             {header.label}
                                         </th>
-                                    ))}
+                                    )})}
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -1208,9 +1657,9 @@ const ProductCompliance = ({
                                     const disableFssai = !isFoodGradeFood;
                                     return (
                                     <tr key={idx} className="hover:bg-gray-50 transition-colors duration-150 group">
-                                        <td className="px-2 py-2 text-center text-xs text-black align-middle font-bold">{idx + 1}</td>
+                                        <td className={`px-2 py-2 text-center text-xs text-black align-middle font-bold ${getStickyColumnProps('supplier', '#').className}`} style={getStickyColumnProps('supplier', '#').style}>{idx + 1}</td>
                                         {!isManager && (
-                                        <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                        <td className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('supplier', 'System Code').className}`} style={getStickyColumnProps('supplier', 'System Code').style}>
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5 font-medium">
                                                     {systemCodeOptions.find(opt => opt.code === row.systemCode)?.label || row.systemCode || '-'}
@@ -1230,7 +1679,7 @@ const ProductCompliance = ({
                                             )}
                                         </td>
                                         )}
-                                        <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                        <td className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('supplier', 'Component Code').className}`} style={getStickyColumnProps('supplier', 'Component Code').style}>
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.componentCode || '-'}</div>
                                             ) : (
@@ -1399,29 +1848,43 @@ const ProductCompliance = ({
                                         </td>
                                         )}
                                         {!isManager && (
-                                        <td className="px-2 py-2 whitespace-nowrap align-middle sticky right-0 bg-white border-l border-gray-100 group-hover:bg-gray-50 min-w-[140px]">
+                                        <td className="px-2 py-2 whitespace-nowrap align-middle sticky right-0 bg-white border-l border-gray-100 group-hover:bg-gray-50 shadow-[-4px_0_10px_rgba(15,23,42,0.08)] min-w-[140px]">
                                             <div className="flex items-center justify-center gap-2">
                                                 <button
+                                                    type="button"
                                                     onClick={() => saveSupplierRow(idx)}
                                                     className="p-1 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all"
                                                     title="Save Row"
+                                                    aria-label={`Save supplier row ${idx + 1}`}
                                                 >
                                                     {savingSupplierRow === idx ? <LoadingOutlined spin className="text-xs" /> : <SaveOutlined className="text-xs" />}
                                                 </button>
                                                 <button
+                                                    type="button"
                                                     onClick={() => cancelSupplierRow(idx)}
                                                     className="p-1 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all"
                                                     title="Cancel Changes"
+                                                    aria-label={`Cancel changes for supplier row ${idx + 1}`}
                                                 >
                                                     <UndoOutlined className="text-xs" />
                                                 </button>
-                                                <button 
-                                                    onClick={()=>removeSupplierRow(idx)} 
-                                                    className="p-1 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all"
-                                                    title="Remove Row"
+                                                <Popconfirm
+                                                    title="Delete this supplier row?"
+                                                    description="This removes the current supplier row."
+                                                    onConfirm={() => removeSupplierRow(idx)}
+                                                    okText="Delete"
+                                                    cancelText="Cancel"
+                                                    okButtonProps={{ danger: true }}
                                                 >
-                                                    <DeleteOutlined className="text-xs" />
-                                                </button>
+                                                    <button 
+                                                        type="button"
+                                                        className="p-1 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all"
+                                                        title="Remove Row"
+                                                        aria-label={`Delete supplier row ${idx + 1}`}
+                                                    >
+                                                        <DeleteOutlined className="text-xs" />
+                                                    </button>
+                                                </Popconfirm>
                                             </div>
                                         </td>
                                         )}
@@ -1448,7 +1911,21 @@ const ProductCompliance = ({
                 <div>
                     <div className="flex justify-between items-center mb-3">
                     <h2 className="text-lg font-bold text-gray-800">Component Details</h2>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        {componentRows.length > 0 && (
+                            <div className="min-w-[280px]">
+                                <Select
+                                    mode="multiple"
+                                    size="small"
+                                    value={visibleComponentColumns}
+                                    onChange={setVisibleComponentColumns}
+                                    options={componentOptionalColumnOptions}
+                                    maxTagCount="responsive"
+                                    placeholder="Visible component columns"
+                                    className="w-full text-xs"
+                                />
+                            </div>
+                        )}
                         {!isManager && (
                         <>
                         <BulkUploadControl 
@@ -1456,15 +1933,19 @@ const ProductCompliance = ({
                             onDownloadTemplate={handleComponentTemplateDownload}
                         />
                         <button 
+                            type="button"
                             onClick={handleComponentExport} 
                             className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
+                            aria-label="Export component detail rows to Excel"
                         >
                             <FileExcelOutlined /> Export Excel
                         </button>
                         <button 
+                            type="button"
                             onClick={handleComponentBulkSave}
                             disabled={isComponentBulkSaving || componentRows.length === 0}
                             className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label="Save all component detail rows"
                         >
                             {isComponentBulkSaving ? <LoadingOutlined spin /> : <SaveOutlined />} Save All
                         </button>
@@ -1475,19 +1956,40 @@ const ProductCompliance = ({
                             cancelText="No"
                         >
                             <button 
+                                type="button"
                                 disabled={isComponentBulkSaving || componentRows.length === 0}
                                 className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                aria-label="Delete all component detail rows"
                             >
                                 <DeleteOutlined /> Delete All
                             </button>
                         </Popconfirm>
-                        <button onClick={addComponentRow} className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs">
+                        <button type="button" onClick={addComponentRow} className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs" aria-label="Add a new component detail row">
                             <PlusOutlined /> Add Component
                         </button>
                         </>
                         )}
                     </div>
                 </div>
+                    {componentRows.length > 0 && (
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-100 bg-primary-50/80 px-3 py-2 text-[11px] backdrop-blur-sm">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-semibold uppercase tracking-[0.16em] text-primary-700">Wide Table Focus</span>
+                                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-gray-600">
+                                    {componentRows.length} component rows
+                                </span>
+                                <span className="text-gray-500">Pinned identity columns:</span>
+                                {componentPinnedLabels.map((label) => (
+                                    <span key={label} className="rounded-full bg-white px-2 py-1 text-[10px] font-medium text-primary-700">
+                                        {label}
+                                    </span>
+                                ))}
+                            </div>
+                            <div className="text-[11px] text-gray-500">
+                                {isCompactViewport ? 'Compact column preset is active for smaller screens.' : 'Hide optional chemistry and category columns when you only need row identity.'}
+                            </div>
+                        </div>
+                    )}
                     <div className={`${componentRows.length === 0 ? 'hidden' : ''} overflow-x-auto border border-gray-200 rounded-xl shadow-sm`}>
                         <table className="min-w-full text-xs divide-y divide-gray-200 border-separate border-spacing-0">
                             <thead className={isManager ? "bg-green-50" : "bg-gray-50"}>
@@ -1511,13 +2013,15 @@ const ProductCompliance = ({
                                         { label: 'Thickness (Micron)', width: 'min-w-[130px]' },
                                         { label: 'Actions', width: 'min-w-[140px]' }
                                     ].filter(h => {
-                                        if (isProducer && (h.label === 'SKU Code' || h.label === 'Component Polymer')) return false;
+                                        if (isProducer && h.label === 'Component Polymer') return false;
                                         return !isManager || (h.label !== 'Actions' && h.label !== 'System Code');
-                                    }).map((header) => (
-                                        <th key={header.label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${isManager ? "bg-green-50" : "bg-gray-50"} ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 z-20' : 'z-10'}`}>
+                                    }).filter((header) => isComponentColumnVisible(header.label)).map((header) => {
+                                        const stickyColumn = getStickyColumnProps('component', header.label, true);
+                                        return (
+                                        <th key={header.label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${isManager ? "bg-green-50" : "bg-gray-50"} ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 z-20' : 'z-10'} ${stickyColumn.className}`} style={stickyColumn.style}>
                                             {header.label}
                                         </th>
-                                    ))}
+                                    )})}
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -1525,9 +2029,9 @@ const ProductCompliance = ({
                                 const idx = indexOfFirstComponentRow + localIdx;
                                 return (
                                 <tr key={idx} className="hover:bg-gray-50 transition-colors duration-150 group">
-                                    <td className="px-2 py-2 text-center text-xs text-black align-middle font-bold">{idx + 1}</td>
+                                    <td className={`px-2 py-2 text-center text-xs text-black align-middle font-bold ${getStickyColumnProps('component', '#').className}`} style={getStickyColumnProps('component', '#').style}>{idx + 1}</td>
                                     {!isManager && (
-                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                    <td className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('component', 'System Code').className}`} style={getStickyColumnProps('component', 'System Code').style}>
                                         <select
                                             className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all text-center hover:border-primary-400"
                                             value={row.systemCode || ''}
@@ -1543,8 +2047,7 @@ const ProductCompliance = ({
                                         </select>
                                     </td>
                                     )}
-                                    {!isProducer && (
-                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                    <td className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('component', 'SKU Code').className}`} style={getStickyColumnProps('component', 'SKU Code').style}>
                                         {isManager ? (
                                             <div className="text-center text-xs text-gray-700 py-1.5">{row.skuCode || '-'}</div>
                                         ) : (
@@ -1556,8 +2059,7 @@ const ProductCompliance = ({
                                         />
                                         )}
                                     </td>
-                                    )}
-                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                    <td className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('component', 'Component code').className}`} style={getStickyColumnProps('component', 'Component code').style}>
                                         {isManager ? (
                                             <div className="text-center text-xs text-gray-700 py-1.5">{row.componentCode || '-'}</div>
                                         ) : (
@@ -1569,6 +2071,7 @@ const ProductCompliance = ({
                                         />
                                         )}
                                         </td>
+                                        {isComponentColumnVisible('Component Descrecption') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.componentDescription || '-'}</div>
@@ -1581,6 +2084,8 @@ const ProductCompliance = ({
                                             />
                                             )}
                                         </td>
+                                        )}
+                                        {isComponentColumnVisible('Supplier Name') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.supplierName || '-'}</div>
@@ -1593,7 +2098,9 @@ const ProductCompliance = ({
                                             />
                                             )}
                                         </td>
+                                        )}
                                         {isProducer && (
+                                        isComponentColumnVisible('Food Grade') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {(() => {
                                                 const matched = (Array.isArray(supplierRows) ? supplierRows : []).find((s) => (s?.systemCode || '').toString().trim() === (row?.systemCode || '').toString().trim());
@@ -1610,7 +2117,9 @@ const ProductCompliance = ({
                                                 );
                                             })()}
                                         </td>
+                                        )
                                         )}
+                                        {isComponentColumnVisible('Polymer Type') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.polymerType || '-'}</div>
@@ -1626,7 +2135,9 @@ const ProductCompliance = ({
                                             </select>
                                             )}
                                         </td>
+                                        )}
                                         {isProducer && (
+                                        isComponentColumnVisible('Recycled Polymer Used') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.recycledPolymerUsed || '-'}</div>
@@ -1649,8 +2160,10 @@ const ProductCompliance = ({
                                             </select>
                                             )}
                                         </td>
+                                        )
                                         )}
                                         {!isProducer && (
+                                        isComponentColumnVisible('Component Polymer') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.componentPolymer || '-'}</div>
@@ -1678,7 +2191,9 @@ const ProductCompliance = ({
                                             })()
                                             )}
                                         </td>
+                                        )
                                         )}
+                                        {isComponentColumnVisible('Polymer Code') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.polymerCode || '-'}</div>
@@ -1703,6 +2218,8 @@ const ProductCompliance = ({
                                             />
                                             )}
                                         </td>
+                                        )}
+                                        {isComponentColumnVisible('Category of EPR') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.category || '-'}</div>
@@ -1728,6 +2245,8 @@ const ProductCompliance = ({
                                             </select>
                                             )}
                                         </td>
+                                        )}
+                                        {isComponentColumnVisible('Category II Type') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.categoryIIType || '-'}</div>
@@ -1747,6 +2266,8 @@ const ProductCompliance = ({
                                             </select>
                                             )}
                                         </td>
+                                        )}
+                                        {isComponentColumnVisible('Container Capacity') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.containerCapacity || '-'}</div>
@@ -1766,7 +2287,8 @@ const ProductCompliance = ({
                                             </select>
                                             )}
                                         </td>
-                                       
+                                        )}
+                                        {isComponentColumnVisible('Monolayer / Multilayer') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {isManager ? (
                                                 <div className="text-center text-xs text-gray-700 py-1.5">{row.layerType || '-'}</div>
@@ -1782,6 +2304,8 @@ const ProductCompliance = ({
                                             </select>
                                             )}
                                         </td>
+                                        )}
+                                        {isComponentColumnVisible('Thickness (Micron)') && (
                                         <td className="px-2 py-2 whitespace-nowrap align-middle">
                                             {(() => {
                                                 const raw = (row.thickness ?? '').toString();
@@ -1827,30 +2351,45 @@ const ProductCompliance = ({
                                                 );
                                             })()}
                                         </td>
-                                        <td className="px-2 py-2 whitespace-nowrap align-middle sticky right-0 bg-white border-l border-gray-100 group-hover:bg-gray-50">
+                                        )}
+                                        <td className="px-2 py-2 whitespace-nowrap align-middle sticky right-0 bg-white border-l border-gray-100 group-hover:bg-gray-50 shadow-[-4px_0_10px_rgba(15,23,42,0.08)]">
                                             {!isManager && (
                                             <div className="flex items-center justify-center gap-2">
                                                 <button
+                                                    type="button"
                                                     onClick={() => saveComponentRow(idx)}
                                                     className="p-1.5 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all hover:scale-110"
                                                     title="Save Row"
+                                                    aria-label={`Save component row ${idx + 1}`}
                                                 >
                                                     {savingComponentRow === idx ? <LoadingOutlined spin className="text-xs" /> : <SaveOutlined className="text-xs" />}
                                                 </button>
                                                 <button
+                                                type="button"
                                                 onClick={() => cancelComponentRow(idx)}
                                                 className="p-1.5 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all hover:scale-110"
                                                 title="Cancel Changes"
+                                                aria-label={`Cancel changes for component row ${idx + 1}`}
                                             >
                                                 <UndoOutlined className="text-xs" />
                                             </button>
-                                            <button 
-                                                onClick={()=>removeComponentRow(idx)} 
-                                                className="p-1.5 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all hover:scale-110"
-                                                title="Remove Row"
+                                            <Popconfirm
+                                                title="Delete this component row?"
+                                                description="This removes the current component detail row."
+                                                onConfirm={() => removeComponentRow(idx)}
+                                                okText="Delete"
+                                                cancelText="Cancel"
+                                                okButtonProps={{ danger: true }}
                                             >
-                                                <DeleteOutlined className="text-xs" />
-                                            </button>
+                                                <button 
+                                                    type="button"
+                                                    className="p-1.5 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all hover:scale-110"
+                                                    title="Remove Row"
+                                                    aria-label={`Delete component row ${idx + 1}`}
+                                                >
+                                                    <DeleteOutlined className="text-xs" />
+                                                </button>
+                                            </Popconfirm>
                                             </div>
                                             )}
                                         </td>
@@ -1882,7 +2421,21 @@ const ProductCompliance = ({
                                 Monthly Procurement Data
                             </h3>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            {monthlyRows.length > 0 && (
+                                <div className="min-w-[280px]">
+                                    <Select
+                                        mode="multiple"
+                                        size="small"
+                                        value={visibleMonthlyColumns}
+                                        onChange={setVisibleMonthlyColumns}
+                                        options={monthlyOptionalColumnOptions}
+                                        maxTagCount="responsive"
+                                        placeholder="Visible monthly columns"
+                                        className="w-full text-xs"
+                                    />
+                                </div>
+                            )}
                             {!isManager && (
                             <>
                             <BulkUploadControl 
@@ -1890,50 +2443,21 @@ const ProductCompliance = ({
                                 onDownloadTemplate={handleMonthlyTemplateDownload}
                             />
                             <button
+                                type="button"
                                 onClick={handleMonthlyExport}
                                 className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
+                                aria-label="Export monthly procurement rows to Excel"
                             >
                                 <DownloadOutlined /> Export Excel
                             </button>
                             <button
-                                onClick={() => {
-                                    const resolvedRows = isProducer
-                                        ? (Array.isArray(monthlyRows) ? monthlyRows : []).map((r) => {
-                                            const curr = { ...r };
-                                            const sc = (curr.systemCode || '').toString().trim();
-                                            if (!sc) return curr;
-                                            const productMatch = systemCodeOptions.find((opt) => opt.code === sc);
-                                            const supplierMatch = (Array.isArray(supplierRows) ? supplierRows : []).find((x) => (x?.systemCode || '').toString().trim() === sc);
-                                            const compMatch =
-                                                (Array.isArray(componentRows) ? componentRows : []).find((x) => (x?.systemCode || '').toString().trim() === sc) ||
-                                                (Array.isArray(componentRows) ? componentRows : []).find((x) => (x?.componentCode || '').toString().trim() === (curr?.componentCode || '').toString().trim());
-                                            curr.supplierCategory = (productMatch?.data?.supplierCategory || curr.supplierCategory || '').toString();
-                                            curr.foodGrade = (supplierMatch?.foodGrade || compMatch?.foodGrade || curr.foodGrade || '').toString();
-                                            curr.recycledPolymerUsed = (compMatch?.recycledPolymerUsed || curr.recycledPolymerUsed || '').toString();
-                                            if (compMatch) {
-                                                curr.polymerType = compMatch.polymerType || curr.polymerType || '';
-                                            }
-                                            curr.componentPolymer = '';
-                                            return curr;
-                                        })
-                                        : monthlyRows;
-                                    const payload = {
-                                        type,
-                                        itemId,
-                                        rows: resolvedRows
-                                    };
-                                    api.post(API_ENDPOINTS.CLIENT.MONTHLY_PROCUREMENT(clientId), payload)
-                                       .then(res => {
-                                           notify('success', 'Saved all monthly procurement rows');
-                                           const rows = res.data?.data || resolvedRows;
-                                           setMonthlyRows(rows);
-                                           setLastSavedMonthlyRows(rows);
-                                       })
-                                       .catch(err => notify('error', err.response?.data?.message || 'Save failed'));
-                                }}
+                                type="button"
+                                onClick={handleMonthlyBulkSave}
+                                disabled={isMonthlyBulkSaving}
                                 className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
+                                aria-label="Save all monthly procurement rows"
                             >
-                                <SaveOutlined /> Save All
+                                {isMonthlyBulkSaving ? <LoadingOutlined spin /> : <SaveOutlined />} Save All
                             </button>
                             <Popconfirm
                                 title="Are you sure you want to delete all rows?"
@@ -1945,21 +2469,25 @@ const ProductCompliance = ({
                                 cancelText="No"
                             >
                                 <button
+                                    type="button"
                                     className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
+                                    aria-label="Delete all monthly procurement rows"
                                 >
                                     <DeleteOutlined /> Delete All
                                 </button>
                             </Popconfirm>
                             <button
+                                type="button"
                                 onClick={() => setMonthlyRows(prev => [...prev, {
                                     systemCode:'', skuCode: '', supplierName:'', componentCode:'', componentDescription:'',
                                     supplierCategory: '', foodGrade: '', polymerType:'', recycledPolymerUsed: '', componentPolymer:'', category:'', dateOfInvoice:'',
                                     monthName:'', quarter:'', yearlyQuarter:'', purchaseQty:'', uom:'',
-                                    perPieceWeightKg:'', monthlyPurchaseMt:'', recycledPercent:'', recycledQty:'', recycledRate: '', recycledQrtAmount: '',
+                                    perPieceWeightKg:'', ppwUom:'KG', monthlyPurchaseMt:'', recycledPercent:'', recycledQty:'', recycledRate: '', recycledQrtAmount: '',
                                     virginQty: '', virginRate: '', virginQtyAmount: '',
                                     rcPercentMentioned: ''
                                 }])}
                                 className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs"
+                                aria-label="Add a new monthly procurement row"
                             >
                                 <PlusOutlined /> Add Row
                             </button>
@@ -1967,37 +2495,101 @@ const ProductCompliance = ({
                             )}
                         </div>
                     </div>
+                    {monthlyRows.length > 0 && (
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-100 bg-primary-50/80 px-3 py-2 text-[11px] backdrop-blur-sm">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-semibold uppercase tracking-[0.16em] text-primary-700">Wide Table Focus</span>
+                                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-gray-600">
+                                    {monthlyRows.length} monthly rows
+                                </span>
+                                <span className="text-gray-500">Pinned identity columns:</span>
+                                {monthlyPinnedLabels.map((label) => (
+                                    <span key={label} className="rounded-full bg-white px-2 py-1 text-[10px] font-medium text-primary-700">
+                                        {label}
+                                    </span>
+                                ))}
+                            </div>
+                            <div className="text-[11px] text-gray-500">
+                                {isCompactViewport
+                                    ? 'Compact column preset is active for smaller screens. Reveal financial fields only when needed.'
+                                    : 'Keep core identity visible while hiding detail-heavy financial columns.'}
+                            </div>
+                        </div>
+                    )}
                     <div className={`${monthlyRows.length === 0 ? 'hidden' : ''} overflow-x-auto rounded-lg border border-gray-200 shadow-sm max-h-[450px] mb-6`}>
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className={isManager ? "bg-green-50 sticky top-0 z-10" : "bg-gray-50 sticky top-0 z-10"}>
                                 <tr>
                                     <th className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 w-12 ${isManager ? "bg-green-50" : "bg-gray-50"}`}>#</th>
             {[
-            'System Code','SKU Code','Supplier Name','Supplier Category','Food Grade','Component code','Component Description','Polymer Type','Recycled Polymer Used','Component Polymer','Category of EPR','Date of invoice','Purchase Qty','UOM','Per Piece Weight','Monthly purchase MT','Recycled %','Recycled QTY','Recycled Rate','Recycled Qrt Amount','Virgin Rate','Virgin Qty','Virgin Qty Amount','RC % Mentioned','Actions'
+            'System Code','SKU Code','Supplier Name','Supplier Category','Food Grade','Component code','Component Description','Polymer Type','Recycled Polymer Used','Component Polymer','Category of EPR','Date of invoice','Purchase Qty','UOM','Per Piece Weight','PPW UOM','Monthly purchase MT','Recycled %','Recycled QTY','Recycled Rate','Recycled Qrt Amount','Virgin Rate','Virgin Qty','Virgin Qty Amount','RC % Mentioned','Actions'
         ].filter(label => {
             if (isProducer && (label === 'SKU Code' || label === 'Component Polymer')) return false;
             if (!isProducer && (label === 'Supplier Category' || label === 'Food Grade' || label === 'Recycled Polymer Used')) return false;
             return !isManager || (label !== 'Actions' && label !== 'System Code');
-        }).map((label) => (
-            <th key={label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 bg-white' : ''} ${label === 'UOM' ? 'min-w-[100px]' : ''} ${isManager ? "bg-green-50" : "bg-gray-50"}`}>
+        }).filter((label) => isMonthlyColumnVisible(label)).map((label) => {
+            const stickyColumn = getStickyColumnProps('monthly', label, true);
+            return (
+            <th key={label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 bg-white' : ''} ${(label === 'UOM' || label === 'PPW UOM') ? 'min-w-[100px]' : ''} ${isManager ? "bg-green-50" : "bg-gray-50"} ${stickyColumn.className}`} style={stickyColumn.style}>
                 {label}
             </th>
-        ))}
+        )})}
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {monthlyRows.slice(indexOfFirstMonthlyRow, indexOfLastMonthlyRow).map((row, index) => {
                                     const idx = indexOfFirstMonthlyRow + index;
+                                    const normalizeMonthlyUom = (value) => {
+                                        const normalized = (value || '').toString().trim();
+                                        switch (normalized.toUpperCase()) {
+                                            case 'MT':
+                                                return 'MT';
+                                            case 'KG':
+                                                return 'KG';
+                                            case 'UNITS':
+                                                return 'Units';
+                                            case 'ROLL':
+                                                return 'Roll';
+                                            case 'NOS':
+                                                return 'Nos';
+                                            case 'PCS':
+                                                return 'Pcs';
+                                            case 'NOT APPLICABLE':
+                                                return 'Not Applicable';
+                                            default:
+                                                return normalized;
+                                        }
+                                    };
+                                    const normalizePpwUom = (value) => {
+                                        const normalized = (value || '').toString().trim();
+                                        switch (normalized.toUpperCase()) {
+                                            case 'GM':
+                                            case 'G':
+                                            case 'GMS':
+                                            case 'GRAM':
+                                            case 'GRAMS':
+                                                return 'GM';
+                                            case 'KG':
+                                            case 'KGS':
+                                            case 'KILOGRAM':
+                                            case 'KILOGRAMS':
+                                            default:
+                                                return 'KG';
+                                        }
+                                    };
                                     const computeMonthly = (r) => {
-                                        const uom = r.uom || '';
+                                        const uom = normalizeMonthlyUom(r.uom);
                                         if (uom === 'Not Applicable') return 0;
                                         const qty = Number(r.purchaseQty) || 0;
                                         const wt = Number(r.perPieceWeightKg) || 0;
-                                        if (uom === 'Units' || uom === 'Nos' || uom === 'Roll') return (qty * wt) / 1000;
+                                        const ppwUom = normalizePpwUom(r.ppwUom);
+                                        if (uom === 'Units' || uom === 'Nos' || uom === 'Roll' || uom === 'Pcs') return ppwUom === 'GM' ? (qty * wt) / 1000000 : (qty * wt) / 1000;
                                         if (uom === 'KG') return qty / 1000;
                                         if (uom === 'MT') return qty;
                                         return Number(r.monthlyPurchaseMt) || 0;
                                     };
+                                    const normalizedRowUom = normalizeMonthlyUom(row.uom);
+                                    const normalizedRowPpwUom = normalizePpwUom(row.ppwUom);
                                     const resolveMonthlyAutoFields = (curr) => {
                                         if (!isProducer) return curr;
                                         const sc = (curr.systemCode || '').toString().trim();
@@ -2045,9 +2637,11 @@ const ProductCompliance = ({
                                         setMonthlyRows(prev => {
                                             const copy = [...prev];
                                             let curr = { ...copy[idx], [field]: value };
-                                            if (field === 'uom' && value === 'Not Applicable') {
+                                            if (field === 'uom' && normalizeMonthlyUom(value) === 'Not Applicable') {
+                                                curr.uom = 'Not Applicable';
                                                 curr.purchaseQty = 0;
                                                 curr.perPieceWeightKg = 0;
+                                                curr.ppwUom = 'KG';
                                                 curr.recycledPercent = 0;
                                             }
                                             if (field === 'recycledPercent') {
@@ -2057,35 +2651,11 @@ const ProductCompliance = ({
                                                 curr = fillFromSystemCode(curr);
                                             }
                                             if (field === 'dateOfInvoice') {
-                                                const dateVal = value.trim();
-                                                let mName = '';
-                                                let qName = '';
-                                                let yName = '';
-                                                if (dateVal === 'Not Applicable') {
-                                                    mName = 'Not Applicable';
-                                                    qName = 'Not Applicable';
-                                                    yName = 'Not Applicable';
-                                                } else {
-                                                    const parts = dateVal.split('-');
-                                                    if (parts.length === 3) {
-                                                        const d = parseInt(parts[0], 10);
-                                                        const m = parseInt(parts[1], 10);
-                                                        const y = parseInt(parts[2], 10);
-                                                        if (!isNaN(d) && !isNaN(m) && !isNaN(y) && m >= 1 && m <= 12) {
-                                                            const dateObj = new Date(y, m - 1, d);
-                                                            mName = dateObj.toLocaleString('default', { month: 'long' });
-                                                            if (m >= 4 && m <= 6) qName = 'Q1';
-                                                            else if (m >= 7 && m <= 9) qName = 'Q2';
-                                                            else if (m >= 10 && m <= 12) qName = 'Q3';
-                                                            else qName = 'Q4';
-                                                            if (m >= 4 && m <= 9) yName = 'H1';
-                                                            else yName = 'H2';
-                                                        }
-                                                    }
-                                                }
-                                                curr.monthName = mName;
-                                                curr.quarter = qName;
-                                                curr.yearlyQuarter = yName;
+                                                const invoiceMeta = normalizeInvoiceDateInput(value);
+                                                curr.dateOfInvoice = invoiceMeta.displayValue;
+                                                curr.monthName = invoiceMeta.monthName;
+                                                curr.quarter = invoiceMeta.quarter;
+                                                curr.yearlyQuarter = invoiceMeta.yearlyQuarter;
                                             }
                                             curr.monthlyPurchaseMt = computeMonthly(curr);
                                             const pctRaw = parseFloat(curr.recycledPercent) || 0;
@@ -2165,8 +2735,8 @@ const ProductCompliance = ({
                                     };
                                     const resolvedRowForDisplay = isProducer ? resolveMonthlyAutoFields({ ...row }) : row;
                                     return (
-                                        <tr key={idx} className="hover:bg-gray-50">
-                                            <td className="px-3 py-2 text-center font-bold text-black">{idx + 1}</td>
+                                        <tr key={idx} className="group hover:bg-gray-50 transition-colors duration-150">
+                                            <td className={`px-3 py-2 text-center font-bold text-black ${getStickyColumnProps('monthly', '#').className}`} style={getStickyColumnProps('monthly', '#').style}>{idx + 1}</td>
                                             {[
                                                 { key:'systemCode', placeholder:'System Code', type:'select-system' },
                                                 { key:'skuCode', placeholder:'SKU Code', type:'text', readOnly: true },
@@ -2181,27 +2751,33 @@ const ProductCompliance = ({
                                                 { key:'category', placeholder:'Category of EPR', type:'text', readOnly: true },
                                                 { key:'dateOfInvoice', placeholder:'Date of invoice', type:'text' },
                                                 { key:'purchaseQty', placeholder:'Purchase Qty', type:'text' },
-                                                { key:'uom', type:'select' },
+                                                { key:'uom', type:'select-uom' },
                                                 { key:'perPieceWeightKg', placeholder:'Per Piece Weight', type:'text' },
+                                                { key:'ppwUom', placeholder:'PPW UOM', type:'select-ppw-uom' },
                                             ].filter(col => {
                                                 if (isProducer && (col.key === 'skuCode' || col.key === 'componentPolymer')) return false;
                                                 if (!isProducer && (col.key === 'supplierCategory' || col.key === 'foodGrade' || col.key === 'recycledPolymerUsed')) return false;
                                                 return !isManager || col.key !== 'systemCode';
-                                            }).map((col) => (
-                                                <td key={col.key} className="px-2 py-2 whitespace-nowrap align-middle">
+                                            }).filter((col) => isMonthlyColumnVisible(col.placeholder || (col.key === 'systemCode' ? 'System Code' : col.key === 'skuCode' ? 'SKU Code' : col.key === 'supplierName' ? 'Supplier Name' : col.key === 'supplierCategory' ? 'Supplier Category' : col.key === 'foodGrade' ? 'Food Grade' : col.key === 'componentCode' ? 'Component code' : col.key === 'componentDescription' ? 'Component Description' : col.key === 'polymerType' ? 'Polymer Type' : col.key === 'recycledPolymerUsed' ? 'Recycled Polymer Used' : col.key === 'componentPolymer' ? 'Component Polymer' : col.key === 'category' ? 'Category of EPR' : col.key === 'dateOfInvoice' ? 'Date of invoice' : col.key === 'purchaseQty' ? 'Purchase Qty' : col.key === 'uom' ? 'UOM' : col.key === 'perPieceWeightKg' ? 'Per Piece Weight' : col.key === 'ppwUom' ? 'PPW UOM' : col.key))).map((col) => {
+                                                const monthlyLabel = col.placeholder || (col.key === 'systemCode' ? 'System Code' : col.key === 'skuCode' ? 'SKU Code' : col.key === 'supplierName' ? 'Supplier Name' : col.key === 'supplierCategory' ? 'Supplier Category' : col.key === 'foodGrade' ? 'Food Grade' : col.key === 'componentCode' ? 'Component code' : col.key === 'componentDescription' ? 'Component Description' : col.key === 'polymerType' ? 'Polymer Type' : col.key === 'recycledPolymerUsed' ? 'Recycled Polymer Used' : col.key === 'componentPolymer' ? 'Component Polymer' : col.key === 'category' ? 'Category of EPR' : col.key === 'dateOfInvoice' ? 'Date of invoice' : col.key === 'purchaseQty' ? 'Purchase Qty' : col.key === 'uom' ? 'UOM' : col.key === 'perPieceWeightKg' ? 'Per Piece Weight' : col.key === 'ppwUom' ? 'PPW UOM' : col.key);
+                                                const stickyColumn = getStickyColumnProps('monthly', monthlyLabel);
+                                                return (
+                                                <td key={col.key} className={`px-2 py-2 whitespace-nowrap align-middle ${stickyColumn.className}`} style={stickyColumn.style}>
                                                     {isManager ? (
                                                         <div className="text-center text-xs text-gray-700 py-1.5">
                                                             {col.type === 'select-system' 
                                                                 ? (systemCodeOptions.find(opt => opt.code === row[col.key])?.label || row[col.key] || '-')
+                                                                : (col.key === 'ppwUom' ? normalizedRowPpwUom
                                                                 : ((col.key === 'supplierCategory' || col.key === 'foodGrade' || col.key === 'recycledPolymerUsed' || col.key === 'polymerType') ? (resolvedRowForDisplay[col.key] || '-') : (row[col.key] || '-'))
+                                                                )
                                                             }
                                                         </div>
                                                     ) : (
                                                     <>
-                                                    {col.type === 'select' ? (
+                                                    {col.type === 'select-uom' ? (
                                                         <select
                                                             className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400"
-                                                            value={row.uom || ''}
+                                                            value={normalizeMonthlyUom(row.uom) || ''}
                                                             onChange={(e)=>updateField('uom', e.target.value)}
                                                             disabled={isManager}
                                                         >
@@ -2211,7 +2787,22 @@ const ProductCompliance = ({
                                                             <option value="Units">Units</option>
                                                             <option value="Roll">Roll</option>
                                                             <option value="Nos">Nos</option>
+                                                            <option value="Pcs">Pcs</option>
                                                             <option value="Not Applicable">Not Applicable</option>
+                                                        </select>
+                                                    ) : col.type === 'select-ppw-uom' ? (
+                                                        <select
+                                                            className={`w-full border text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all ${
+                                                                normalizedRowUom === 'Not Applicable'
+                                                                    ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
+                                                                    : 'bg-white border-gray-300 hover:border-primary-400'
+                                                            }`}
+                                                            value={normalizedRowPpwUom}
+                                                            onChange={(e)=>updateField('ppwUom', e.target.value)}
+                                                            disabled={isManager || normalizedRowUom === 'Not Applicable'}
+                                                        >
+                                                            <option value="KG">KG</option>
+                                                            <option value="GM">GM</option>
                                                         </select>
                                                     ) : col.type === 'select-system' ? (
                                                         <select
@@ -2233,21 +2824,22 @@ const ProductCompliance = ({
                                                             className={`w-full text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all hover:border-primary-400 ${
                                                                 col.readOnly || 
                                                                 (col.key === 'dateOfInvoice' && row[col.key] === 'Not Applicable') || 
-                                                                (row.uom === 'Not Applicable' && ['purchaseQty', 'perPieceWeightKg'].includes(col.key)) 
+                                                                (normalizedRowUom === 'Not Applicable' && ['purchaseQty', 'perPieceWeightKg'].includes(col.key)) 
                                                                 ? 'bg-gray-100 border border-gray-300 text-gray-700 cursor-not-allowed' 
                                                                 : 'bg-white border border-gray-300 text-gray-700'
                                                             }`}
                                                             placeholder={col.placeholder}
                                                             value={(col.key === 'supplierCategory' || col.key === 'foodGrade' || col.key === 'recycledPolymerUsed' || col.key === 'polymerType') ? (resolvedRowForDisplay[col.key] ?? '') : (row[col.key] ?? '')}
                                                             onChange={(e)=>updateField(col.key, e.target.value)}
-                                                            readOnly={isManager || col.readOnly || (col.key === 'dateOfInvoice' && row[col.key] === 'Not Applicable') || (row.uom === 'Not Applicable' && ['purchaseQty', 'perPieceWeightKg'].includes(col.key))}
+                                                            readOnly={isManager || col.readOnly || (col.key === 'dateOfInvoice' && row[col.key] === 'Not Applicable') || (normalizedRowUom === 'Not Applicable' && ['purchaseQty', 'perPieceWeightKg'].includes(col.key))}
                                                             disabled={isManager}
                                                         />
                                                     )}
                                                     </>
                                                     )}
                                                 </td>
-                                            ))}
+                                            )})}
+                                            {isMonthlyColumnVisible('Monthly purchase MT') && (
                                             <td className="px-2 py-2 whitespace-nowrap align-middle">
                                                 {isManager ? (
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.monthlyPurchaseMt ?? 0}</div>
@@ -2261,6 +2853,8 @@ const ProductCompliance = ({
                                                 />
                                                 )}
                                             </td>
+                                            )}
+                                            {isMonthlyColumnVisible('Recycled %') && (
                                             <td className="px-2 py-2 whitespace-nowrap align-middle">
                                                 {isManager ? (
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.recycledPercent ?? ''}</div>
@@ -2277,6 +2871,8 @@ const ProductCompliance = ({
                                                 />
                                                 )}
                                             </td>
+                                            )}
+                                            {isMonthlyColumnVisible('Recycled QTY') && (
                                             <td className="px-2 py-2 whitespace-nowrap align-middle">
                                                 {isManager ? (
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.recycledQty ?? 0}</div>
@@ -2290,6 +2886,8 @@ const ProductCompliance = ({
                                                 />
                                                 )}
                                             </td>
+                                            )}
+                                            {isMonthlyColumnVisible('Recycled Rate') && (
                                             <td className="px-2 py-2 whitespace-nowrap align-middle">
                                                 {isManager ? (
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.recycledRate ?? ''}</div>
@@ -2305,6 +2903,8 @@ const ProductCompliance = ({
                                                 />
                                                 )}
                                             </td>
+                                            )}
+                                            {isMonthlyColumnVisible('Recycled Qrt Amount') && (
                                             <td className="px-2 py-2 whitespace-nowrap align-middle">
                                                 {isManager ? (
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.recycledQrtAmount ?? 0}</div>
@@ -2318,6 +2918,8 @@ const ProductCompliance = ({
                                                 />
                                                 )}
                                             </td>
+                                            )}
+                                            {isMonthlyColumnVisible('Virgin Rate') && (
                                             <td className="px-2 py-2 whitespace-nowrap align-middle">
                                                 {isManager ? (
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.virginRate ?? ''}</div>
@@ -2333,6 +2935,8 @@ const ProductCompliance = ({
                                                 />
                                                 )}
                                             </td>
+                                            )}
+                                            {isMonthlyColumnVisible('Virgin Qty') && (
                                             <td className="px-2 py-2 whitespace-nowrap align-middle">
                                                 {isManager ? (
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.virginQty ?? 0}</div>
@@ -2346,6 +2950,8 @@ const ProductCompliance = ({
                                                 />
                                                 )}
                                             </td>
+                                            )}
+                                            {isMonthlyColumnVisible('Virgin Qty Amount') && (
                                             <td className="px-2 py-2 whitespace-nowrap align-middle">
                                                 {isManager ? (
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.virginQtyAmount ?? 0}</div>
@@ -2359,6 +2965,8 @@ const ProductCompliance = ({
                                                 />
                                                 )}
                                             </td>
+                                            )}
+                                            {isMonthlyColumnVisible('RC % Mentioned') && (
                                             <td className="px-2 py-2 whitespace-nowrap align-middle">
                                                 {isManager ? (
                                                     <div className="text-center text-xs text-gray-700 py-1.5">{row.rcPercentMentioned || '-'}</div>
@@ -2375,30 +2983,45 @@ const ProductCompliance = ({
                                                 </select>
                                                 )}
                                             </td>
-                                            <td className="px-3 py-2 whitespace-nowrap align-middle text-center sticky right-0 bg-white min-w-[140px]">
+                                            )}
+                                            <td className="px-3 py-2 whitespace-nowrap align-middle text-center sticky right-0 bg-white min-w-[140px] border-l border-gray-100 group-hover:bg-gray-50 shadow-[-4px_0_10px_rgba(15,23,42,0.08)]">
                                                 {!isManager && (
                                                 <div className="flex justify-center gap-2">
                                                     <button
+                                                        type="button"
                                                         onClick={saveRow}
                                                         className="p-1 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all"
                                                         title="Save Row"
+                                                        aria-label={`Save monthly procurement row ${idx + 1}`}
                                                     >
                                                         {savingMonthlyRow === idx ? <LoadingOutlined className="text-xs" /> : <SaveOutlined className="text-xs" />}
                                                     </button>
                                                     <button
+                                                        type="button"
                                                         onClick={cancelRow}
                                                         className="p-1 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all"
                                                         title="Cancel Changes"
+                                                        aria-label={`Cancel changes for monthly procurement row ${idx + 1}`}
                                                     >
                                                         <UndoOutlined className="text-xs" />
                                                     </button>
-                                                    <button
-                                                        onClick={()=>setMonthlyRows(prev => prev.filter((_, i) => i !== idx))}
-                                                        className="p-1 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all"
-                                                        title="Remove Row"
+                                                    <Popconfirm
+                                                        title="Delete this monthly row?"
+                                                        description="This removes the current monthly procurement row."
+                                                        onConfirm={() => setMonthlyRows(prev => prev.filter((_, i) => i !== idx))}
+                                                        okText="Delete"
+                                                        cancelText="Cancel"
+                                                        okButtonProps={{ danger: true }}
                                                     >
-                                                        <DeleteOutlined className="text-xs" />
-                                                    </button>
+                                                        <button
+                                                            type="button"
+                                                            className="p-1 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all"
+                                                            title="Remove Row"
+                                                            aria-label={`Delete monthly procurement row ${idx + 1}`}
+                                                        >
+                                                            <DeleteOutlined className="text-xs" />
+                                                        </button>
+                                                    </Popconfirm>
                                                 </div>
                                                 )}
                                             </td>
@@ -2432,14 +3055,18 @@ const ProductCompliance = ({
                                 onDownloadTemplate={handleRecycledTemplateDownload}
                             />
                             <button
+                                type="button"
                                 onClick={handleRecycledExport}
                                 className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
+                                aria-label="Export recycled quantity rows to Excel"
                             >
                                 <DownloadOutlined /> Export Excel
                             </button>
                             <button
+                                type="button"
                                 onClick={handleRecycledBulkSave}
                                 className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
+                                aria-label="Save all recycled quantity rows"
                             >
                                 <SaveOutlined /> Save All
                             </button>
@@ -2450,12 +3077,14 @@ const ProductCompliance = ({
                                 cancelText="No"
                             >
                                 <button
+                                    type="button"
                                     className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md shadow text-xs font-bold flex items-center gap-2 transition-all hover:scale-105"
+                                    aria-label="Delete all recycled quantity rows"
                                 >
                                     <DeleteOutlined /> Delete All
                                 </button>
                             </Popconfirm>
-                            <button onClick={addRecycledRow} className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs">
+                            <button type="button" onClick={addRecycledRow} className="px-3 py-1 bg-primary-50 text-primary-700 rounded-lg font-bold border border-primary-200 hover:bg-primary-100 transition-colors flex items-center gap-2 text-xs" aria-label="Add a new recycled quantity row">
                                 <PlusOutlined /> Add Row
                             </button>
                             </>
@@ -2480,21 +3109,23 @@ const ProductCompliance = ({
                                         { label: 'Used Recycled %', width: 'min-w-[140px]' },
                                         { label: 'Used Recycled Qty MT', width: 'min-w-[180px]' },
                                         { label: 'Actions', width: 'min-w-[100px]' }
-                                    ].filter(h => !isManager || (h.label !== 'Actions' && h.label !== 'System Code')).map((header) => (
-                                        <th key={header.label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 bg-white' : ''} ${isManager ? "bg-green-50" : "bg-gray-50"}`}>
+                                    ].filter(h => !isManager || (h.label !== 'Actions' && h.label !== 'System Code')).map((header) => {
+                                        const stickyColumn = getStickyColumnProps('recycled', header.label, true);
+                                        return (
+                                        <th key={header.label} className={`px-3 py-3 text-center text-xs font-bold ${isManager ? "text-green-800" : "text-gray-700"} uppercase tracking-wider whitespace-nowrap sticky top-0 border-b border-gray-200 ${header.width} ${header.label === 'Actions' ? 'right-0 shadow-sm border-l border-gray-200 bg-white' : ''} ${isManager ? "bg-green-50" : "bg-gray-50"} ${stickyColumn.className}`} style={stickyColumn.style}>
                                             {header.label}
                                         </th>
-                                    ))}
+                                    )})}
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {currentRecycledRows.map((row, index) => {
                                     const idx = indexOfFirstRecycledRow + index;
                                     return (
-                                        <tr key={idx} className="hover:bg-gray-50">
-                                    <td className="px-3 py-2 text-center font-bold text-black">{idx + 1}</td>
+                                        <tr key={idx} className="group hover:bg-gray-50 transition-colors duration-150">
+                                    <td className={`px-3 py-2 text-center font-bold text-black ${getStickyColumnProps('recycled', '#').className}`} style={getStickyColumnProps('recycled', '#').style}>{idx + 1}</td>
                                     {!isManager && (
-                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                    <td className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('recycled', 'System Code').className}`} style={getStickyColumnProps('recycled', 'System Code').style}>
                                         <select
                                             className="w-full bg-white border border-gray-300 text-gray-700 text-xs rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 block px-2 py-1.5 transition-all text-center hover:border-primary-400"
                                             value={row.systemCode || ''}
@@ -2510,7 +3141,7 @@ const ProductCompliance = ({
                                         </select>
                                     </td>
                                     )}
-                                    <td className="px-2 py-2 whitespace-nowrap align-middle">
+                                    <td className={`px-2 py-2 whitespace-nowrap align-middle ${getStickyColumnProps('recycled', 'Component Code').className}`} style={getStickyColumnProps('recycled', 'Component Code').style}>
                                         {isManager ? (
                                             <div className="text-center text-xs text-gray-700 py-1.5">{row.componentCode || '-'}</div>
                                         ) : (
@@ -2650,30 +3281,44 @@ const ProductCompliance = ({
                                                 />
                                                 )}
                                             </td>
-                                            <td className="px-3 py-2 whitespace-nowrap align-middle text-center sticky right-0 bg-white min-w-[140px]">
+                                            <td className="px-3 py-2 whitespace-nowrap align-middle text-center sticky right-0 bg-white min-w-[140px] border-l border-gray-100 group-hover:bg-gray-50 shadow-[-4px_0_10px_rgba(15,23,42,0.08)]">
                                                 {!isManager && (
                                                 <div className="flex justify-center gap-2">
                                                     <button
+                                                        type="button"
                                                         onClick={() => saveRecycledRow(idx)}
                                                         className="p-1 rounded text-white bg-green-500 hover:bg-green-600 shadow-sm transition-all"
                                                         title="Save Row"
+                                                        aria-label={`Save recycled quantity row ${idx + 1}`}
                                                     >
                                                         {savingRecycledRow === idx ? <LoadingOutlined className="text-xs" /> : <SaveOutlined className="text-xs" />}
                                                     </button>
                                                     <button
+                                                        type="button"
                                                         onClick={() => cancelRecycledRow(idx)}
                                                         className="p-1 rounded text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all"
                                                         title="Cancel Changes"
+                                                        aria-label={`Cancel changes for recycled quantity row ${idx + 1}`}
                                                     >
                                                         <UndoOutlined className="text-xs" />
                                                     </button>
-                                                    <button
-                                                        onClick={()=>removeRecycledRow(idx)}
-                                                        className="p-1 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all"
-                                                        title="Remove Row"
+                                                    <Popconfirm
+                                                        title="Delete this recycled row?"
+                                                        description="This removes the current recycled quantity row."
+                                                        onConfirm={() => removeRecycledRow(idx)}
+                                                        okText="Delete"
+                                                        cancelText="Cancel"
+                                                        okButtonProps={{ danger: true }}
                                                     >
-                                                        <DeleteOutlined className="text-xs" />
-                                                    </button>
+                                                        <button
+                                                            type="button"
+                                                            className="p-1 rounded text-red-500 bg-red-50 hover:bg-red-100 transition-all"
+                                                            title="Remove Row"
+                                                            aria-label={`Delete recycled quantity row ${idx + 1}`}
+                                                        >
+                                                            <DeleteOutlined className="text-xs" />
+                                                        </button>
+                                                    </Popconfirm>
                                                 </div>
                                                 )}
                                             </td>
@@ -2822,6 +3467,7 @@ const ProductCompliance = ({
                                                 ? (row.registrationStatus || '').toString()
                                                 : 'Pending';
                                         const isCtoNotAvailable = ctoAvailability === 'Not Available';
+                                        const isCtoExpired = !isCtoNotAvailable && isPastDate(row.ctoValidUpto);
 
                                         const uploadDoc = async (file) => {
                                             try {
@@ -2941,13 +3587,20 @@ const ProductCompliance = ({
                                                     />
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <input
-                                                        type="date"
-                                                        value={(row.ctoValidUpto || '').toString()}
-                                                        onChange={(e) => handleSupplierCtoChange && handleSupplierCtoChange(idx, 'ctoValidUpto', e.target.value)}
-                                                        disabled={isManager || isCtoNotAvailable}
-                                                        className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
-                                                    />
+                                                    <div className="flex flex-col gap-1">
+                                                        <input
+                                                            type="date"
+                                                            value={(row.ctoValidUpto || '').toString()}
+                                                            onChange={(e) => handleSupplierCtoChange && handleSupplierCtoChange(idx, 'ctoValidUpto', e.target.value)}
+                                                            disabled={isManager || isCtoNotAvailable}
+                                                            className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
+                                                        />
+                                                        {isCtoExpired && (
+                                                            <span className="inline-flex w-fit items-center rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                                                                CTO Expired
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-3 py-2">
                                                     <div className="flex items-center gap-2">

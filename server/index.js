@@ -28,7 +28,7 @@ import {
   correlationIdMiddleware,
   requestLoggerMiddleware,
 } from "./middleware/correlationId.js";
-import { initSentry } from "./config/sentry.js";
+import { bindSentryRequestContext, initSentry } from "./config/sentry.js";
 import { sanitizeInput } from "./middleware/sanitizeInput.js";
 
 const envCandidates = [
@@ -46,8 +46,11 @@ if (envPath) {
 const validatedEnv = validateEnvironment(process.env);
 
 const app = express();
+let server = null;
+let shuttingDown = false;
+app.disable("x-powered-by");
 app.set("trust proxy", 1); // Trust first proxy (Render/Vercel) for secure cookies
-initSentry(app);
+initSentry();
 
 // Ensure uploads directory exists at startup
 try {
@@ -86,9 +89,32 @@ if (
 const realtimeEmitter = new EventEmitter();
 app.set("realtimeEmitter", realtimeEmitter);
 const allowedOrigins = validatedEnv.FRONTEND_URL.map((o) => o.trim());
+const devLoopbackOrigins = (() => {
+  if (validatedEnv.NODE_ENV === "production") return [];
+
+  const variants = new Set();
+  for (const origin of allowedOrigins) {
+    try {
+      const parsed = new URL(origin);
+      if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+        variants.add(origin);
+        const alternate = new URL(origin);
+        alternate.hostname =
+          parsed.hostname === "localhost" ? "127.0.0.1" : "localhost";
+        variants.add(alternate.toString().replace(/\/$/, ""));
+      }
+    } catch {
+      // Ignore malformed URLs because env validation already handles them.
+    }
+  }
+  return Array.from(variants);
+})();
 
 if (validatedEnv.NODE_ENV !== "production") {
-  console.log("Allowed origins:", allowedOrigins);
+  logger.debug(
+    { allowedOrigins, devLoopbackOrigins },
+    "Allowed origins",
+  );
 }
 
 app.use(
@@ -100,17 +126,21 @@ app.use(
       "Authorization",
       "X-Requested-With",
       "Accept",
+      "X-Correlation-Id",
     ],
     origin: (origin, callback) => {
       if (validatedEnv.NODE_ENV !== "production") {
-        console.log("Incoming origin:", origin);
+        logger.debug({ origin }, "Incoming origin");
       }
 
       if (!origin) {
         return callback(null, true);
       }
 
-      if (allowedOrigins.includes(origin)) {
+      if (
+        allowedOrigins.includes(origin) ||
+        devLoopbackOrigins.includes(origin)
+      ) {
         return callback(null, true);
       }
 
@@ -120,8 +150,10 @@ app.use(
   }),
 );
 app.use(correlationIdMiddleware);
+app.use(bindSentryRequestContext);
 app.use(requestLoggerMiddleware);
 app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 app.use(
   helmet({
@@ -141,6 +173,8 @@ app.get("/", (request, response) => {
 });
 
 app.get("/api/health", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
   const state = mongoose.connection.readyState;
   const dbStatus =
     state === 1
@@ -175,25 +209,89 @@ app.use("/api/notification", notificationRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-connectDB()
-  .then(async () => {
-    try {
-      await seedRoles();
-      initAuditCron();
-      app.listen(PORT, "0.0.0.0", () => {
-        logger.info(`Server is running ${PORT}`);
-      });
-    } catch (startupError) {
-      logger.error("Error during startup sequence:", startupError);
+const closeServer = () =>
+  new Promise((resolve) => {
+    if (!server) {
+      resolve();
+      return;
     }
-  })
-  .catch((err) => {
-    logger.error(
-      "CRITICAL: Database connection failed. Server starting in limited mode.",
-      err,
-    );
-    // Start server anyway to provide health check and logs
-    app.listen(PORT, "0.0.0.0", () => {
-      logger.info(`Server started (LIMITED MODE - NO DB) on ${PORT}`);
+
+    server.close((error) => {
+      if (error) {
+        logger.error({ err: error }, "Error while closing HTTP server");
+      }
+      resolve();
     });
   });
+
+const closeDatabase = async () => {
+  if (mongoose.connection.readyState === 0) return;
+
+  try {
+    await mongoose.connection.close();
+  } catch (error) {
+    logger.error({ err: error }, "Error while closing database connection");
+  }
+};
+
+const gracefulShutdown = async (signal, exitCode = 0) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  logger.warn({ signal }, "Graceful shutdown started");
+
+  await Promise.allSettled([closeServer(), closeDatabase()]);
+  process.exit(exitCode);
+};
+
+const handleFatalError = async (type, error) => {
+  logger.fatal({ err: error }, `${type} received`);
+  await gracefulShutdown(type, 1);
+};
+
+const startHttpServer = (startupLabel) => {
+  server = app.listen(PORT, "0.0.0.0", () => {
+    logger.info(`${startupLabel} on ${PORT}`);
+  });
+  server.requestTimeout = 120000;
+  server.headersTimeout = 125000;
+  server.keepAliveTimeout = 65000;
+};
+
+const startApplication = async () => {
+  try {
+    await connectDB();
+    await seedRoles();
+    initAuditCron();
+    startHttpServer("Server is running");
+  } catch (error) {
+    logger.error({ err: error }, "Error during startup sequence");
+
+    if (validatedEnv.NODE_ENV === "production") {
+      logger.fatal(
+        "Database connection failed in production. Refusing to start in limited mode.",
+      );
+      process.exit(1);
+    }
+
+    startHttpServer("Server started (LIMITED MODE - NO DB)");
+  }
+};
+
+process.on("SIGINT", () => {
+  gracefulShutdown("SIGINT");
+});
+
+process.on("SIGTERM", () => {
+  gracefulShutdown("SIGTERM");
+});
+
+process.on("unhandledRejection", (reason) => {
+  handleFatalError("unhandledRejection", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  handleFatalError("uncaughtException", error);
+});
+
+startApplication();

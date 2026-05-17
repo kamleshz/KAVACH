@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
+import usePrefersReducedMotion from "../hooks/usePrefersReducedMotion";
 
 const GsapPageTransition = ({
   children,
@@ -7,13 +8,10 @@ const GsapPageTransition = ({
   transitionKey = "default",
 }) => {
   const containerRef = useRef(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useLayoutEffect(() => {
     if (!containerRef.current || typeof window === "undefined") return undefined;
-
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
     if (prefersReducedMotion) return undefined;
 
     const ctx = gsap.context(() => {
@@ -31,7 +29,7 @@ const GsapPageTransition = ({
     }, containerRef);
 
     return () => ctx.revert();
-  }, [transitionKey]);
+  }, [prefersReducedMotion, transitionKey]);
 
   return (
     <div ref={containerRef} className={className}>

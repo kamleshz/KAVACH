@@ -2,12 +2,13 @@ import React from 'react';
 import { FaClipboardCheck } from 'react-icons/fa';
 import ClientDetail from '../../pages/ClientDetail';
 
-const Audit = ({ clientId, setIsAuditComplete, setActiveTab, wasteType }) => {
+const Audit = ({ clientId, clientData, setIsAuditComplete, setActiveTab, wasteType }) => {
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
             {clientId ? (
             <ClientDetail 
                 clientId={clientId} 
+                initialClientData={clientData}
                 embedded={true} 
                 initialViewMode="process"
                 onAuditComplete={() => {

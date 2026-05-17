@@ -2,17 +2,24 @@ import { randomUUID } from "crypto";
 import CacheService from "./cache.service.js";
 import { isPdfQueueEnabled, pdfQueue } from "../queues/pdf.queue.js";
 import ReportGeneratorService from "./analysis/reportGenerator.service.js";
+import logger from "../utils/logger.js";
 
 const REPORT_META_PREFIX = "report:meta:";
 const REPORT_BUFFER_PREFIX = "report:buffer:";
 const REPORT_LOOKUP_PREFIX = "report:lookup:";
-const REPORT_CACHE_VERSION = "2026-05-02-complete-report-index-v1";
+const REPORT_CACHE_VERSION = "2026-05-15-index-fit-and-no-left-box-v48";
 
 const createReportCacheKey = ({ reportType, clientId, type, itemId, userId }) =>
   `${REPORT_LOOKUP_PREFIX}${REPORT_CACHE_VERSION}:${reportType}:${clientId}:${type}:${itemId}:${userId || "anonymous"}`;
 
 const createMetaKey = (jobId) => `${REPORT_META_PREFIX}${jobId}`;
 const createBufferKey = (jobId) => `${REPORT_BUFFER_PREFIX}${jobId}`;
+const canAccessReportJob = (meta, userId) => {
+  if (!meta) return false;
+  if (!userId) return !meta.userId;
+  if (!meta.userId) return true;
+  return String(meta.userId) === String(userId);
+};
 
 class PdfService {
   static async enqueueReport({ reportType, clientId, type, itemId, userId }) {
@@ -26,7 +33,9 @@ class PdfService {
     const cachedMeta = await CacheService.getCache(reportCacheKey);
 
     if (cachedMeta?.jobId) {
-      const cachedStatus = await this.getJobStatus(cachedMeta.jobId);
+      const cachedStatus = await this.getJobStatus(cachedMeta.jobId, {
+        userId,
+      });
       if (cachedStatus?.state === "completed") {
         return {
           jobId: cachedMeta.jobId,
@@ -56,37 +65,70 @@ class PdfService {
       return { jobId, cached: true, fallback: true };
     }
 
-    const job = await pdfQueue.add("generate-report", {
-      reportType,
-      clientId,
-      type,
-      itemId,
-      userId,
-    });
+    try {
+      const job = await pdfQueue.add("generate-report", {
+        reportType,
+        clientId,
+        type,
+        itemId,
+        userId,
+      });
 
-    const meta = {
-      jobId: job.id,
-      state: "queued",
-      reportType,
-      clientId,
-      type,
-      itemId,
-      userId,
-      createdAt: new Date().toISOString(),
-    };
+      const meta = {
+        jobId: job.id,
+        state: "queued",
+        reportType,
+        clientId,
+        type,
+        itemId,
+        userId,
+        createdAt: new Date().toISOString(),
+      };
 
-    await CacheService.setCache(
-      createMetaKey(job.id),
-      meta,
-      CacheService.ttl.reports,
-    );
-    await CacheService.setCache(
-      reportCacheKey,
-      { jobId: job.id },
-      CacheService.ttl.reports,
-    );
+      await CacheService.setCache(
+        createMetaKey(job.id),
+        meta,
+        CacheService.ttl.reports,
+      );
+      await CacheService.setCache(
+        reportCacheKey,
+        { jobId: job.id },
+        CacheService.ttl.reports,
+      );
 
-    return { jobId: job.id, cached: false };
+      return { jobId: job.id, cached: false };
+    } catch (error) {
+      logger.error(
+        {
+          error: error?.message,
+          reportType,
+          clientId,
+          type,
+          itemId,
+          userId,
+        },
+        "[PDF] Queue enqueue failed, falling back to direct generation",
+      );
+
+      const buffer = await this.generateReportBuffer({
+        reportType,
+        clientId,
+        type,
+        itemId,
+        userId,
+      });
+      const jobId = randomUUID();
+      await this.persistCompletedJob({
+        jobId,
+        reportType,
+        clientId,
+        type,
+        itemId,
+        userId,
+        buffer,
+      });
+      return { jobId, cached: true, fallback: true };
+    }
   }
 
   static async generateReportBuffer({
@@ -173,9 +215,11 @@ class PdfService {
     return meta;
   }
 
-  static async getJobStatus(jobId) {
+  static async getJobStatus(jobId, { userId } = {}) {
     const meta = await CacheService.getCache(createMetaKey(jobId));
-    if (meta) return meta;
+    if (meta) {
+      return canAccessReportJob(meta, userId) ? meta : null;
+    }
 
     if (!isPdfQueueEnabled || !pdfQueue) return null;
 
@@ -191,7 +235,14 @@ class PdfService {
         ? new Date(job.timestamp).toISOString()
         : undefined,
       failedReason: job.failedReason || undefined,
+      reportType: job.data?.reportType,
+      clientId: job.data?.clientId,
+      type: job.data?.type,
+      itemId: job.data?.itemId,
+      userId: job.data?.userId,
     };
+
+    if (!canAccessReportJob(status, userId)) return null;
 
     await CacheService.setCache(
       createMetaKey(jobId),
@@ -207,18 +258,25 @@ class PdfService {
     return Buffer.from(encoded, "base64");
   }
 
-  static async listReportJobs({ page, limit }) {
+  static async listReportJobs({ page, limit, userId }) {
     const keys = await CacheService.listKeys(`${REPORT_META_PREFIX}*`);
-    const sortedKeys = keys.sort().reverse();
-    const total = sortedKeys.length;
+    const rawItems = await Promise.all(keys.map((key) => CacheService.getCache(key)));
+    const filteredItems = rawItems
+      .filter(Boolean)
+      .filter((item) => canAccessReportJob(item, userId))
+      .sort((a, b) => {
+        const aDate =
+          a?.completedAt || a?.failedAt || a?.createdAt || "";
+        const bDate =
+          b?.completedAt || b?.failedAt || b?.createdAt || "";
+        return bDate.localeCompare(aDate);
+      });
+    const total = filteredItems.length;
     const start = (page - 1) * limit;
-    const selectedKeys = sortedKeys.slice(start, start + limit);
-    const rawItems = await Promise.all(
-      selectedKeys.map((key) => CacheService.getCache(key)),
-    );
+    const data = filteredItems.slice(start, start + limit);
 
     return {
-      data: rawItems.filter(Boolean),
+      data,
       total,
     };
   }

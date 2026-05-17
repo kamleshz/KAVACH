@@ -11,6 +11,8 @@ import MonthlyProcurementModel from "../../models/monthlyProcurement.model.js";
 import SkuComplianceModel from "../../models/skuCompliance.model.js";
 import ClientModel from "../../models/client.model.js";
 import PWPModel from "../../models/pwp.model.js";
+import "../../models/user.model.js";
+import PlasticAnalysisService from "./plasticAnalysis.service.js";
 import {
   buildSupplierMetaByName,
   buildSupplierStatusByName,
@@ -18,11 +20,30 @@ import {
   normalizeSupplierCtoDateText,
   normalizeSupplierCtoRegistrationStatus,
 } from "../../utils/supplierCto.js";
+import logger from "../../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const reportDebugEnabled = process.env.NODE_ENV !== "production";
 
 class ReportGeneratorService {
+  static getNextFinancialYear(fy) {
+    if (!fy) return "Unknown";
+    const parts = fy.split("-");
+    if (parts.length === 2) {
+      const startYear = parseInt(parts[0], 10);
+      const endYear = parseInt(parts[1], 10);
+      if (!Number.isNaN(startYear) && !Number.isNaN(endYear)) {
+        return `${startYear + 1}-${endYear + 1}`;
+      }
+    }
+    return `${fy} (Next)`;
+  }
+
+  static generateAuditorInsights(...args) {
+    return PlasticAnalysisService.generateAuditorInsights(...args);
+  }
+
   /**
    * Generate Plastic Compliance Report PDF
    */
@@ -33,8 +54,9 @@ class ReportGeneratorService {
     userId,
     options = {},
   ) {
-    console.log(
-      `[Report Generation] Starting for Client: ${clientId}, Type: ${type}, ItemId: ${itemId}`,
+    logger.info(
+      { clientId, type, itemId, userId },
+      "[Report Generation] Starting",
     );
 
     // Register Handlebars helpers
@@ -69,11 +91,12 @@ class ReportGeneratorService {
       clientDoc = await PWPModel.findById(clientId).populate("assignedTo");
 
     if (!clientDoc) {
-      console.error("[Report Generation] Client not found");
+      logger.error({ clientId, type, itemId }, "[Report Generation] Client not found");
       throw new Error("Client not found");
     }
-    console.log(
-      `[Report Generation] Client found: ${clientDoc.name || clientDoc.clientName}`,
+    logger.info(
+      { clientId, clientName: clientDoc.name || clientDoc.clientName },
+      "[Report Generation] Client found",
     );
 
     // Logic to determine Auditor Name (assignedTo is usually the auditor/user working on it)
@@ -95,7 +118,10 @@ class ReportGeneratorService {
       type,
       itemId,
     });
-    console.log(`[Report Generation] Analysis Doc found: ${!!analysisDoc}`);
+    logger.debug(
+      { clientId, type, itemId, found: Boolean(analysisDoc) },
+      "[Report Generation] Analysis doc lookup",
+    );
 
     // Helper for date formatting
     const formatDate = (date) =>
@@ -244,8 +270,9 @@ class ReportGeneratorService {
       }));
 
     // 3. Fetch SKU Details (Grouped by Industry Category)
-    console.log(
-      `[Report Generation] Fetching Product Compliance for Client: ${clientId}, Type: ${type}, ItemId: ${itemId}, isProducer: ${isProducer}`,
+    logger.debug(
+      { clientId, type, itemId, isProducer },
+      "[Report Generation] Fetching compliance documents",
     );
     const [productComplianceDoc, supplierCtoDoc, monthlyProcurementDoc] =
       await Promise.all([
@@ -253,8 +280,15 @@ class ReportGeneratorService {
         SupplierCtoCheckModel.findOne({ client: clientId, type, itemId }),
         MonthlyProcurementModel.findOne({ client: clientId, type, itemId }),
       ]);
-    console.log(
-      `[Report Generation] Product Compliance Doc found: ${!!productComplianceDoc}, Rows: ${productComplianceDoc?.rows?.length || 0}`,
+    logger.debug(
+      {
+        clientId,
+        type,
+        itemId,
+        found: Boolean(productComplianceDoc),
+        rows: productComplianceDoc?.rows?.length || 0,
+      },
+      "[Report Generation] Product compliance lookup",
     );
 
     const allRows = productComplianceDoc?.rows || [];
@@ -292,7 +326,9 @@ class ReportGeneratorService {
       // If stored as "uploads/file.jpg", resolve relative to root
       const absolutePath = path.resolve(process.cwd(), img);
       // DEBUG: Log image resolution
-      console.log(`[resolveImage] Input: ${img}, Resolved: ${absolutePath}`);
+      if (reportDebugEnabled) {
+        logger.debug({ input: img, absolutePath }, "[resolveImage] Resolved image path");
+      }
       // Convert to file URI or base64? File URI is safer for local puppeteer
       // But we need to make sure the file exists
       if (fs.existsSync(absolutePath)) {
@@ -301,16 +337,21 @@ class ReportGeneratorService {
           const bitmap = fs.readFileSync(absolutePath);
           const base64 = Buffer.from(bitmap).toString("base64");
           const ext = path.extname(absolutePath).substring(1);
-          console.log(
-            `[resolveImage] Successfully converted to base64, length: ${base64.length}`,
-          );
+          if (reportDebugEnabled) {
+            logger.debug(
+              { absolutePath, base64Length: base64.length },
+              "[resolveImage] Converted image to base64",
+            );
+          }
           return `data:image/${ext};base64,${base64}`;
         } catch (e) {
-          console.error("Error reading image file:", e);
+          logger.error({ err: e, absolutePath }, "Error reading image file");
           return null;
         }
       }
-      console.log(`[resolveImage] File not found: ${absolutePath}`);
+      if (reportDebugEnabled) {
+        logger.debug({ absolutePath }, "[resolveImage] File not found");
+      }
       return null;
     };
 
@@ -450,134 +491,173 @@ class ReportGeneratorService {
       if (!industryMap[cat]) industryMap[cat] = {}; // Changed to Object for SKU grouping
 
       if (isProducer) {
-        // Producer Logic: Group by Component Code
-        const compCode =
-          (row.componentCode || "").trim() || "Unknown Component";
+        const skuCode =
+          (row?.skuCode || "").toString().trim() ||
+          (row?.systemCode || "").toString().trim() ||
+          (row?.componentCode || "").toString().trim() ||
+          "Unknown SKU";
+        const candidateProductImage = resolveImage(
+          row.productImage || row.componentImage,
+        );
 
-        // If not exists, create entry
-        if (!industryMap[cat][compCode]) {
-          // Resolve Component Image
-          const componentImgSrc = resolveImage(row.componentImage);
+        if (!industryMap[cat][skuCode]) {
+          industryMap[cat][skuCode] = {
+            skuCode,
+            skuDescription: row.skuDescription || row.componentDescription || "-",
+            skuUom: row.skuUom || "-",
+            clientName: row.clientName || "-",
+            productImage: candidateProductImage,
+            status: "Pending",
+            components: [],
+          };
+        } else if (
+          !industryMap[cat][skuCode].productImage &&
+          candidateProductImage
+        ) {
+          industryMap[cat][skuCode].productImage = candidateProductImage;
+        }
 
-          // Look up details
-          const compDetail =
-            componentDetails.find(
-              (c) => (c.componentCode || "").trim() === compCode,
-            ) || {};
-          const suppComp =
-            supplierCompliance.find(
-              (s) => (s.componentCode || "").trim() === compCode,
-            ) || {};
+        if (
+          (!industryMap[cat][skuCode].clientName ||
+            industryMap[cat][skuCode].clientName === "-") &&
+          row.clientName
+        ) {
+          industryMap[cat][skuCode].clientName = row.clientName;
+        }
 
-          // Aggregate Procurement Data (optional, but good to have)
-          const procRecords = procurementDetails.filter(
-            (p) => (p.componentCode || "").trim() === compCode,
-          );
-          const totalMonthlyPurchaseMt = procRecords.reduce(
-            (sum, p) => sum + (p.monthlyPurchaseMt || 0),
-            0,
-          );
-          const totalRecycledQty = procRecords.reduce(
-            (sum, p) => sum + (p.recycledQty || 0),
-            0,
-          );
-          let recycledPolymerUsed = pickText(
-            row.recycledPolymerUsed,
-            row.recycled_polymer_used,
-            row["Recycled Polymer Used"],
-            compDetail.recycledPolymerUsed,
-            compDetail.recycled_polymer_used,
-            compDetail["Recycled Polymer Used"],
-          );
-          if (!recycledPolymerUsed) {
-            for (const p of procRecords) {
-              recycledPolymerUsed = pickText(
-                p.recycledPolymerUsed,
-                p.recycled_polymer_used,
-                p["Recycled Polymer Used"],
-              );
-              if (recycledPolymerUsed) break;
-            }
+        const compCode = (row.componentCode || "").trim();
+        const compDetail =
+          componentDetails.find(
+            (c) => (c.componentCode || "").trim() === compCode,
+          ) || {};
+        const suppComp =
+          supplierCompliance.find(
+            (s) => (s.componentCode || "").trim() === compCode,
+          ) || {};
+
+        const procRecords = procurementDetails.filter(
+          (p) => (p.componentCode || "").trim() === compCode,
+        );
+        const totalMonthlyPurchaseMt = procRecords.reduce(
+          (sum, p) => sum + (p.monthlyPurchaseMt || 0),
+          0,
+        );
+        const totalRecycledQty = procRecords.reduce(
+          (sum, p) => sum + (p.recycledQty || 0),
+          0,
+        );
+
+        let recycledPolymerUsed = pickText(
+          row.recycledPolymerUsed,
+          row.recycled_polymer_used,
+          row["Recycled Polymer Used"],
+          compDetail.recycledPolymerUsed,
+          compDetail.recycled_polymer_used,
+          compDetail["Recycled Polymer Used"],
+        );
+        if (!recycledPolymerUsed) {
+          for (const p of procRecords) {
+            recycledPolymerUsed = pickText(
+              p.recycledPolymerUsed,
+              p.recycled_polymer_used,
+              p["Recycled Polymer Used"],
+            );
+            if (recycledPolymerUsed) break;
           }
-          if (!recycledPolymerUsed) recycledPolymerUsed = "-";
+        }
+        if (!recycledPolymerUsed) recycledPolymerUsed = "-";
 
-          let polymerType = pickText(
-            row.polymerType,
-            row["Polymer Type"],
-            compDetail.polymerType,
-            compDetail["Polymer Type"],
-          );
-          if (!polymerType) {
-            for (const p of procRecords) {
-              polymerType = pickText(p.polymerType, p["Polymer Type"]);
-              if (polymerType) break;
-            }
+        let polymerType = pickText(
+          row.polymerType,
+          row["Polymer Type"],
+          compDetail.polymerType,
+          compDetail["Polymer Type"],
+        );
+        if (!polymerType) {
+          for (const p of procRecords) {
+            polymerType = pickText(p.polymerType, p["Polymer Type"]);
+            if (polymerType) break;
           }
-          if (!polymerType) polymerType = "-";
+        }
+        if (!polymerType) polymerType = "-";
 
-          let componentPolymer = pickText(
-            row.componentPolymer,
-            row.component_polymer,
-            row["Component Polymer"],
-            row.componentPolymerType,
-            row["Component Polymer Type"],
-            row.polymer,
-            row["Polymer"],
-            compDetail.componentPolymer,
-            compDetail.component_polymer,
-            compDetail["Component Polymer"],
-            compDetail.componentPolymerType,
-            compDetail["Component Polymer Type"],
-            compDetail.polymer,
-            compDetail["Polymer"],
-          );
-          if (!componentPolymer) {
-            for (const p of procRecords) {
-              componentPolymer = pickText(
-                p.componentPolymer,
-                p.component_polymer,
-                p["Component Polymer"],
-                p.componentPolymerType,
-                p["Component Polymer Type"],
-                p.polymer,
-                p["Polymer"],
-                p.polymerType,
-                p["Polymer Type"],
-              );
-              if (componentPolymer) break;
-            }
+        let componentPolymer = pickText(
+          row.componentPolymer,
+          row.component_polymer,
+          row["Component Polymer"],
+          row.componentPolymerType,
+          row["Component Polymer Type"],
+          row.polymer,
+          row["Polymer"],
+          compDetail.componentPolymer,
+          compDetail.component_polymer,
+          compDetail["Component Polymer"],
+          compDetail.componentPolymerType,
+          compDetail["Component Polymer Type"],
+          compDetail.polymer,
+          compDetail["Polymer"],
+        );
+        if (!componentPolymer) {
+          for (const p of procRecords) {
+            componentPolymer = pickText(
+              p.componentPolymer,
+              p.component_polymer,
+              p["Component Polymer"],
+              p.componentPolymerType,
+              p["Component Polymer Type"],
+              p.polymer,
+              p["Polymer"],
+              p.polymerType,
+              p["Polymer Type"],
+            );
+            if (componentPolymer) break;
           }
-          if (!componentPolymer) componentPolymer = polymerType || "-";
+        }
+        if (!componentPolymer) componentPolymer = polymerType || "-";
 
-          industryMap[cat][compCode] = {
-            isComponent: true, // Flag to identify this is a component object, not SKU
-            componentCode: compCode,
-            componentDescription: row.componentDescription || "-",
+        const componentStatus =
+          row.componentComplianceStatus || row.complianceStatus || "Pending";
+        const componentImgSrc = resolveImage(row.componentImage);
+        const bucket = industryMap[cat][skuCode];
+        const componentKey =
+          `${compCode || "-"}::${(row.supplierName || suppComp.supplierName || "-").toString().trim().toLowerCase()}`;
+
+        if (
+          !bucket.components.some(
+            (component) => component.__componentKey === componentKey,
+          )
+        ) {
+          bucket.components.push({
+            __componentKey: componentKey,
+            componentCode: compCode || "-",
             componentImage: componentImgSrc,
+            componentDescription: row.componentDescription || "-",
             supplierName: row.supplierName || suppComp.supplierName || "-",
-            supplierStatus: suppComp.supplierStatus || "-",
             supplierState: row.supplierState || suppComp.supplierState || "-",
+            supplierStatus: suppComp.supplierStatus || "-",
             eprCertificateNumber: suppComp.eprCertificateNumber || "-",
             polymerType,
             componentPolymer,
             recycledPolymerUsed,
             category: compDetail.category || row.category || "-",
+            categoryIIType: compDetail.categoryIIType || "-",
+            containerCapacity: compDetail.containerCapacity || "-",
+            layerType: compDetail.layerType || "-",
             thickness: compDetail.thickness || "-",
             monthlyPurchaseMt: totalMonthlyPurchaseMt.toFixed(4),
             recycledQty: totalRecycledQty.toFixed(4),
-            status:
-              row.componentComplianceStatus ||
-              row.complianceStatus ||
-              "Pending",
+            status: componentStatus,
             auditorRemarks: row.auditorRemarks || "-",
-            // Dummy 'components' array to satisfy summary calculation structure if needed,
-            // but better to adjust summary calculation.
-            // However, the summary calculation uses `sku.components` to sum up monthlyPurchase.
-            // So I'll put a self-reference or empty array?
-            // Let's adjust summary calculation to handle isProducer.
-            components: [],
-          };
+            managerRemarks: row.managerRemarks || "-",
+          });
         }
+
+        const statuses = bucket.components.map((component) => component.status);
+        bucket.status = statuses.includes("Non-Compliant")
+          ? "Non-Compliant"
+          : statuses.includes("Compliant")
+            ? "Compliant"
+            : "Pending";
       } else {
         // Brand Owner Logic: Group by SKU
         const skuCode = (row?.skuCode || "").toString().trim() || "Unknown SKU";
@@ -755,35 +835,7 @@ class ReportGeneratorService {
         compPendingCount,
         complianceScore;
 
-      if (isProducer) {
-        // Producer Summary Logic (skus array actually contains components)
-        totalSkus = skus.length; // Actually total components
-
-        // Sum monthly purchase from the component objects directly
-        totalMonthlyPurchase = skus.reduce(
-          (sum, comp) => sum + parseFloat(comp.monthlyPurchaseMt || 0),
-          0,
-        );
-
-        // Status counts based on component status
-        skuCompliantCount = skus.filter((c) => c.status === "Compliant").length;
-        skuNonCompliantCount = skus.filter(
-          (c) => c.status === "Non-Compliant",
-        ).length;
-        skuPendingCount =
-          totalSkus - (skuCompliantCount + skuNonCompliantCount);
-
-        // For Producer, Component Stats = SKU Stats (since we mapped components as SKUs)
-        compCompliantCount = skuCompliantCount;
-        compNonCompliantCount = skuNonCompliantCount;
-        compPendingCount = skuPendingCount;
-        complianceScore =
-          totalSkus > 0
-            ? ((skuCompliantCount / totalSkus) * 100).toFixed(1)
-            : 0;
-      } else {
-        // Brand Owner Summary Logic
-        // Category Summary Stats
+      {
         totalSkus = skus.length;
         totalMonthlyPurchase = skus.reduce(
           (sum, sku) =>
@@ -821,14 +873,6 @@ class ReportGeneratorService {
       }
 
       const normalizedSkus = skus.map((sku) => {
-        if (isProducer) {
-          return {
-            ...sku,
-            hasComponentImage: Boolean(sku.componentImage),
-            hasAuditorRemarks: hasMeaningfulValue(sku.auditorRemarks),
-          };
-        }
-
         const components = Array.isArray(sku.components) ? sku.components : [];
         const componentsWithImages = components.filter((component) =>
           Boolean(component.componentImage),
@@ -869,8 +913,9 @@ class ReportGeneratorService {
     const skuComplianceDocs = await SkuComplianceModel.find({
       client: clientId,
     });
-    console.log(
-      `[Report Generation] SkuCompliance docs found: ${skuComplianceDocs.length} for clientId: ${clientId}`,
+    logger.debug(
+      { clientId, count: skuComplianceDocs.length },
+      "[Report Generation] SkuCompliance docs found",
     );
 
     const normalizeText = (v) =>
@@ -933,8 +978,13 @@ class ReportGeneratorService {
 
     // If no dedicated SkuCompliance docs, fallback: build from productCompliance rows + skuComplianceMap
     if (markingSource.length === 0 && allRows.length > 0) {
-      console.log(
-        `[Report Generation] Falling back to productCompliance rows for marking data. allRows: ${allRows.length}, skuComplianceMap keys: ${Object.keys(skuComplianceMap).length}`,
+      logger.debug(
+        {
+          clientId,
+          allRows: allRows.length,
+          skuComplianceKeys: Object.keys(skuComplianceMap).length,
+        },
+        "[Report Generation] Falling back to productCompliance rows for marking data",
       );
       const uniqueSkus = new Map();
       allRows.forEach((row) => {
@@ -962,19 +1012,29 @@ class ReportGeneratorService {
         });
       });
       markingSource = Array.from(uniqueSkus.values());
-      console.log(
-        `[Report Generation] Fallback marking source built: ${markingSource.length} unique SKUs`,
+      logger.debug(
+        { clientId, count: markingSource.length },
+        "[Report Generation] Fallback marking source built",
       );
     }
 
-    console.log(
-      `[Report Generation] BEFORE SORT - markingSource has ${markingSource.length} items:`,
-    );
-    markingSource.forEach((doc, i) => {
-      console.log(
-        `  [${i}] ${doc.skuCode}: ${doc.skuDescription} (UOM: ${doc.skuUm || doc.skuUom})`,
+    if (reportDebugEnabled) {
+      logger.debug(
+        { count: markingSource.length },
+        "[Report Generation] BEFORE SORT - markingSource size",
       );
-    });
+      markingSource.forEach((doc, i) => {
+        logger.debug(
+          {
+            index: i,
+            skuCode: doc.skuCode,
+            skuDescription: doc.skuDescription,
+            skuUom: doc.skuUm || doc.skuUom,
+          },
+          "[Report Generation] Marking source item",
+        );
+      });
+    }
 
     const markingLabelingData = markingSource
       .sort((a, b) => {
@@ -983,14 +1043,18 @@ class ReportGeneratorService {
         return aCode.localeCompare(bCode);
       })
       .map((doc, index) => {
-        // DEBUG: Log each SKU being processed with ALL key data
-        console.log(`[Report Generation] Processing SKU ${index + 1}:`);
-        console.log(`  Code: ${doc.skuCode}`);
-        console.log(`  Desc: ${doc.skuDescription}`);
-        console.log(`  UOM: ${doc.skuUm || doc.skuUom}`);
-        console.log(
-          `  Image: ${doc.productImage?.substring(0, 50) || "none"}...`,
-        );
+        if (reportDebugEnabled) {
+          logger.debug(
+            {
+              index: index + 1,
+              skuCode: doc.skuCode,
+              skuDescription: doc.skuDescription,
+              skuUom: doc.skuUm || doc.skuUom,
+              productImagePreview: doc.productImage?.substring(0, 50) || "none",
+            },
+            "[Report Generation] Processing SKU",
+          );
+        }
 
         const brandOwner = doc.brandOwner || "";
         const eprCertBrandOwner = doc.eprCertBrandOwner || "";
@@ -1006,14 +1070,23 @@ class ReportGeneratorService {
           .map((img) => resolveImage(img))
           .filter(Boolean);
 
-        // Debug logging for image issues
         if (markingImages.length > 0) {
-          console.log(
-            `[Report Generation] SKU ${doc.skuCode}: ${markingImages.length} marking images found`,
-          );
-          markingImages.forEach((img, idx) =>
-            console.log(`  Image ${idx + 1}: ${img?.substring(0, 100)}...`),
-          );
+          if (reportDebugEnabled) {
+            logger.debug(
+              { skuCode: doc.skuCode, count: markingImages.length },
+              "[Report Generation] Marking images found",
+            );
+            markingImages.forEach((img, idx) =>
+              logger.debug(
+                {
+                  skuCode: doc.skuCode,
+                  index: idx + 1,
+                  preview: img?.substring(0, 100) || "",
+                },
+                "[Report Generation] Marking image preview",
+              ),
+            );
+          }
         }
         const auditorRemarks = Array.isArray(doc.remarks)
           ? doc.remarks.join("\n")
@@ -1098,166 +1171,155 @@ class ReportGeneratorService {
       })
       .filter((row) => row.hasAnyData);
 
-    console.log(
-      `[Report Generation] Final markingLabelingData count: ${markingLabelingData.length}`,
+    logger.debug(
+      { count: markingLabelingData.length },
+      "[Report Generation] Final markingLabelingData count",
     );
 
-    const markingLabelingReportByIndustry = !isProducer
-      ? Object.values(
-          markingLabelingData.reduce((acc, item) => {
-            const industryName =
-              (item.industryCategory || "General").trim() || "General";
-            if (!acc[industryName]) {
-              acc[industryName] = {
-                name: industryName,
-                rows: [],
-              };
-            }
-            acc[industryName].rows.push(item);
-            return acc;
-          }, {}),
-        )
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((group) => ({
-            ...group,
-            rows: group.rows.sort((a, b) =>
-              (a.skuCode || "").localeCompare(b.skuCode || ""),
-            ),
-          }))
-      : [];
-
-    const industrySkuSummaryReport = !isProducer
-      ? industryCategories
-          .map((category) => {
-            const markingBySku = new Map(
-              markingLabelingData.map((item) => [
-                (item.skuCode || "").trim(),
-                item,
-              ]),
-            );
-
-            const rows = (category.skus || []).map((sku) => {
-              const skuCode = (sku.skuCode || "").trim();
-              const markingRow = markingBySku.get(skuCode) || {};
-              const savedMarkingStatus = (markingRow.complianceStatus || "")
-                .toString()
-                .trim();
-              const derivedMarkingStatus = (sku.markingDetails?.status || "")
-                .toString()
-                .trim();
-              const supplierCounts = (sku.components || []).reduce(
-                (acc, component, index) => {
-                  const status = (component?.supplierStatus || "")
-                    .toString()
-                    .trim()
-                    .toLowerCase();
-                  const componentCode = (component?.componentCode || "")
-                    .toString()
-                    .trim();
-                  const supplierName = (component?.supplierName || "")
-                    .toString()
-                    .trim()
-                    .toLowerCase();
-                  const supplierKey = `${componentCode}::${supplierName || `supplier-${index}`}`;
-
-                  if (status.includes("unregistered")) {
-                    acc.unregistered.add(supplierKey);
-                  } else if (status.includes("registered")) {
-                    acc.registered.add(supplierKey);
-                  }
-
-                  return acc;
-                },
-                { registered: new Set(), unregistered: new Set() },
-              );
-              const componentRemarks = (sku.components || [])
-                .map((component) => {
-                  const remark = (component.auditorRemarks || "")
-                    .toString()
-                    .trim();
-                  if (!remark || remark === "-") return "";
-                  const componentCode = (component.componentCode || "")
-                    .toString()
-                    .trim();
-                  return componentCode ? `${componentCode}: ${remark}` : remark;
-                })
-                .filter(Boolean);
-
-              const componentSolutions = (sku.components || [])
-                .map((component) => {
-                  const status = (component?.status || "").toString().trim();
-                  const remark = (component?.managerRemarks || "")
-                    .toString()
-                    .trim();
-                  if (
-                    status !== "Non-Compliant" ||
-                    !remark ||
-                    remark === "-"
-                  )
-                    return "";
-                  const componentCode = (component?.componentCode || "")
-                    .toString()
-                    .trim();
-                  return componentCode ? `${componentCode}: ${remark}` : remark;
-                })
-                .filter(Boolean);
-
-              const markingRemarks = [
-                (markingRow.auditorRemarks || "").toString().trim(),
-                (markingRow.complianceRemarks || "").toString().trim(),
-              ].filter((remark) => remark && remark !== "-");
-
-              return {
-                skuCode: skuCode || "-",
-                skuDescription: sku.skuDescription || "-",
-                complianceStatus: sku.status || "Pending",
-                markingLabelingStatus:
-                  savedMarkingStatus || derivedMarkingStatus || "Pending",
-                supplierRegisteredCount: supplierCounts.registered.size,
-                supplierUnregisteredCount: supplierCounts.unregistered.size,
-                remarks:
-                  [...new Set([...componentRemarks, ...markingRemarks])].join(
-                    "\n",
-                  ) || "-",
-                solution:
-                  sku.status === "Non-Compliant"
-                    ? [...new Set(componentSolutions)].join("\n") || "-"
-                    : "-",
-              };
-            });
-
-            return {
-              name: category.name,
-              rows,
-            };
-          })
-          .filter((category) => category.rows.length > 0)
-      : [];
-
-    const industryCategorySummaryReport = !isProducer
-      ? industrySkuSummaryReport.map((category) => {
-          const rows = Array.isArray(category.rows) ? category.rows : [];
-          return {
-            name: category.name,
-            totalSku: rows.length,
-            complianceCompliant: rows.filter(
-              (row) => row.complianceStatus === "Compliant",
-            ).length,
-            complianceNonCompliant: rows.filter(
-              (row) => row.complianceStatus === "Non-Compliant",
-            ).length,
-            markingCompliant: rows.filter(
-              (row) => row.markingLabelingStatus === "Compliant",
-            ).length,
-            markingNonCompliant: rows.filter(
-              (row) => row.markingLabelingStatus === "Non-Compliant",
-            ).length,
+    const markingLabelingReportByIndustry = Object.values(
+      markingLabelingData.reduce((acc, item) => {
+        const industryName =
+          (item.industryCategory || "General").trim() || "General";
+        if (!acc[industryName]) {
+          acc[industryName] = {
+            name: industryName,
+            rows: [],
           };
-        })
-      : [];
+        }
+        acc[industryName].rows.push(item);
+        return acc;
+      }, {}),
+    )
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((group) => ({
+        ...group,
+        rows: group.rows.sort((a, b) =>
+          (a.skuCode || "").localeCompare(b.skuCode || ""),
+        ),
+      }));
 
-    const complianceOverview = !isProducer
-      ? (() => {
+    const industrySkuSummaryReport = industryCategories
+      .map((category) => {
+        const markingBySku = new Map(
+          markingLabelingData.map((item) => [(item.skuCode || "").trim(), item]),
+        );
+
+        const rows = (category.skus || []).map((sku) => {
+          const skuCode = (sku.skuCode || "").trim();
+          const markingRow = markingBySku.get(skuCode) || {};
+          const savedMarkingStatus = (markingRow.complianceStatus || "")
+            .toString()
+            .trim();
+          const derivedMarkingStatus = (sku.markingDetails?.status || "")
+            .toString()
+            .trim();
+          const supplierCounts = (sku.components || []).reduce(
+            (acc, component, index) => {
+              const status = (component?.supplierStatus || "")
+                .toString()
+                .trim()
+                .toLowerCase();
+              const componentCode = (component?.componentCode || "")
+                .toString()
+                .trim();
+              const supplierName = (component?.supplierName || "")
+                .toString()
+                .trim()
+                .toLowerCase();
+              const supplierKey = `${componentCode}::${supplierName || `supplier-${index}`}`;
+
+              if (status.includes("unregistered")) {
+                acc.unregistered.add(supplierKey);
+              } else if (status.includes("registered")) {
+                acc.registered.add(supplierKey);
+              }
+
+              return acc;
+            },
+            { registered: new Set(), unregistered: new Set() },
+          );
+          const componentRemarks = (sku.components || [])
+            .map((component) => {
+              const remark = (component.auditorRemarks || "")
+                .toString()
+                .trim();
+              if (!remark || remark === "-") return "";
+              const componentCode = (component.componentCode || "")
+                .toString()
+                .trim();
+              return componentCode ? `${componentCode}: ${remark}` : remark;
+            })
+            .filter(Boolean);
+
+          const componentSolutions = (sku.components || [])
+            .map((component) => {
+              const status = (component?.status || "").toString().trim();
+              const remark = (component?.managerRemarks || "")
+                .toString()
+                .trim();
+              if (status !== "Non-Compliant" || !remark || remark === "-")
+                return "";
+              const componentCode = (component?.componentCode || "")
+                .toString()
+                .trim();
+              return componentCode ? `${componentCode}: ${remark}` : remark;
+            })
+            .filter(Boolean);
+
+          const markingRemarks = [
+            (markingRow.auditorRemarks || "").toString().trim(),
+            (markingRow.complianceRemarks || "").toString().trim(),
+          ].filter((remark) => remark && remark !== "-");
+
+          return {
+            skuCode: skuCode || "-",
+            skuDescription: sku.skuDescription || "-",
+            complianceStatus: sku.status || "Pending",
+            markingLabelingStatus:
+              savedMarkingStatus || derivedMarkingStatus || "Pending",
+            supplierRegisteredCount: supplierCounts.registered.size,
+            supplierUnregisteredCount: supplierCounts.unregistered.size,
+            remarks:
+              [...new Set([...componentRemarks, ...markingRemarks])].join(
+                "\n",
+              ) || "-",
+            solution:
+              sku.status === "Non-Compliant"
+                ? [...new Set(componentSolutions)].join("\n") || "-"
+                : "-",
+          };
+        });
+
+        return {
+          name: category.name,
+          rows,
+        };
+      })
+      .filter((category) => category.rows.length > 0);
+
+    const industryCategorySummaryReport = industrySkuSummaryReport.map(
+      (category) => {
+        const rows = Array.isArray(category.rows) ? category.rows : [];
+        return {
+          name: category.name,
+          totalSku: rows.length,
+          complianceCompliant: rows.filter(
+            (row) => row.complianceStatus === "Compliant",
+          ).length,
+          complianceNonCompliant: rows.filter(
+            (row) => row.complianceStatus === "Non-Compliant",
+          ).length,
+          markingCompliant: rows.filter(
+            (row) => row.markingLabelingStatus === "Compliant",
+          ).length,
+          markingNonCompliant: rows.filter(
+            (row) => row.markingLabelingStatus === "Non-Compliant",
+          ).length,
+        };
+      },
+    );
+
+    const complianceOverview = (() => {
           const totals = industrySkuSummaryReport.reduce(
             (acc, category) => {
               (category.rows || []).forEach((row) => {
@@ -1302,11 +1364,9 @@ class ReportGeneratorService {
             otherPct,
             donutGradient,
           };
-        })()
-      : null;
+        })();
 
-    const complianceSnapshot = !isProducer
-      ? (() => {
+    const complianceSnapshot = (() => {
           const allSkuRows = industrySkuSummaryReport.flatMap(
             (category) => category.rows || [],
           );
@@ -1367,8 +1427,7 @@ class ReportGeneratorService {
             markingCompliancePct,
             eprReadinessStatus,
           };
-        })()
-      : null;
+        })();
 
     const sectionStatus = (() => {
       const iconMap = {
@@ -1408,7 +1467,9 @@ class ReportGeneratorService {
           skuCompliance: buildStatus(
             industryCategories.length ? "partial" : "missing",
           ),
-          markingLabeling: buildStatus("missing"),
+          markingLabeling: buildStatus(
+            markingLabelingData.length ? "complete" : "missing",
+          ),
           targetsCalculation: buildStatus(
             targetsReady ? "complete" : "missing",
           ),
@@ -1452,8 +1513,7 @@ class ReportGeneratorService {
       };
     })();
 
-    const industryComplianceBarData = !isProducer
-      ? industrySkuSummaryReport.map((category) => {
+    const industryComplianceBarData = industrySkuSummaryReport.map((category) => {
           const rows = Array.isArray(category.rows) ? category.rows : [];
           const compliant = rows.filter(
             (row) => row.complianceStatus === "Compliant",
@@ -1481,8 +1541,7 @@ class ReportGeneratorService {
             nonCompliantPct,
             otherPct,
           };
-        })
-      : [];
+        });
 
     const annualTargetSummaryReport = (prePostSummary || []).map(
       (row, index) => {
@@ -1544,6 +1603,10 @@ class ReportGeneratorService {
           skuCode,
           skuDescription,
           procurementTons: 0,
+          virginQty: 0,
+          recycledQty: 0,
+          virginAmount: 0,
+          recycledAmount: 0,
           totalCost: 0,
           suppliers: {},
         };
@@ -1551,6 +1614,10 @@ class ReportGeneratorService {
       const skuBucket = industryBucket.skus[skuCode];
 
       skuBucket.procurementTons += procurementTons;
+      skuBucket.virginQty += virginQty;
+      skuBucket.recycledQty += recycledQty;
+      skuBucket.virginAmount += virginAmount;
+      skuBucket.recycledAmount += recycledAmount;
       skuBucket.totalCost += virginAmount + recycledAmount;
 
       const supplierKey = `${supplierName.toLowerCase()}::${componentCode.toLowerCase()}`;
@@ -1626,6 +1693,10 @@ class ReportGeneratorService {
               skuCode: sku.skuCode,
               skuDescription: sku.skuDescription,
               procurementTons: sku.procurementTons.toFixed(4),
+              virginQty: sku.virginQty.toFixed(4),
+              recycledQty: sku.recycledQty.toFixed(4),
+              virginAmount: sku.virginAmount.toFixed(2),
+              recycledAmount: sku.recycledAmount.toFixed(2),
               totalCost: sku.totalCost.toFixed(2),
               avgRate: sku.procurementTons > 0 ? avgRateSku.toFixed(2) : "-",
               suppliers: supplierRows,
@@ -1719,6 +1790,7 @@ class ReportGeneratorService {
         if (!map[groupName]) {
           map[groupName] = {
             name: groupName,
+            annualPurchaseMt: 0,
             recycledQty: 0,
             recycledAmount: 0,
             virginQty: 0,
@@ -1729,6 +1801,7 @@ class ReportGeneratorService {
         }
 
         const bucket = map[groupName];
+        bucket.annualPurchaseMt += parseFloat(row?.monthlyPurchaseMt || 0) || 0;
         bucket.recycledQty += recycledQty;
         bucket.recycledAmount += recycledAmount;
         bucket.virginQty += virginQty;
@@ -1744,6 +1817,7 @@ class ReportGeneratorService {
           category,
           polymerName,
           recycledPolymerUsed,
+          annualPurchaseMt: (parseFloat(row?.monthlyPurchaseMt || 0) || 0).toFixed(4),
           recycledQty: recycledQty.toFixed(4),
           recycledAmount: recycledAmount.toFixed(2),
           virginQty: virginQty.toFixed(4),
@@ -1755,6 +1829,7 @@ class ReportGeneratorService {
       return Object.values(map)
         .map((group) => ({
           ...group,
+          annualPurchaseMt: group.annualPurchaseMt.toFixed(4),
           recycledQty: group.recycledQty.toFixed(4),
           recycledAmount: group.recycledAmount.toFixed(2),
           virginQty: group.virginQty.toFixed(4),
@@ -1783,14 +1858,44 @@ class ReportGeneratorService {
         map.get(supplierName).push(row);
       });
       return Array.from(map.entries())
-        .map(([supplierName, rows]) => ({
-          supplierName,
-          rows: (rows || []).sort((a, b) => {
-            const skuCompare = (a.skuCode || "").localeCompare(b.skuCode || "");
-            if (skuCompare !== 0) return skuCompare;
-            return (a.componentName || "").localeCompare(b.componentName || "");
-          }),
-        }))
+        .map(([supplierName, rows]) => {
+          const totals = (rows || []).reduce(
+            (acc, row) => {
+              acc.annualPurchaseMt += parseFloat(row?.annualPurchaseMt || 0) || 0;
+              acc.recycledQty += parseFloat(row?.recycledQty || 0) || 0;
+              acc.virginQty += parseFloat(row?.virginQty || 0) || 0;
+              acc.recycledAmount += parseFloat(row?.recycledAmount || 0) || 0;
+              acc.virginAmount += parseFloat(row?.virginAmount || 0) || 0;
+              acc.totalSpend += parseFloat(row?.totalSpend || 0) || 0;
+              return acc;
+            },
+            {
+              annualPurchaseMt: 0,
+              recycledQty: 0,
+              virginQty: 0,
+              recycledAmount: 0,
+              virginAmount: 0,
+              totalSpend: 0,
+            },
+          );
+
+          return {
+            supplierName,
+            totals: {
+              annualPurchaseMt: totals.annualPurchaseMt.toFixed(4),
+              recycledQty: totals.recycledQty.toFixed(4),
+              virginQty: totals.virginQty.toFixed(4),
+              recycledAmount: totals.recycledAmount.toFixed(2),
+              virginAmount: totals.virginAmount.toFixed(2),
+              totalSpend: totals.totalSpend.toFixed(2),
+            },
+            rows: (rows || []).sort((a, b) => {
+              const skuCompare = (a.skuCode || "").localeCompare(b.skuCode || "");
+              if (skuCompare !== 0) return skuCompare;
+              return (a.componentName || "").localeCompare(b.componentName || "");
+            }),
+          };
+        })
         .sort((a, b) =>
           (a.supplierName || "").localeCompare(b.supplierName || ""),
         );
@@ -1824,6 +1929,517 @@ class ReportGeneratorService {
       });
     });
     if (costAnalysisSkuDetails.length) costAnalysisSkuDetails[0].isFirst = true;
+
+    const finalizePdfCostRows = (rows) =>
+      (rows || [])
+        .map((row) => {
+          const annualPurchaseMtRaw = Number(row?.annualPurchaseMtRaw || 0) || 0;
+          const recycledQtyRaw = Number(row?.recycledQtyRaw || 0) || 0;
+          const virginQtyRaw = Number(row?.virginQtyRaw || 0) || 0;
+          const recycledAmountRaw = Number(row?.recycledAmountRaw || 0) || 0;
+          const virginAmountRaw = Number(row?.virginAmountRaw || 0) || 0;
+          const annualSpendRaw = recycledAmountRaw + virginAmountRaw;
+          const recycledSharePctRaw =
+            annualPurchaseMtRaw > 0
+              ? (recycledQtyRaw / annualPurchaseMtRaw) * 100
+              : 0;
+
+          return {
+            ...row,
+            annualPurchaseMt: formatNumber(annualPurchaseMtRaw, 3),
+            recycledQty: formatNumber(recycledQtyRaw, 3),
+            virginQty: formatNumber(virginQtyRaw, 3),
+            recycledAmount: formatNumber(recycledAmountRaw, 2),
+            virginAmount: formatNumber(virginAmountRaw, 2),
+            totalSpend: formatNumber(annualSpendRaw, 2),
+            recycledSharePct: formatPercent(recycledSharePctRaw, 1),
+            sortValue: annualPurchaseMtRaw,
+          };
+        })
+        .sort((a, b) => {
+          if (b.sortValue !== a.sortValue) return b.sortValue - a.sortValue;
+          return (a.name || "").localeCompare(b.name || "");
+        });
+
+    const buildPdfCostGroups = (groupBy) => {
+      const map = new Map();
+
+      (procurementDetails || []).forEach((row, index) => {
+        const skuCode =
+          normalizeText(row?.skuCode) ||
+          normalizeText(row?.systemCode) ||
+          normalizeText(row?.componentCode) ||
+          `sku-${index + 1}`;
+        const skuDescription =
+          (skuDescriptionMap[skuCode] || "").toString().trim() || "-";
+        const industryName =
+          (skuIndustryMap[skuCode] || row?.industryCategory || "")
+            .toString()
+            .trim() || "-";
+        const supplierName =
+          normalizeText(row?.supplierName) || "Unknown Supplier";
+        const supplierStatus =
+          normalizeText(row?.supplierStatus) ||
+          supplierStatusByName.get(supplierName.toLowerCase()) ||
+          "-";
+        const category = deriveCategoryFromRow(row);
+        const polymerName = derivePolymerNameFromRow(row);
+
+        let key = skuCode;
+        let name = skuCode;
+        let baseFields = {
+          skuCode,
+          skuDescription,
+          industryName,
+          supplierStatus,
+        };
+
+        if (groupBy === "polymer") {
+          key = polymerName.toLowerCase();
+          name = polymerName;
+          baseFields = {};
+        } else if (groupBy === "category") {
+          key = category.toLowerCase();
+          name = category;
+          baseFields = {};
+        } else if (groupBy === "supplier") {
+          key = supplierName.toLowerCase();
+          name = supplierName;
+          baseFields = { supplierStatus };
+        }
+
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            name,
+            ...baseFields,
+            annualPurchaseMtRaw: 0,
+            recycledQtyRaw: 0,
+            virginQtyRaw: 0,
+            recycledAmountRaw: 0,
+            virginAmountRaw: 0,
+          });
+        }
+
+        const bucket = map.get(key);
+        bucket.annualPurchaseMtRaw += Number(row?.monthlyPurchaseMt || 0) || 0;
+        bucket.recycledQtyRaw += Number(row?.recycledQty || 0) || 0;
+        bucket.virginQtyRaw += Number(row?.virginQty || 0) || 0;
+        bucket.recycledAmountRaw += Number(row?.recycledQrtAmount || 0) || 0;
+        bucket.virginAmountRaw += Number(row?.virginQtyAmount || 0) || 0;
+      });
+
+      return finalizePdfCostRows(Array.from(map.values()));
+    };
+
+    const buildPdfCostSection = (rows, countLabel) => {
+      const totalsRaw = (rows || []).reduce(
+        (acc, row) => {
+          acc.annualPurchaseMtRaw += Number(row?.annualPurchaseMtRaw || 0) || 0;
+          acc.recycledQtyRaw += Number(row?.recycledQtyRaw || 0) || 0;
+          acc.virginQtyRaw += Number(row?.virginQtyRaw || 0) || 0;
+          acc.recycledAmountRaw += Number(row?.recycledAmountRaw || 0) || 0;
+          acc.virginAmountRaw += Number(row?.virginAmountRaw || 0) || 0;
+          return acc;
+        },
+        {
+          annualPurchaseMtRaw: 0,
+          recycledQtyRaw: 0,
+          virginQtyRaw: 0,
+          recycledAmountRaw: 0,
+          virginAmountRaw: 0,
+        },
+      );
+
+      const annualSpendRaw =
+        totalsRaw.recycledAmountRaw + totalsRaw.virginAmountRaw;
+      const recycledSharePctRaw =
+        totalsRaw.annualPurchaseMtRaw > 0
+          ? (totalsRaw.recycledQtyRaw / totalsRaw.annualPurchaseMtRaw) * 100
+          : 0;
+
+      return {
+        countLabel,
+        totalGroups: rows.length,
+        cards: [
+          {
+            label: "Annual Purchase MT",
+            value: formatNumber(totalsRaw.annualPurchaseMtRaw, 3),
+          },
+          {
+            label: "Recycled Qty",
+            value: formatNumber(totalsRaw.recycledQtyRaw, 3),
+          },
+          {
+            label: "Virgin Qty",
+            value: formatNumber(totalsRaw.virginQtyRaw, 3),
+          },
+          {
+            label: "Recycled Amount",
+            value: formatNumber(totalsRaw.recycledAmountRaw, 2),
+          },
+          {
+            label: "Virgin Amount",
+            value: formatNumber(totalsRaw.virginAmountRaw, 2),
+          },
+        ],
+        rows,
+        totals: {
+          annualPurchaseMt: formatNumber(totalsRaw.annualPurchaseMtRaw, 3),
+          recycledQty: formatNumber(totalsRaw.recycledQtyRaw, 3),
+          virginQty: formatNumber(totalsRaw.virginQtyRaw, 3),
+          recycledAmount: formatNumber(totalsRaw.recycledAmountRaw, 2),
+          virginAmount: formatNumber(totalsRaw.virginAmountRaw, 2),
+          totalSpend: formatNumber(annualSpendRaw, 2),
+          recycledSharePct: formatPercent(recycledSharePctRaw, 1),
+        },
+      };
+    };
+
+    const getMonthMetaFromProcurementRow = (row) => {
+      const invoiceDate =
+        row?.dateOfInvoice instanceof Date
+          ? row.dateOfInvoice
+          : row?.dateOfInvoice
+            ? new Date(row.dateOfInvoice)
+            : null;
+
+      if (invoiceDate && !Number.isNaN(invoiceDate.getTime())) {
+        const year = invoiceDate.getFullYear();
+        const month = invoiceDate.getMonth();
+        return {
+          key: `${year}-${String(month + 1).padStart(2, "0")}`,
+          sortKey: `${year}-${String(month + 1).padStart(2, "0")}`,
+          label: invoiceDate.toLocaleString("en-GB", {
+            month: "short",
+            year: "numeric",
+          }),
+        };
+      }
+
+      const monthText = normalizeText(row?.monthName);
+      if (!monthText) return null;
+
+      const shortMonths = [
+        "jan",
+        "feb",
+        "mar",
+        "apr",
+        "may",
+        "jun",
+        "jul",
+        "aug",
+        "sep",
+        "oct",
+        "nov",
+        "dec",
+      ];
+      const monthIndex = shortMonths.findIndex((m) =>
+        monthText.toLowerCase().startsWith(m),
+      );
+
+      if (monthIndex >= 0) {
+        const normalized = String(monthIndex + 1).padStart(2, "0");
+        return {
+          key: `fallback-${normalized}`,
+          sortKey: `9999-${normalized}`,
+          label: monthText,
+        };
+      }
+
+      return {
+        key: `fallback-${monthText.toLowerCase()}`,
+        sortKey: `9999-${monthText.toLowerCase()}`,
+        label: monthText,
+      };
+    };
+
+    const pdfCostAnalysisSections = {
+      skuWise: buildPdfCostSection(buildPdfCostGroups("sku"), "Total SKU"),
+      polymerWise: buildPdfCostSection(buildPdfCostGroups("polymer"), "Total Polymers"),
+      categoryWise: buildPdfCostSection(buildPdfCostGroups("category"), "Total Categories"),
+      supplierWise: buildPdfCostSection(buildPdfCostGroups("supplier"), "Total Suppliers"),
+    };
+
+    const buildPdfMonthlyCostGroups = (groupBy) => {
+      const map = new Map();
+
+      (procurementDetails || []).forEach((row, index) => {
+        const monthMeta = getMonthMetaFromProcurementRow(row);
+        if (!monthMeta) return;
+
+        const skuCode =
+          normalizeText(row?.skuCode) ||
+          normalizeText(row?.systemCode) ||
+          normalizeText(row?.componentCode) ||
+          `sku-${index + 1}`;
+        const skuDescription =
+          (skuDescriptionMap[skuCode] || "").toString().trim() || "-";
+        const industryName =
+          (skuIndustryMap[skuCode] || row?.industryCategory || "")
+            .toString()
+            .trim() || "-";
+        const supplierName =
+          normalizeText(row?.supplierName) || "Unknown Supplier";
+        const supplierStatus =
+          normalizeText(row?.supplierStatus) ||
+          supplierStatusByName.get(supplierName.toLowerCase()) ||
+          "-";
+        const category = deriveCategoryFromRow(row);
+        const polymerName = derivePolymerNameFromRow(row);
+
+        let groupKey = skuCode;
+        let name = skuCode;
+        let baseFields = {
+          skuCode,
+          skuDescription,
+          industryName,
+          supplierStatus,
+        };
+
+        if (groupBy === "polymer") {
+          groupKey = polymerName.toLowerCase();
+          name = polymerName;
+          baseFields = {};
+        } else if (groupBy === "category") {
+          groupKey = category.toLowerCase();
+          name = category;
+          baseFields = {};
+        } else if (groupBy === "supplier") {
+          groupKey = supplierName.toLowerCase();
+          name = supplierName;
+          baseFields = { supplierStatus };
+        }
+
+        const bucketKey = `${groupKey}::${monthMeta.key}`;
+        if (!map.has(bucketKey)) {
+          map.set(bucketKey, {
+            key: bucketKey,
+            name,
+            monthKey: monthMeta.key,
+            monthSortKey: monthMeta.sortKey,
+            monthLabel: monthMeta.label,
+            ...baseFields,
+            monthlyPurchaseMtRaw: 0,
+            recycledQtyRaw: 0,
+            virginQtyRaw: 0,
+            recycledAmountRaw: 0,
+            virginAmountRaw: 0,
+          });
+        }
+
+        const bucket = map.get(bucketKey);
+        bucket.monthlyPurchaseMtRaw += Number(row?.monthlyPurchaseMt || 0) || 0;
+        bucket.recycledQtyRaw += Number(row?.recycledQty || 0) || 0;
+        bucket.virginQtyRaw += Number(row?.virginQty || 0) || 0;
+        bucket.recycledAmountRaw += Number(row?.recycledQrtAmount || 0) || 0;
+        bucket.virginAmountRaw += Number(row?.virginQtyAmount || 0) || 0;
+      });
+
+      return Array.from(map.values())
+        .map((row) => {
+          const monthlyPurchaseMtRaw = Number(row?.monthlyPurchaseMtRaw || 0) || 0;
+          const recycledQtyRaw = Number(row?.recycledQtyRaw || 0) || 0;
+          const virginQtyRaw = Number(row?.virginQtyRaw || 0) || 0;
+          const recycledAmountRaw = Number(row?.recycledAmountRaw || 0) || 0;
+          const virginAmountRaw = Number(row?.virginAmountRaw || 0) || 0;
+          const recycledSharePctRaw =
+            monthlyPurchaseMtRaw > 0
+              ? (recycledQtyRaw / monthlyPurchaseMtRaw) * 100
+              : 0;
+
+          return {
+            ...row,
+            monthlyPurchaseMtRaw,
+            recycledQtyRaw,
+            virginQtyRaw,
+            recycledAmountRaw,
+            virginAmountRaw,
+            monthlyPurchaseMt: formatNumber(monthlyPurchaseMtRaw, 3),
+            recycledQty: formatNumber(recycledQtyRaw, 3),
+            virginQty: formatNumber(virginQtyRaw, 3),
+            recycledAmount: formatNumber(recycledAmountRaw, 2),
+            virginAmount: formatNumber(virginAmountRaw, 2),
+            recycledSharePct: formatPercent(recycledSharePctRaw, 1),
+          };
+        })
+        .sort((a, b) => {
+          const monthCompare = (a.monthSortKey || "").localeCompare(
+            b.monthSortKey || "",
+          );
+          if (monthCompare !== 0) return monthCompare;
+          const valueCompare =
+            (Number(b.monthlyPurchaseMtRaw || 0) || 0) -
+            (Number(a.monthlyPurchaseMtRaw || 0) || 0);
+          if (valueCompare !== 0) return valueCompare;
+          return (a.name || "").localeCompare(b.name || "");
+        });
+    };
+
+    const buildPdfMonthlySection = (rows, countLabel) => {
+      const totalsRaw = (rows || []).reduce(
+        (acc, row) => {
+          acc.monthlyPurchaseMtRaw += Number(row?.monthlyPurchaseMtRaw || 0) || 0;
+          acc.recycledQtyRaw += Number(row?.recycledQtyRaw || 0) || 0;
+          acc.virginQtyRaw += Number(row?.virginQtyRaw || 0) || 0;
+          acc.recycledAmountRaw += Number(row?.recycledAmountRaw || 0) || 0;
+          acc.virginAmountRaw += Number(row?.virginAmountRaw || 0) || 0;
+          return acc;
+        },
+        {
+          monthlyPurchaseMtRaw: 0,
+          recycledQtyRaw: 0,
+          virginQtyRaw: 0,
+          recycledAmountRaw: 0,
+          virginAmountRaw: 0,
+        },
+      );
+
+      const monthTotals = new Map();
+      (rows || []).forEach((row) => {
+        const key = row?.monthKey || "-";
+        const existing = monthTotals.get(key) || {
+          key,
+          label: row?.monthLabel || "-",
+          sortKey: row?.monthSortKey || key,
+          purchase: 0,
+        };
+        existing.purchase += Number(row?.monthlyPurchaseMtRaw || 0) || 0;
+        monthTotals.set(key, existing);
+      });
+
+      const orderedMonths = Array.from(monthTotals.values()).sort((a, b) =>
+        (a.sortKey || "").localeCompare(b.sortKey || ""),
+      );
+      const monthlyMetricsByMonth = new Map();
+      (rows || []).forEach((row) => {
+        const key = row?.monthKey || "-";
+        const existing = monthlyMetricsByMonth.get(key) || {
+          key,
+          label: row?.monthLabel || "-",
+          sortKey: row?.monthSortKey || key,
+          monthlyPurchaseMtRaw: 0,
+          recycledQtyRaw: 0,
+          virginQtyRaw: 0,
+        };
+        existing.monthlyPurchaseMtRaw += Number(row?.monthlyPurchaseMtRaw || 0) || 0;
+        existing.recycledQtyRaw += Number(row?.recycledQtyRaw || 0) || 0;
+        existing.virginQtyRaw += Number(row?.virginQtyRaw || 0) || 0;
+        monthlyMetricsByMonth.set(key, existing);
+      });
+
+      const orderedMetricMonths = Array.from(monthlyMetricsByMonth.values()).sort(
+        (a, b) => (a.sortKey || "").localeCompare(b.sortKey || ""),
+      );
+      const maxMonthlyPurchase = orderedMetricMonths.reduce(
+        (max, item) => Math.max(max, Number(item.monthlyPurchaseMtRaw || 0) || 0),
+        0,
+      );
+      const maxRecycledQty = orderedMetricMonths.reduce(
+        (max, item) => Math.max(max, Number(item.recycledQtyRaw || 0) || 0),
+        0,
+      );
+      const maxVirginQty = orderedMetricMonths.reduce(
+        (max, item) => Math.max(max, Number(item.virginQtyRaw || 0) || 0),
+        0,
+      );
+      const latestMonth = orderedMonths[orderedMonths.length - 1] || null;
+      const peakMonth = orderedMonths.reduce(
+        (best, month) => (month.purchase > (best?.purchase || 0) ? month : best),
+        null,
+      );
+      const recycledSharePctRaw =
+        totalsRaw.monthlyPurchaseMtRaw > 0
+          ? (totalsRaw.recycledQtyRaw / totalsRaw.monthlyPurchaseMtRaw) * 100
+          : 0;
+
+      return {
+        countLabel,
+        cards: [
+          {
+            label: "Months Covered",
+            value: String(orderedMonths.length),
+          },
+          {
+            label: "Latest Invoice Month",
+            value: latestMonth?.label || "-",
+          },
+          {
+            label: "Peak Purchase Month",
+            value: peakMonth?.label || "-",
+          },
+          {
+            label: "Peak Purchase MT",
+            value: formatNumber(peakMonth?.purchase || 0, 3),
+          },
+          {
+            label: "Recycled Share",
+            value: `${formatPercent(recycledSharePctRaw, 1)}%`,
+          },
+        ],
+        monthlyChart: {
+          purchase: orderedMetricMonths.map((item) => ({
+            label: item.label,
+            value: formatNumber(item.monthlyPurchaseMtRaw, 3),
+            pct:
+              maxMonthlyPurchase > 0
+                ? Math.max(
+                    6,
+                    Math.round((item.monthlyPurchaseMtRaw / maxMonthlyPurchase) * 100),
+                  )
+                : 0,
+          })),
+          recycled: orderedMetricMonths.map((item) => ({
+            label: item.label,
+            value: formatNumber(item.recycledQtyRaw, 3),
+            pct:
+              maxRecycledQty > 0
+                ? Math.max(
+                    6,
+                    Math.round((item.recycledQtyRaw / maxRecycledQty) * 100),
+                  )
+                : 0,
+          })),
+          virgin: orderedMetricMonths.map((item) => ({
+            label: item.label,
+            value: formatNumber(item.virginQtyRaw, 3),
+            pct:
+              maxVirginQty > 0
+                ? Math.max(
+                    6,
+                    Math.round((item.virginQtyRaw / maxVirginQty) * 100),
+                  )
+                : 0,
+          })),
+        },
+        rows,
+        totals: {
+          monthlyPurchaseMt: formatNumber(totalsRaw.monthlyPurchaseMtRaw, 3),
+          recycledQty: formatNumber(totalsRaw.recycledQtyRaw, 3),
+          virginQty: formatNumber(totalsRaw.virginQtyRaw, 3),
+          recycledAmount: formatNumber(totalsRaw.recycledAmountRaw, 2),
+          virginAmount: formatNumber(totalsRaw.virginAmountRaw, 2),
+          recycledSharePct: formatPercent(recycledSharePctRaw, 1),
+        },
+      };
+    };
+
+    pdfCostAnalysisSections.skuWise.monthly = buildPdfMonthlySection(
+      buildPdfMonthlyCostGroups("sku"),
+      "Total SKU Months",
+    );
+    pdfCostAnalysisSections.polymerWise.monthly = buildPdfMonthlySection(
+      buildPdfMonthlyCostGroups("polymer"),
+      "Total Polymer Months",
+    );
+    pdfCostAnalysisSections.categoryWise.monthly = buildPdfMonthlySection(
+      buildPdfMonthlyCostGroups("category"),
+      "Total Category Months",
+    );
+    pdfCostAnalysisSections.supplierWise.monthly = buildPdfMonthlySection(
+      buildPdfMonthlyCostGroups("supplier"),
+      "Total Supplier Months",
+    );
 
     // 4. Calculate Sales & Purchase Summary (Registered vs Unregistered)
     const normalizeCategory = (val) => {
@@ -2186,10 +2802,7 @@ class ReportGeneratorService {
         targetTables,
       );
     } catch (err) {
-      console.error(
-        "[Report Generation] Error generating auditor insights:",
-        err,
-      );
+      logger.error({ err }, "[Report Generation] Error generating auditor insights");
       // Non-blocking error, continue with empty insights
     }
 
@@ -2417,19 +3030,34 @@ class ReportGeneratorService {
       })),
     };
 
-    // Load company logo as base64
+    const loadAssetBase64 = (candidates) => {
+      for (const assetPath of candidates) {
+        if (!fs.existsSync(assetPath)) continue;
+        const resolved = resolveImage(assetPath);
+        if (resolved) return resolved;
+      }
+      return "";
+    };
+
+    // Left logo is the client/company mark, right logo is the fixed AnantTattva mark.
+    let companyLogoBase64 = "";
     let logoBase64 = "";
     try {
-      const logoPath = path.join(__dirname, "../../../logo.png");
-      if (fs.existsSync(logoPath)) {
-        const logoBuffer = fs.readFileSync(logoPath);
-        logoBase64 = `data:image/png;base64,${logoBuffer.toString("base64")}`;
-      }
+      companyLogoBase64 = loadAssetBase64([
+        path.join(__dirname, "../../assets/report/Company Logo.png"),
+        path.join(__dirname, "../../assets/report/company-left-logo.png"),
+      ]);
+      const logoCandidates = [
+        path.join(__dirname, "../../assets/report/company-logo.png"),
+        path.join(__dirname, "../../../logo.png"),
+      ];
+      logoBase64 = loadAssetBase64(logoCandidates);
     } catch (e) {
-      console.warn("[Report Generation] Could not load logo:", e.message);
+      logger.warn({ err: e }, "[Report Generation] Could not load logo");
     }
 
     const templateData = {
+      companyLogoBase64,
       logoBase64,
       isProducer,
       isBrandOwner: !isProducer,
@@ -2454,357 +3082,727 @@ class ReportGeneratorService {
       costAnalysisPolymerReport,
       costAnalysisSupplierReport,
       costAnalysisSkuDetails,
+      pdfCostAnalysisSections,
       industryCategories,
       markingLabelingData,
       markingLabelingReportByIndustry,
       // Phase 3: Summary Reports
-      portalSummary: {
-        ...(isProducer
-          ? {}
-          : (() => {
-              const fy = (clientDoc.financialYear || "").toString().trim();
-              const urepPctByCat = {
-                "Cat-I": UREP_TARGET_MATRIX["Cat-I"]?.[fy] || 0,
-                "Cat-II": UREP_TARGET_MATRIX["Cat-II"]?.[fy] || 0,
-                "Cat-III": UREP_TARGET_MATRIX["Cat-III"]?.[fy] || 0,
-                "Cat-IV": UREP_TARGET_MATRIX["Cat-IV"]?.[fy] || 0,
-              };
-              const totalTargetPct =
-                (urepPctByCat["Cat-I"] || 0) +
-                (urepPctByCat["Cat-II"] || 0) +
-                (urepPctByCat["Cat-III"] || 0) +
-                (urepPctByCat["Cat-IV"] || 0);
+      portalSummary: (() => {
+        const fy = (clientDoc.financialYear || "").toString().trim();
+        const urepPctByCat = {
+          "Cat-I": UREP_TARGET_MATRIX["Cat-I"]?.[fy] || 0,
+          "Cat-II": UREP_TARGET_MATRIX["Cat-II"]?.[fy] || 0,
+          "Cat-III": UREP_TARGET_MATRIX["Cat-III"]?.[fy] || 0,
+          "Cat-IV": UREP_TARGET_MATRIX["Cat-IV"]?.[fy] || 0,
+        };
+        const totalTargetPct =
+          (urepPctByCat["Cat-I"] || 0) +
+          (urepPctByCat["Cat-II"] || 0) +
+          (urepPctByCat["Cat-III"] || 0) +
+          (urepPctByCat["Cat-IV"] || 0);
 
-              const skuStatusMap = new Map();
-              (industryCategories || []).forEach((cat) => {
-                (cat?.skus || []).forEach((sku) => {
-                  const code = (sku?.skuCode || "").toString().trim();
-                  if (!code || skuStatusMap.has(code)) return;
-                  skuStatusMap.set(code, (sku?.status || "").toString().trim());
-                });
-              });
+        const procurementRows = Array.isArray(procurementDetails)
+          ? procurementDetails
+          : [];
+        const normalizeKey = (value) => (value || "").toString().trim();
+        const resolvePrimaryKey = (row, index = 0) =>
+          isProducer
+            ? normalizeKey(row?.skuCode) ||
+              normalizeKey(row?.systemCode) ||
+              normalizeKey(row?.componentCode) ||
+              `sku-${index + 1}`
+            : normalizeKey(row?.skuCode) ||
+              normalizeKey(row?.systemCode) ||
+              normalizeKey(row?.componentCode) ||
+              `sku-${index + 1}`;
 
-              const totalSku = skuStatusMap.size;
-              const compliantSku = Array.from(skuStatusMap.values()).filter(
-                (s) => s === "Compliant",
-              ).length;
-              const nonCompliantSku = Array.from(skuStatusMap.values()).filter(
-                (s) => s === "Non-Compliant",
-              ).length;
+        const componentMetaByCode = new Map();
+        (componentDetails || []).forEach((row) => {
+          const componentCode = normalizeKey(row?.componentCode);
+          if (!componentCode) return;
+          componentMetaByCode.set(componentCode, {
+            polymerName:
+              normalizeKey(row?.componentPolymer) ||
+              normalizeKey(row?.polymerType) ||
+              normalizeKey(row?.recycledPolymerUsed) ||
+              "",
+          });
+        });
 
-              let riskLabel = "Low Risk";
-              let riskClass = "risk-low";
-              if (nonCompliantSku >= Math.max(1, Math.ceil(totalSku * 0.5))) {
-                riskLabel = "High Risk";
-                riskClass = "risk-high";
-              } else if (nonCompliantSku > 0) {
-                riskLabel = "Medium Risk";
-                riskClass = "risk-medium";
-              }
+        const procurementMetaByKey = new Map();
+        const registerProcurementMeta = (key, meta) => {
+          const normalized = normalizeKey(key);
+          if (!normalized) return;
+          const existing = procurementMetaByKey.get(normalized) || {};
+          procurementMetaByKey.set(normalized, {
+            primaryKey:
+              existing.primaryKey || meta.primaryKey || normalized,
+            industryCategory:
+              existing.industryCategory ||
+              meta.industryCategory ||
+              "Uncategorized",
+            categoryKey: existing.categoryKey || meta.categoryKey || "OTHER",
+            componentCode:
+              existing.componentCode || meta.componentCode || "",
+            clientName: existing.clientName || meta.clientName || "",
+            polymerName: existing.polymerName || meta.polymerName || "",
+          });
+        };
 
-              const componentStatusMap = {};
-              (supplierCompliance || []).forEach((row) => {
-                const key = (row?.componentCode || "").toString().trim();
-                if (!key) return;
-                componentStatusMap[key] = (row?.supplierStatus || "")
-                  .toString()
-                  .trim()
-                  .toLowerCase();
-              });
+        const primaryStatusMap = new Map();
+        (allRows || []).forEach((row, index) => {
+          const primaryKey = resolvePrimaryKey(row, index);
+          const status = pickText(
+            isProducer
+              ? row?.componentComplianceStatus
+              : row?.productComplianceStatus,
+            row?.complianceStatus,
+            row?.status,
+          );
 
-              const procurementRows = Array.isArray(procurementDetails)
-                ? procurementDetails
-                : [];
-              const totals = {
-                monthlyPurchaseMt: 0,
-                recycledQty: 0,
-                virginQty: 0,
-                recycledAmount: 0,
-                virginAmount: 0,
-              };
+          if (isProducer) {
+            const existing = primaryStatusMap.get(primaryKey) || {
+              hasCompliant: false,
+              hasNonCompliant: false,
+            };
+            if (status === "Non-Compliant") existing.hasNonCompliant = true;
+            else if (status === "Compliant") existing.hasCompliant = true;
+            primaryStatusMap.set(primaryKey, existing);
+          } else if (!primaryStatusMap.has(primaryKey)) {
+            primaryStatusMap.set(primaryKey, status);
+          }
 
-              const categoryAgg = new Map();
-              const industryAgg = new Map();
-              const supplierAgg = new Map();
+          const meta = {
+            primaryKey,
+            industryCategory:
+              normalizeKey(row?.industryCategory) || "Uncategorized",
+            categoryKey: normalizeUrepCategory(row?.category) || "OTHER",
+            componentCode: normalizeKey(row?.componentCode),
+            clientName: normalizeKey(row?.clientName) || "",
+            polymerName:
+              componentMetaByCode.get(normalizeKey(row?.componentCode))
+                ?.polymerName || "",
+          };
+          registerProcurementMeta(row?.skuCode, meta);
+          registerProcurementMeta(row?.systemCode, meta);
+          registerProcurementMeta(row?.componentCode, meta);
+        });
 
-              const supplierRegistered = new Set();
-              const supplierUnregistered = new Set();
+        const totalSku = primaryStatusMap.size;
+        const compliantSku = Array.from(primaryStatusMap.values()).filter(
+          (status) =>
+            isProducer ? status?.hasCompliant && !status?.hasNonCompliant : status === "Compliant",
+        ).length;
+        const nonCompliantSku = Array.from(primaryStatusMap.values()).filter(
+          (status) =>
+            isProducer ? status?.hasNonCompliant : status === "Non-Compliant",
+        ).length;
 
-              const ensureAgg = (map, key, name) => {
-                if (!map.has(key)) {
-                  map.set(key, {
-                    key,
-                    name,
-                    skuSet: new Set(),
-                    monthlyPurchaseMt: 0,
-                    recycledQty: 0,
-                    virginQty: 0,
-                    recycledAmount: 0,
-                    virginAmount: 0,
-                  });
-                }
-                return map.get(key);
-              };
+        let riskLabel = "Low Risk";
+        let riskClass = "risk-low";
+        if (nonCompliantSku >= Math.max(1, Math.ceil(totalSku * 0.5))) {
+          riskLabel = "High Risk";
+          riskClass = "risk-high";
+        } else if (nonCompliantSku > 0) {
+          riskLabel = "Medium Risk";
+          riskClass = "risk-medium";
+        }
 
-              procurementRows.forEach((row) => {
-                const skuCode = (row?.skuCode || "").toString().trim();
-                const supplierName = (row?.supplierName || "Unknown")
-                  .toString()
-                  .trim();
-                const supplierKey = supplierName.toLowerCase() || "unknown";
-                const industryName =
-                  (skuIndustryMap?.[skuCode] || "Uncategorized")
-                    .toString()
-                    .trim() || "Uncategorized";
+        const componentStatusMap = {};
+        (supplierCompliance || []).forEach((row) => {
+          const key = normalizeKey(row?.componentCode);
+          if (!key) return;
+          componentStatusMap[key] = (row?.supplierStatus || "")
+            .toString()
+            .trim()
+            .toLowerCase();
+        });
 
-                const monthlyPurchaseMt =
-                  Number(row?.monthlyPurchaseMt || 0) || 0;
-                const recycledQty = Number(row?.recycledQty || 0) || 0;
-                const virginQty = Number(row?.virginQty || 0) || 0;
-                const recycledAmount = Number(row?.recycledQrtAmount || 0) || 0;
-                const virginAmount = Number(row?.virginQtyAmount || 0) || 0;
+        const totals = {
+          monthlyPurchaseMt: 0,
+          recycledQty: 0,
+          virginQty: 0,
+          recycledAmount: 0,
+          virginAmount: 0,
+        };
 
-                totals.monthlyPurchaseMt += monthlyPurchaseMt;
-                totals.recycledQty += recycledQty;
-                totals.virginQty += virginQty;
-                totals.recycledAmount += recycledAmount;
-                totals.virginAmount += virginAmount;
+        const categoryAgg = new Map();
+        const clientAgg = new Map();
+        const industryAgg = new Map();
+        const polymerAgg = new Map();
+        const stateAgg = new Map();
+        const supplierTypeAgg = new Map();
+        const supplierAgg = new Map();
 
-                const catKey = normalizeUrepCategory(row?.category) || "OTHER";
-                const catName =
-                  catKey === "Cat-I"
-                    ? "Category I"
-                    : catKey === "Cat-II"
-                      ? "Category II"
-                      : catKey === "Cat-III"
-                        ? "Category III"
-                        : catKey === "Cat-IV"
-                          ? "Category IV"
-                          : "Not Applicable";
+        const supplierRegistered = new Set();
+        const supplierUnregistered = new Set();
+        const supplierTypeOrder = [
+          "Manufacture",
+          "Importer of raw material",
+          "Importer",
+          "Producer",
+          "Brand Owner",
+          "PWP",
+          "Seller",
+        ];
+        const supplierTypeLookup = new Map();
 
-                const catAgg = ensureAgg(categoryAgg, catKey, catName);
-                const indAgg = ensureAgg(
-                  industryAgg,
-                  industryName.toLowerCase(),
-                  industryName,
-                );
-                const supAgg = ensureAgg(
-                  supplierAgg,
-                  supplierKey,
-                  supplierName,
-                );
+        const registerSupplierType = (row) => {
+          const supplierType = normalizeKey(row?.supplierType);
+          if (!supplierType) return;
+          const supplierName = normalizeKey(row?.supplierName).toLowerCase();
+          const componentCode = normalizeKey(row?.componentCode).toLowerCase();
+          if (supplierName && componentCode) {
+            supplierTypeLookup.set(
+              `${supplierName}::${componentCode}`,
+              supplierType,
+            );
+          }
+          if (supplierName) {
+            supplierTypeLookup.set(supplierName, supplierType);
+          }
+        };
 
-                [catAgg, indAgg, supAgg].forEach((bucket) => {
-                  if (skuCode) bucket.skuSet.add(skuCode);
-                  bucket.monthlyPurchaseMt += monthlyPurchaseMt;
-                  bucket.recycledQty += recycledQty;
-                  bucket.virginQty += virginQty;
-                  bucket.recycledAmount += recycledAmount;
-                  bucket.virginAmount += virginAmount;
-                });
+        (allRows || []).forEach(registerSupplierType);
+        procurementRows.forEach(registerSupplierType);
+        (supplierCompliance || []).forEach(registerSupplierType);
 
-                const compCode = (row?.componentCode || "").toString().trim();
-                const status = (componentStatusMap?.[compCode] || "")
-                  .toString()
-                  .trim();
-                if (status.includes("unregistered")) {
-                  supplierUnregistered.add(supplierKey);
-                  supplierRegistered.delete(supplierKey);
-                } else if (status.includes("registered")) {
-                  if (!supplierUnregistered.has(supplierKey))
-                    supplierRegistered.add(supplierKey);
-                }
-              });
+        const ensureAgg = (map, key, name) => {
+          if (!map.has(key)) {
+            map.set(key, {
+              key,
+              name,
+              skuSet: new Set(),
+              monthlyPurchaseMt: 0,
+              recycledQty: 0,
+              virginQty: 0,
+              recycledAmount: 0,
+              virginAmount: 0,
+            });
+          }
+          return map.get(key);
+        };
 
-              const registeredSuppliers = supplierRegistered.size;
-              const unregisteredSuppliers = supplierUnregistered.size;
-              const totalSuppliers =
-                registeredSuppliers + unregisteredSuppliers;
+        const ensureStateAgg = (key, name) => {
+          if (!stateAgg.has(key)) {
+            stateAgg.set(key, {
+              key,
+              name,
+              skuSet: new Set(),
+              supplierSet: new Set(),
+              registeredSet: new Set(),
+              unregisteredSet: new Set(),
+              monthlyPurchaseMt: 0,
+              recycledQty: 0,
+              virginQty: 0,
+              recycledAmount: 0,
+              virginAmount: 0,
+            });
+          }
+          return stateAgg.get(key);
+        };
 
-              const recycledTargetQty =
-                totals.monthlyPurchaseMt * (totalTargetPct / 100);
-              const virginTargetQty = Math.max(
-                totals.monthlyPurchaseMt - recycledTargetQty,
-                0,
-              );
-              const recycledShortfall = totals.recycledQty - recycledTargetQty;
-              const virginShortfall = totals.virginQty - virginTargetQty;
+        const resolveProcurementMeta = (row, index) => {
+          const candidates = [
+            normalizeKey(row?.skuCode),
+            normalizeKey(row?.systemCode),
+            normalizeKey(row?.componentCode),
+          ].filter(Boolean);
+          for (const candidate of candidates) {
+            const found = procurementMetaByKey.get(candidate);
+            if (found) return found;
+          }
+          return {
+            primaryKey: resolvePrimaryKey(row, index),
+            industryCategory:
+              normalizeKey(row?.industryCategory) || "Uncategorized",
+            categoryKey: normalizeUrepCategory(row?.category) || "OTHER",
+            componentCode: normalizeKey(row?.componentCode),
+            clientName: normalizeKey(row?.clientName) || "",
+            polymerName:
+              normalizeKey(row?.componentPolymer) ||
+              normalizeKey(row?.polymerType) ||
+              normalizeKey(row?.recycledPolymerUsed) ||
+              componentMetaByCode.get(normalizeKey(row?.componentCode))
+                ?.polymerName ||
+              "",
+          };
+        };
 
-              const recycledAchievedPct =
-                recycledTargetQty > 0
-                  ? (totals.recycledQty / recycledTargetQty) * 100
+        procurementRows.forEach((row, index) => {
+          const meta = resolveProcurementMeta(row, index);
+          const primaryKey = meta.primaryKey || resolvePrimaryKey(row, index);
+          const supplierName = (row?.supplierName || "Unknown")
+            .toString()
+            .trim();
+          const supplierKey = supplierName.toLowerCase() || "unknown";
+          const supplierMeta = supplierMetaByName.get(supplierName) || {};
+          const supplierStateName =
+            (
+              row?.supplierState ||
+              supplierMeta?.supplierState ||
+              "Unknown State"
+            )
+              .toString()
+              .trim() ||
+            "Unknown State";
+          const supplierStateKey = supplierStateName.toLowerCase();
+          const clientName =
+            (
+              normalizeKey(row?.clientName) ||
+              meta.clientName ||
+              "Unassigned Client"
+            )
+              .toString()
+              .trim() || "Unassigned Client";
+          const industryName =
+            (
+              normalizeKey(row?.industryCategory) ||
+              meta.industryCategory ||
+              "Uncategorized"
+            )
+              .toString()
+              .trim() || "Uncategorized";
+          const polymerName =
+            (
+              normalizeKey(row?.componentPolymer) ||
+              normalizeKey(row?.polymerType) ||
+              normalizeKey(row?.recycledPolymerUsed) ||
+              meta.polymerName ||
+              "Unspecified Polymer"
+            )
+              .toString()
+              .trim() || "Unspecified Polymer";
+
+          const monthlyPurchaseMt = Number(row?.monthlyPurchaseMt || 0) || 0;
+          const recycledQty = Number(row?.recycledQty || 0) || 0;
+          const virginQty = Number(row?.virginQty || 0) || 0;
+          const recycledAmount = Number(row?.recycledQrtAmount || 0) || 0;
+          const virginAmount = Number(row?.virginQtyAmount || 0) || 0;
+
+          totals.monthlyPurchaseMt += monthlyPurchaseMt;
+          totals.recycledQty += recycledQty;
+          totals.virginQty += virginQty;
+          totals.recycledAmount += recycledAmount;
+          totals.virginAmount += virginAmount;
+
+          const catKey =
+            normalizeUrepCategory(row?.category) || meta.categoryKey || "OTHER";
+          const catName =
+            catKey === "Cat-I"
+              ? "Category I"
+              : catKey === "Cat-II"
+                ? "Category II"
+                : catKey === "Cat-III"
+                  ? "Category III"
+                  : catKey === "Cat-IV"
+                    ? "Category IV"
+                    : "Not Applicable";
+
+          const catAgg = ensureAgg(categoryAgg, catKey, catName);
+          const cliAgg = ensureAgg(
+            clientAgg,
+            clientName.toLowerCase(),
+            clientName,
+          );
+          const indAgg = ensureAgg(
+            industryAgg,
+            industryName.toLowerCase(),
+            industryName,
+          );
+          const polAgg = ensureAgg(
+            polymerAgg,
+            polymerName.toLowerCase(),
+            polymerName,
+          );
+          const stAgg = ensureStateAgg(supplierStateKey, supplierStateName);
+          const compCode = normalizeKey(row?.componentCode) || meta.componentCode;
+          const supplierTypeName =
+            supplierTypeLookup.get(`${supplierKey}::${compCode}`) ||
+            supplierTypeLookup.get(supplierKey) ||
+            normalizeKey(supplierMeta?.supplierType) ||
+            normalizeKey(row?.supplierType);
+          const supplierTypeBucket = supplierTypeName
+            ? ensureAgg(
+                supplierTypeAgg,
+                supplierTypeName.toLowerCase(),
+                supplierTypeName,
+              )
+            : null;
+          const supAgg = ensureAgg(supplierAgg, supplierKey, supplierName);
+
+          [catAgg, cliAgg, indAgg, polAgg, stAgg, supplierTypeBucket, supAgg]
+            .filter(Boolean)
+            .forEach((bucket) => {
+            if (primaryKey) bucket.skuSet.add(primaryKey);
+            bucket.monthlyPurchaseMt += monthlyPurchaseMt;
+            bucket.recycledQty += recycledQty;
+            bucket.virginQty += virginQty;
+            bucket.recycledAmount += recycledAmount;
+            bucket.virginAmount += virginAmount;
+            });
+          stAgg.supplierSet.add(supplierKey);
+
+          const status = (componentStatusMap?.[compCode] || "")
+            .toString()
+            .trim();
+          if (status.includes("unregistered")) {
+            supplierUnregistered.add(supplierKey);
+            supplierRegistered.delete(supplierKey);
+            stAgg.unregisteredSet.add(supplierKey);
+            stAgg.registeredSet.delete(supplierKey);
+          } else if (status.includes("registered")) {
+            if (!supplierUnregistered.has(supplierKey)) {
+              supplierRegistered.add(supplierKey);
+            }
+            if (!stAgg.unregisteredSet.has(supplierKey)) {
+              stAgg.registeredSet.add(supplierKey);
+            }
+          }
+        });
+
+        const registeredSuppliers = supplierRegistered.size;
+        const unregisteredSuppliers = supplierUnregistered.size;
+        const totalSuppliers =
+          registeredSuppliers + unregisteredSuppliers;
+
+        const recycledTargetQty =
+          totals.monthlyPurchaseMt * (totalTargetPct / 100);
+        const virginTargetQty = Math.max(
+          totals.monthlyPurchaseMt - recycledTargetQty,
+          0,
+        );
+        const recycledShortfall = totals.recycledQty - recycledTargetQty;
+        const virginShortfall = totals.virginQty - virginTargetQty;
+
+        const recycledAchievedPct =
+          recycledTargetQty > 0
+            ? (totals.recycledQty / recycledTargetQty) * 100
+            : 0;
+        const virginAchievedPct =
+          virginTargetQty > 0
+            ? (totals.virginQty / virginTargetQty) * 100
+            : 0;
+
+        const shortfallMeta = (value) => {
+          const n = Number(value);
+          if (!Number.isFinite(n)) {
+            return {
+              arrow: "↓",
+              abs: formatNumber(0, 2),
+              color: "color:#dc2626;",
+            };
+          }
+          if (n >= 0) {
+            return {
+              arrow: "↑",
+              abs: formatNumber(Math.abs(n), 2),
+              color: "color:#16a34a;",
+            };
+          }
+          return {
+            arrow: "↓",
+            abs: formatNumber(Math.abs(n), 2),
+            color: "color:#dc2626;",
+          };
+        };
+
+        const categoryOrder = [
+          { key: "Cat-I", name: "Category I" },
+          { key: "Cat-II", name: "Category II" },
+          { key: "Cat-III", name: "Category III" },
+          { key: "OTHER", name: "Not Applicable" },
+        ];
+        const getCategoryBucket = (key, name) => {
+          if (categoryAgg.has(key)) return categoryAgg.get(key);
+          return {
+            key,
+            name,
+            skuSet: new Set(),
+            monthlyPurchaseMt: 0,
+            recycledQty: 0,
+            virginQty: 0,
+            recycledAmount: 0,
+            virginAmount: 0,
+          };
+        };
+        const categoryWise = categoryOrder
+          .map((c) => getCategoryBucket(c.key, c.name))
+          .map((bucket) => {
+            const isKnown = ["Cat-I", "Cat-II", "Cat-III", "Cat-IV"].includes(
+              bucket.key,
+            );
+            const pct = isKnown ? urepPctByCat[bucket.key] || 0 : 0;
+            const recycledTarget = bucket.monthlyPurchaseMt * (pct / 100);
+            const recycledShare =
+              bucket.monthlyPurchaseMt > 0
+                ? (bucket.recycledQty / bucket.monthlyPurchaseMt) * 100
+                : 0;
+            const recycledVsVirgin =
+              bucket.monthlyPurchaseMt > 0
+                ? (bucket.recycledQty / bucket.monthlyPurchaseMt) * 100
+                : 0;
+            const virginVsTotal = 100 - recycledVsVirgin;
+            const recycledVsVirginLeftPct = clampPct(recycledVsVirgin);
+            const recycledVsVirginRightPct = clampPct(virginVsTotal);
+            return {
+              name: bucket.name,
+              monthlyPurchaseMt: formatNumber(bucket.monthlyPurchaseMt, 3),
+              recycledSharePct: formatPercent(recycledShare, 1),
+              recycledTargetQty: formatNumber(recycledTarget, 3),
+              targetPctLabel: pct ? `${pct}%` : "0%",
+              recycledQty: formatNumber(bucket.recycledQty, 3),
+              virginQty: formatNumber(bucket.virginQty, 3),
+              recycledAmount: formatNumber(bucket.recycledAmount, 3),
+              virginAmount: formatNumber(bucket.virginAmount, 3),
+              recycledVsVirginLeftPct,
+              recycledVsVirginRightPct,
+              recycledVsVirginLeftPctLabel: formatPercent(
+                recycledVsVirginLeftPct,
+                2,
+              ),
+              recycledVsVirginRightPctLabel: formatPercent(
+                recycledVsVirginRightPct,
+                2,
+              ),
+            };
+          });
+
+        const buildBreakdownCards = (map) =>
+          Array.from(map.values())
+            .map((bucket) => {
+              const recycledShare =
+                bucket.monthlyPurchaseMt > 0
+                  ? (bucket.recycledQty / bucket.monthlyPurchaseMt) * 100
                   : 0;
-              const virginAchievedPct =
-                virginTargetQty > 0
-                  ? (totals.virginQty / virginTargetQty) * 100
-                  : 0;
-
-              const shortfallMeta = (value) => {
-                const n = Number(value);
-                if (!Number.isFinite(n))
-                  return {
-                    arrow: "↓",
-                    abs: formatNumber(0, 2),
-                    color: "color:#dc2626;",
-                  };
-                if (n >= 0)
-                  return {
-                    arrow: "↑",
-                    abs: formatNumber(Math.abs(n), 2),
-                    color: "color:#16a34a;",
-                  };
-                return {
-                  arrow: "↓",
-                  abs: formatNumber(Math.abs(n), 2),
-                  color: "color:#dc2626;",
-                };
-              };
-
-              const categoryOrder = [
-                { key: "Cat-I", name: "Category I" },
-                { key: "Cat-II", name: "Category II" },
-                { key: "Cat-III", name: "Category III" },
-                { key: "OTHER", name: "Not Applicable" },
-              ];
-              const getCategoryBucket = (key, name) => {
-                if (categoryAgg.has(key)) return categoryAgg.get(key);
-                return {
-                  key,
-                  name,
-                  skuSet: new Set(),
-                  monthlyPurchaseMt: 0,
-                  recycledQty: 0,
-                  virginQty: 0,
-                  recycledAmount: 0,
-                  virginAmount: 0,
-                };
-              };
-              const categoryWise = categoryOrder
-                .map((c) => getCategoryBucket(c.key, c.name))
-                .map((bucket) => {
-                  const isKnown = [
-                    "Cat-I",
-                    "Cat-II",
-                    "Cat-III",
-                    "Cat-IV",
-                  ].includes(bucket.key);
-                  const pct = isKnown ? urepPctByCat[bucket.key] || 0 : 0;
-                  const recycledTarget = bucket.monthlyPurchaseMt * (pct / 100);
-                  const recycledShare =
-                    bucket.monthlyPurchaseMt > 0
-                      ? (bucket.recycledQty / bucket.monthlyPurchaseMt) * 100
-                      : 0;
-                  const recycledVsVirgin =
-                    bucket.monthlyPurchaseMt > 0
-                      ? (bucket.recycledQty / bucket.monthlyPurchaseMt) * 100
-                      : 0;
-                  const virginVsTotal = 100 - recycledVsVirgin;
-                  const recycledVsVirginLeftPct = clampPct(recycledVsVirgin);
-                  const recycledVsVirginRightPct = clampPct(virginVsTotal);
-                  return {
-                    name: bucket.name,
-                    monthlyPurchaseMt: formatNumber(
-                      bucket.monthlyPurchaseMt,
-                      3,
-                    ),
-                    recycledSharePct: formatPercent(recycledShare, 1),
-                    recycledTargetQty: formatNumber(recycledTarget, 3),
-                    targetPctLabel: pct ? `${pct}%` : "0%",
-                    recycledQty: formatNumber(bucket.recycledQty, 3),
-                    virginQty: formatNumber(bucket.virginQty, 3),
-                    recycledAmount: formatNumber(bucket.recycledAmount, 3),
-                    virginAmount: formatNumber(bucket.virginAmount, 3),
-                    recycledVsVirginLeftPct,
-                    recycledVsVirginRightPct,
-                    recycledVsVirginLeftPctLabel: formatPercent(
-                      recycledVsVirginLeftPct,
-                      2,
-                    ),
-                    recycledVsVirginRightPctLabel: formatPercent(
-                      recycledVsVirginRightPct,
-                      2,
-                    ),
-                  };
-                });
-
-              const buildGroupRows = (map) => {
-                const rows = Array.from(map.values()).map((bucket) => {
-                  const recTarget =
-                    bucket.monthlyPurchaseMt * (totalTargetPct / 100);
-                  const virTarget = Math.max(
-                    bucket.monthlyPurchaseMt - recTarget,
-                    0,
-                  );
-                  const recShort = bucket.recycledQty - recTarget;
-                  const virShort = bucket.virginQty - virTarget;
-                  const recMeta = shortfallMeta(recShort);
-                  const virMeta = shortfallMeta(virShort);
-                  return {
-                    name: bucket.name,
-                    totalSku: bucket.skuSet.size,
-                    monthlyPurchaseMt: formatNumber(
-                      bucket.monthlyPurchaseMt,
-                      3,
-                    ),
-                    recycledTargetQty: formatNumber(recTarget, 3),
-                    recycledAchievedMt: formatNumber(bucket.recycledQty, 3),
-                    recycledShortfallArrow: recMeta.arrow,
-                    recycledShortfallAbs: recMeta.abs,
-                    recycledShortfallStyle: recMeta.color,
-                    virginTargetQty: formatNumber(virTarget, 3),
-                    virginAchievedMt: formatNumber(bucket.virginQty, 3),
-                    virginShortfallArrow: virMeta.arrow,
-                    virginShortfallAbs: virMeta.abs,
-                    virginShortfallStyle: virMeta.color,
-                    sortKey: bucket.monthlyPurchaseMt,
-                  };
-                });
-                return rows.sort((a, b) => b.sortKey - a.sortKey);
-              };
-
-              const industryWise = buildGroupRows(industryAgg);
-              const supplierWise = buildGroupRows(supplierAgg);
-
-              const recMetaTotal = shortfallMeta(recycledShortfall);
-              const virMetaTotal = shortfallMeta(virginShortfall);
-
+              const virginShare = 100 - recycledShare;
+              const recycledVsVirginLeftPct = clampPct(recycledShare);
+              const recycledVsVirginRightPct = clampPct(virginShare);
               return {
-                financialYear: fy || "-",
-                totalTargetPct: formatPercent(totalTargetPct, 1),
-                totalSku,
-                compliantSku,
-                nonCompliantSku,
-                totalSuppliers,
-                registeredSuppliers,
-                unregisteredSuppliers,
-                riskLabel,
-                riskClass,
-                totalMonthlyPurchaseMt: formatNumber(
-                  totals.monthlyPurchaseMt,
-                  3,
+                name: bucket.name,
+                totalSku: bucket.skuSet.size,
+                monthlyPurchaseMt: formatNumber(bucket.monthlyPurchaseMt, 3),
+                recycledSharePct: formatPercent(recycledShare, 1),
+                recycledQty: formatNumber(bucket.recycledQty, 3),
+                virginQty: formatNumber(bucket.virginQty, 3),
+                recycledAmount: formatNumber(bucket.recycledAmount, 3),
+                virginAmount: formatNumber(bucket.virginAmount, 3),
+                recycledVsVirginLeftPct,
+                recycledVsVirginRightPct,
+                recycledVsVirginLeftPctLabel: formatPercent(
+                  recycledVsVirginLeftPct,
+                  2,
                 ),
-                recycledTargetQty: formatNumber(recycledTargetQty, 2),
-                virginTargetQty: formatNumber(virginTargetQty, 2),
-                recycledQtyAmount: formatNumber(totals.recycledAmount, 3),
-                virginQtyAmount: formatNumber(totals.virginAmount, 3),
-                recycledAchievedMt: formatNumber(totals.recycledQty, 2),
-                virginAchievedMt: formatNumber(totals.virginQty, 2),
-                recycledShortfallArrow: recMetaTotal.arrow,
-                recycledShortfallAbs: recMetaTotal.abs,
-                recycledShortfallStyle: recMetaTotal.color,
-                virginShortfallArrow: virMetaTotal.arrow,
-                virginShortfallAbs: virMetaTotal.abs,
-                virginShortfallStyle: virMetaTotal.color,
-                recycledAchievedPct: formatPercent(recycledAchievedPct, 1),
-                virginAchievedPct: formatPercent(virginAchievedPct, 1),
-                recycledAchievedBarPct: clampPct(recycledAchievedPct),
-                virginAchievedBarPct: clampPct(virginAchievedPct),
-                categoryWise,
-                industryWise,
-                supplierWise,
+                recycledVsVirginRightPctLabel: formatPercent(
+                  recycledVsVirginRightPct,
+                  2,
+                ),
+                sortKey: bucket.monthlyPurchaseMt,
               };
-            })()),
-      },
+            })
+            .sort((a, b) => b.sortKey - a.sortKey);
+
+        const summarizeBreakdownRows = (rows) => {
+          const totals = (rows || []).reduce(
+            (acc, row) => {
+              acc.totalSku += Number(row?.totalSku || 0) || 0;
+              acc.monthlyPurchaseMt += Number(row?.monthlyPurchaseMt || 0) || 0;
+              acc.recycledQty += Number(row?.recycledQty || 0) || 0;
+              acc.virginQty += Number(row?.virginQty || 0) || 0;
+              acc.recycledAmount += Number(row?.recycledAmount || 0) || 0;
+              acc.virginAmount += Number(row?.virginAmount || 0) || 0;
+              return acc;
+            },
+            {
+              totalSku: 0,
+              monthlyPurchaseMt: 0,
+              recycledQty: 0,
+              virginQty: 0,
+              recycledAmount: 0,
+              virginAmount: 0,
+            },
+          );
+
+          const recycledSharePct =
+            totals.monthlyPurchaseMt > 0
+              ? (totals.recycledQty / totals.monthlyPurchaseMt) * 100
+              : 0;
+
+          return {
+            totalSku: totals.totalSku,
+            monthlyPurchaseMt: formatNumber(totals.monthlyPurchaseMt, 3),
+            recycledQty: formatNumber(totals.recycledQty, 3),
+            virginQty: formatNumber(totals.virginQty, 3),
+            recycledSharePct: formatPercent(recycledSharePct, 1),
+            recycledAmount: formatNumber(totals.recycledAmount, 3),
+            virginAmount: formatNumber(totals.virginAmount, 3),
+          };
+        };
+
+        const buildGroupRows = (map) => {
+          const rows = Array.from(map.values()).map((bucket) => {
+            const recTarget = bucket.monthlyPurchaseMt * (totalTargetPct / 100);
+            const virTarget = Math.max(bucket.monthlyPurchaseMt - recTarget, 0);
+            const recShort = bucket.recycledQty - recTarget;
+            const virShort = bucket.virginQty - virTarget;
+            const recMeta = shortfallMeta(recShort);
+            const virMeta = shortfallMeta(virShort);
+            return {
+              name: bucket.name,
+              totalSku: bucket.skuSet.size,
+              monthlyPurchaseMt: formatNumber(bucket.monthlyPurchaseMt, 3),
+              recycledTargetQty: formatNumber(recTarget, 3),
+              recycledAchievedMt: formatNumber(bucket.recycledQty, 3),
+              recycledShortfallArrow: recMeta.arrow,
+              recycledShortfallAbs: recMeta.abs,
+              recycledShortfallStyle: recMeta.color,
+              virginTargetQty: formatNumber(virTarget, 3),
+              virginAchievedMt: formatNumber(bucket.virginQty, 3),
+              virginShortfallArrow: virMeta.arrow,
+              virginShortfallAbs: virMeta.abs,
+              virginShortfallStyle: virMeta.color,
+              sortKey: bucket.monthlyPurchaseMt,
+            };
+          });
+          return rows.sort((a, b) => b.sortKey - a.sortKey);
+        };
+
+        const summarizeTargetRows = (rows) => {
+          const totals = (rows || []).reduce(
+            (acc, row) => {
+              acc.totalSku += Number(row?.totalSku || 0) || 0;
+              acc.monthlyPurchaseMt += Number(row?.monthlyPurchaseMt || 0) || 0;
+              acc.recycledTargetQty += Number(row?.recycledTargetQty || 0) || 0;
+              acc.recycledAchievedMt += Number(row?.recycledAchievedMt || 0) || 0;
+              acc.virginTargetQty += Number(row?.virginTargetQty || 0) || 0;
+              acc.virginAchievedMt += Number(row?.virginAchievedMt || 0) || 0;
+              return acc;
+            },
+            {
+              totalSku: 0,
+              monthlyPurchaseMt: 0,
+              recycledTargetQty: 0,
+              recycledAchievedMt: 0,
+              virginTargetQty: 0,
+              virginAchievedMt: 0,
+            },
+          );
+
+          const recycledShortfall =
+            totals.recycledAchievedMt - totals.recycledTargetQty;
+          const virginShortfall =
+            totals.virginAchievedMt - totals.virginTargetQty;
+          const recMeta = shortfallMeta(recycledShortfall);
+          const virMeta = shortfallMeta(virginShortfall);
+
+          return {
+            totalSku: totals.totalSku,
+            monthlyPurchaseMt: formatNumber(totals.monthlyPurchaseMt, 3),
+            recycledTargetQty: formatNumber(totals.recycledTargetQty, 3),
+            recycledAchievedMt: formatNumber(totals.recycledAchievedMt, 3),
+            recycledShortfallArrow: recMeta.arrow,
+            recycledShortfallAbs: recMeta.abs,
+            recycledShortfallStyle: recMeta.color,
+            virginTargetQty: formatNumber(totals.virginTargetQty, 3),
+            virginAchievedMt: formatNumber(totals.virginAchievedMt, 3),
+            virginShortfallArrow: virMeta.arrow,
+            virginShortfallAbs: virMeta.abs,
+            virginShortfallStyle: virMeta.color,
+          };
+        };
+
+        const clientWise = buildBreakdownCards(clientAgg);
+        const industryWise = buildGroupRows(industryAgg);
+        const polymerWise = buildBreakdownCards(polymerAgg);
+        const supplierTypeWise = buildGroupRows(supplierTypeAgg)
+          .filter(
+            (row) =>
+              Number(row?.totalSku || 0) > 0 ||
+              Number(row?.monthlyPurchaseMt || 0) > 0 ||
+              Number(row?.recycledAchievedMt || 0) > 0 ||
+              Number(row?.virginAchievedMt || 0) > 0,
+          )
+          .sort((a, b) => {
+            const aIndex = supplierTypeOrder.findIndex((item) => item === a.name);
+            const bIndex = supplierTypeOrder.findIndex((item) => item === b.name);
+            const safeAIndex = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+            const safeBIndex = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+            if (safeAIndex !== safeBIndex) return safeAIndex - safeBIndex;
+            return (Number(b?.sortKey || 0) || 0) - (Number(a?.sortKey || 0) || 0);
+          });
+        const supplierWise = buildGroupRows(supplierAgg);
+        const stateWiseSupplierSummary = Array.from(stateAgg.values())
+          .map((bucket) => ({
+            stateName: bucket.name,
+            totalSuppliers: bucket.supplierSet.size,
+            registeredSuppliers: bucket.registeredSet.size,
+            unregisteredSuppliers: bucket.unregisteredSet.size,
+            totalSku: bucket.skuSet.size,
+            annualPurchaseMt: formatNumber(bucket.monthlyPurchaseMt, 3),
+            recycledQty: formatNumber(bucket.recycledQty, 3),
+            virginQty: formatNumber(bucket.virginQty, 3),
+            recycledAmount: formatNumber(bucket.recycledAmount, 3),
+            virginAmount: formatNumber(bucket.virginAmount, 3),
+          }))
+          .sort(
+            (a, b) =>
+              (Number(b?.totalSuppliers || 0) || 0) -
+              (Number(a?.totalSuppliers || 0) || 0),
+          );
+        const stateWiseSupplierSummaryTotals = {
+          recycledQty: formatNumber(totals.recycledQty, 3),
+          virginQty: formatNumber(totals.virginQty, 3),
+          recycledAmount: formatNumber(totals.recycledAmount, 3),
+          virginAmount: formatNumber(totals.virginAmount, 3),
+          annualPurchaseMt: formatNumber(totals.monthlyPurchaseMt, 3),
+        };
+
+        const recMetaTotal = shortfallMeta(recycledShortfall);
+        const virMetaTotal = shortfallMeta(virginShortfall);
+
+        return {
+          financialYear: fy || "-",
+          totalTargetPct: formatPercent(totalTargetPct, 1),
+          totalSku,
+          compliantSku,
+          nonCompliantSku,
+          totalSuppliers,
+          registeredSuppliers,
+          unregisteredSuppliers,
+          riskLabel,
+          riskClass,
+          totalMonthlyPurchaseMt: formatNumber(totals.monthlyPurchaseMt, 3),
+          recycledTargetQty: formatNumber(recycledTargetQty, 2),
+          virginTargetQty: formatNumber(virginTargetQty, 2),
+          recycledQtyAmount: formatNumber(totals.recycledAmount, 3),
+          virginQtyAmount: formatNumber(totals.virginAmount, 3),
+          recycledAchievedMt: formatNumber(totals.recycledQty, 2),
+          virginAchievedMt: formatNumber(totals.virginQty, 2),
+          recycledShortfallArrow: recMetaTotal.arrow,
+          recycledShortfallAbs: recMetaTotal.abs,
+          recycledShortfallStyle: recMetaTotal.color,
+          virginShortfallArrow: virMetaTotal.arrow,
+          virginShortfallAbs: virMetaTotal.abs,
+          virginShortfallStyle: virMetaTotal.color,
+          recycledAchievedPct: formatPercent(recycledAchievedPct, 1),
+          virginAchievedPct: formatPercent(virginAchievedPct, 1),
+          recycledAchievedBarPct: clampPct(recycledAchievedPct),
+          virginAchievedBarPct: clampPct(virginAchievedPct),
+          categoryWise,
+          clientWise,
+          clientWiseTotals: summarizeBreakdownRows(clientWise),
+          industryWise,
+          industryWiseTotals: summarizeTargetRows(industryWise),
+          polymerWise,
+          polymerWiseTotals: summarizeBreakdownRows(polymerWise),
+          supplierTypeWise,
+          supplierTypeWiseTotals: summarizeTargetRows(supplierTypeWise),
+          supplierWise,
+          supplierWiseTotals: summarizeTargetRows(supplierWise),
+          stateWiseSupplierSummary,
+          stateWiseSupplierSummaryTotals,
+        };
+      })(),
       salesSummary: {
         years: displaySalesYears,
         data: salesSummaryTable,
@@ -2828,12 +3826,10 @@ class ReportGeneratorService {
       __dirname,
       `../../templates/${templateFileName}`,
     );
-    console.log(`[Report Generation] Template Path: ${templatePath}`);
+    logger.debug({ templatePath }, "[Report Generation] Template path");
 
     if (!fs.existsSync(templatePath)) {
-      console.error(
-        `[Report Generation] Template file missing at ${templatePath}`,
-      );
+      logger.error({ templatePath }, "[Report Generation] Template file missing");
       throw new Error(`Template file missing at ${templatePath}`);
     }
 
@@ -2842,28 +3838,27 @@ class ReportGeneratorService {
     const html = template(templateData);
 
     // 7. Generate PDF
-    console.log("[Report Generation] Launching Puppeteer...");
+    logger.info("[Report Generation] Launching Puppeteer");
     try {
-      // Log env to debug
       const executablePath =
         process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
-      console.log(
-        "PUPPETEER_EXECUTABLE_PATH:",
-        process.env.PUPPETEER_EXECUTABLE_PATH,
+      logger.debug(
+        {
+          configuredExecutablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+          resolvedExecutablePath: executablePath,
+        },
+        "[Report Generation] Puppeteer executable paths",
       );
-      console.log("Resolved executablePath:", executablePath);
 
-      // Check if executable exists
       if (fs.existsSync(executablePath)) {
-        console.log("Executable found at path:", executablePath);
+        logger.debug({ executablePath }, "[Report Generation] Executable found");
       } else {
-        console.warn("Executable NOT found at path:", executablePath);
-        // Try to find browser in standard paths by platform
+        logger.warn({ executablePath }, "[Report Generation] Executable not found");
         if (!process.env.PUPPETEER_EXECUTABLE_PATH) {
           if (process.platform === "linux") {
             const standardPath = "/usr/bin/google-chrome-stable";
             if (fs.existsSync(standardPath)) {
-              console.log("Found standard path:", standardPath);
+              logger.debug({ standardPath }, "[Report Generation] Found Linux browser path");
               process.env.PUPPETEER_EXECUTABLE_PATH = standardPath;
             }
           } else if (process.platform === "win32") {
@@ -2875,7 +3870,7 @@ class ReportGeneratorService {
             ];
             for (const p of candidates) {
               if (fs.existsSync(p)) {
-                console.log("Found Windows browser path:", p);
+                logger.debug({ executablePath: p }, "[Report Generation] Found Windows browser path");
                 process.env.PUPPETEER_EXECUTABLE_PATH = p;
                 break;
               }
@@ -2887,7 +3882,7 @@ class ReportGeneratorService {
             ];
             for (const p of candidates) {
               if (fs.existsSync(p)) {
-                console.log("Found macOS browser path:", p);
+                logger.debug({ executablePath: p }, "[Report Generation] Found macOS browser path");
                 process.env.PUPPETEER_EXECUTABLE_PATH = p;
                 break;
               }
@@ -2917,21 +3912,31 @@ class ReportGeneratorService {
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || executablePath,
       });
       const page = await browser.newPage();
-      console.log("[Report Generation] Setting Content...");
+      logger.debug("[Report Generation] Setting content");
       await page.setContent(html, { waitUntil: "networkidle0" });
-      console.log("[Report Generation] Printing PDF...");
+      logger.debug("[Report Generation] Printing PDF");
+      const footerTemplate = `
+        <div style="width: 100%; padding: 0 20px 10px; box-sizing: border-box; font-family: Nunito, Arial, sans-serif; font-size: 8px; color: #0F5D46; background-color: transparent; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+          <div style="width: 100%; background: #EAF5F0; background-color: #EAF5F0; color: #0F5D46; padding: 7px 16px 8px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; border-top: 1px solid #D6EADF; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+            <span>AnantTattva EPR Kavach System</span>
+            <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+          </div>
+        </div>`;
       const pdfBuffer = await page.pdf({
         format: "A4",
         landscape: true, // Changed to Landscape to fit wide tables
+        displayHeaderFooter: true,
+        headerTemplate: `<div></div>`,
+        footerTemplate,
         printBackground: true,
-        margin: { top: "20px", right: "20px", bottom: "20px", left: "20px" },
+        margin: { top: "20px", right: "20px", bottom: "42px", left: "20px" },
       });
       await browser.close();
-      console.log("[Report Generation] PDF Generated Successfully");
+      logger.info("[Report Generation] PDF generated successfully");
 
       return pdfBuffer;
     } catch (puppeteerError) {
-      console.error("[Report Generation] Puppeteer Error:", puppeteerError);
+      logger.error({ err: puppeteerError }, "[Report Generation] Puppeteer error");
       throw new Error(
         `Puppeteer PDF generation failed: ${puppeteerError.message}`,
       );

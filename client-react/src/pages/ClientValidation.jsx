@@ -311,6 +311,163 @@ Date: ___________________`;
     return false;
   };
 
+  const buildValidationSubmission = () => {
+    if (!client) {
+      return {
+        isComplete: false,
+        payload: null,
+      };
+    }
+
+    const engagementLetter = isVerified('tab1_engagement');
+    const basicInfo = isVerified('tab2_overview') && isVerified('tab2_auth_person') && isVerified('tab2_coord_person');
+    const addressDetails = isVerified('tab3_address');
+
+    const isEwaste = client.wasteType === 'E-Waste' || client.wasteType === 'E_WASTE';
+    const requiredDocs = ['PAN', 'GST', 'CIN'];
+    if (!isEwaste) {
+      requiredDocs.push('Factory License');
+      requiredDocs.push('EPR Certificate');
+    } else {
+      requiredDocs.push('E-waste Registration');
+      if (client.isImportingEEE === 'Yes' || client.isImportingEEE === true) {
+        requiredDocs.push('EEE Import Authorization');
+      }
+    }
+
+    const docs = (client.documents || []).filter((d) => requiredDocs.includes(d.documentType));
+    const companyDocuments = docs.length === 0 ? false : docs.every((_, i) => isVerified(`doc_${i}`));
+    const msmeCount = (client.msmeDetails || []).length;
+    const msmeDetails = msmeCount > 0 ? isVerified('tab4_msme') : true;
+
+    const plantGroups = {};
+    const normalize = (name) => name ? name.trim().toLowerCase() : '';
+    const processData = (list, keyName) => {
+      (list || []).forEach((item) => {
+        const pName = item.plantName;
+        if (!pName) return;
+        const norm = normalize(pName);
+        if (!plantGroups[norm]) {
+          plantGroups[norm] = { displayName: pName, cteDetails: [], ctoDetails: [] };
+        }
+        plantGroups[norm][keyName].push(item);
+      });
+    };
+
+    processData(client.productionFacility?.cteDetailsList, 'cteDetails');
+    processData(client.productionFacility?.ctoDetailsList, 'ctoDetails');
+
+    const sortedGroups = Object.values(plantGroups).sort((a, b) =>
+      a.displayName.localeCompare(b.displayName),
+    );
+
+    let cteVerified = true;
+    let ctoVerified = true;
+    let hasCte = false;
+    let hasCto = false;
+    const verifiedItemIds = [];
+
+    sortedGroups.forEach((group, pIdx) => {
+      if (group.cteDetails.length > 0) hasCte = true;
+      group.cteDetails.forEach((item, idx) => {
+        if (!isVerified(`cte_${pIdx}_${idx}`)) {
+          cteVerified = false;
+        } else if (item._id) {
+          verifiedItemIds.push(item._id);
+        }
+      });
+
+      if (group.ctoDetails.length > 0) hasCto = true;
+      group.ctoDetails.forEach((item, idx) => {
+        if (!isVerified(`cto_${pIdx}_${idx}`)) {
+          ctoVerified = false;
+        } else if (item._id) {
+          verifiedItemIds.push(item._id);
+        }
+      });
+    });
+
+    if (!hasCte) cteVerified = false;
+    if (!hasCto) ctoVerified = false;
+
+    const regs = Array.isArray(client.productionFacility?.regulationsCoveredUnderCto)
+      ? client.productionFacility.regulationsCoveredUnderCto
+      : [];
+    const needsWater = regs.includes('Water');
+    const needsAir = regs.includes('Air');
+    const needsHazardousWaste = regs.some((r) => {
+      const lower = (r || '').toString().trim().toLowerCase();
+      return lower === 'hazardous waste' || lower === 'hazardous wate';
+    });
+    const ctoAdditionalDetails = hasCto ? isVerified('cto_additional_details') : true;
+    const ctoRegulations = hasCto ? isVerified('cto_regulations') : true;
+    const ctoWater = hasCto ? (!needsWater || isVerified('cto_water')) : true;
+    const ctoAir = hasCto ? (!needsAir || isVerified('cto_air')) : true;
+    const ctoHazardous = hasCto ? (!needsHazardousWaste || isVerified('cto_hazardous')) : true;
+
+    const isComplete = engagementLetter && basicInfo && addressDetails && companyDocuments && msmeDetails &&
+      (!hasCte || cteVerified) && (!hasCto || ctoVerified) &&
+      ctoAdditionalDetails && ctoRegulations && ctoWater && ctoAir && ctoHazardous;
+
+    return {
+      isComplete,
+      payload: {
+        validationStatus: isComplete ? 'Verified' : 'In Progress',
+        verifiedItemIds,
+        validationDetails: {
+          engagementLetter,
+          basicInfo,
+          addressDetails,
+          companyDocuments,
+          msmeDetails,
+          cteDetails: hasCte ? cteVerified : false,
+          ctoDetails: hasCto ? ctoVerified : false,
+          ctoAdditionalDetails,
+          ctoRegulations,
+          ctoWater,
+          ctoAir,
+          ctoHazardous,
+          verificationProgress: verificationState,
+          remarks: 'Validation completed via dashboard.'
+        }
+      }
+    };
+  };
+
+  const saveValidationState = async ({ advanceToAudit = false } = {}) => {
+    const submission = buildValidationSubmission();
+    if (!submission.payload) {
+      throw new Error('Client details are not available');
+    }
+
+    const validationResponse = await api.put(API_ENDPOINTS.CLIENT.VALIDATE(id), submission.payload);
+    const validatedClient = validationResponse.data?.data || client;
+    setClient(validatedClient);
+
+    if (advanceToAudit) {
+      if (!submission.isComplete) {
+        throw new Error('Complete all verification checks before moving to audit');
+      }
+
+      const transitionResponse = await api.put(API_ENDPOINTS.CLIENT.UPDATE(id), {
+        clientStatus: 'AUDIT',
+        statusChangeReason: 'Validation completed via dashboard.'
+      });
+      const transitionedClient = transitionResponse.data?.data || validatedClient;
+      setClient(transitionedClient);
+
+      return {
+        ...submission,
+        client: transitionedClient,
+      };
+    }
+
+    return {
+      ...submission,
+      client: validatedClient,
+    };
+  };
+
   const generateValidationPDF = (clientData, validationDetails) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
@@ -584,11 +741,9 @@ Date: ___________________`;
   const handleConfirmComplete = async () => {
     try {
         setLoading(true);
-        const response = await api.put(API_ENDPOINTS.CLIENT.UPDATE(id), {
-            clientStatus: 'AUDIT'
-        });
+        const { isComplete } = await saveValidationState({ advanceToAudit: true });
         
-        if (response.data.success) {
+        if (isComplete) {
             toast.success("Validation Completed! Moving to Audit Stage.", { theme: "colored" });
             setIsCompleteModalOpen(false);
             
@@ -614,135 +769,12 @@ Date: ___________________`;
 
     try {
       setLoading(true);
-
-      // 1. Engagement Letter
-      const engagementLetter = isVerified('tab1_engagement');
-
-      // 2. Basic Info
-      const basicInfo = isVerified('tab2_overview') && isVerified('tab2_auth_person') && isVerified('tab2_coord_person');
+      const { isComplete, payload, client: validatedClient } = await saveValidationState();
       
-      // 3. Address
-      const addressDetails = isVerified('tab3_address');
-
-      // 4. Documents
-      // For E-Waste, check for E-Waste Registration and Import Authorization if applicable
-      const isEwaste = client.wasteType === 'E-Waste' || client.wasteType === 'E_WASTE';
-      const requiredDocs = ['PAN', 'GST', 'CIN'];
-      if (!isEwaste) {
-          requiredDocs.push('Factory License'); // Plastic specific
-          requiredDocs.push('EPR Certificate'); // Plastic specific
-      } else {
-          requiredDocs.push('E-waste Registration'); // E-Waste specific
-          if (client.isImportingEEE === 'Yes' || client.isImportingEEE === true) {
-              requiredDocs.push('EEE Import Authorization');
-          }
-      }
-
-      const docs = (client.documents || []).filter(d => requiredDocs.includes(d.documentType));
-      // Relaxed check: if no docs found but required, it fails. If docs found, all must be verified.
-      // Better: Check if ALL required docs are present AND verified.
-      // For now, sticking to "Verify whatever is uploaded" + "At least some docs uploaded" logic from before, 
-      // but filtered by relevant types.
-      const companyDocuments = docs.length === 0 ? false : docs.every((_, i) => isVerified(`doc_${i}`));
-
-      // 5. MSME
-      const msmeDetails = isVerified('tab4_msme');
-
-      // 5. CTE/CTO
-      // Re-create grouping logic to match render indices
-      const plantGroups = {};
-      const normalize = (name) => name ? name.trim().toLowerCase() : '';
-      const processData = (list, keyName) => {
-          (list || []).forEach(item => {
-              const pName = item.plantName;
-              if (!pName) return;
-              const norm = normalize(pName);
-              if (!plantGroups[norm]) {
-                  plantGroups[norm] = { displayName: pName, cteDetails: [], ctoDetails: [] };
-              }
-              plantGroups[norm][keyName].push(item);
-          });
-      };
-      processData(client.productionFacility?.cteDetailsList, 'cteDetails');
-      processData(client.productionFacility?.ctoDetailsList, 'ctoDetails');
-      const sortedGroups = Object.values(plantGroups).sort((a, b) => a.displayName.localeCompare(b.displayName));
-
-      let cteVerified = true;
-      let ctoVerified = true;
-      let hasCte = false;
-      let hasCto = false;
-      const verifiedItemIds = [];
-
-      sortedGroups.forEach((group, pIdx) => {
-          if (group.cteDetails.length > 0) hasCte = true;
-          group.cteDetails.forEach((item, idx) => {
-              if (!isVerified(`cte_${pIdx}_${idx}`)) {
-                  cteVerified = false;
-              } else {
-                  if (item._id) verifiedItemIds.push(item._id);
-              }
-          });
-
-          if (group.ctoDetails.length > 0) hasCto = true;
-          group.ctoDetails.forEach((item, idx) => {
-              if (!isVerified(`cto_${pIdx}_${idx}`)) {
-                  ctoVerified = false;
-              } else {
-                  if (item._id) verifiedItemIds.push(item._id);
-              }
-          });
-      });
-
-      if (!hasCte) cteVerified = false; // or true if N/A? Let's say false if missing but technically not applicable
-      if (!hasCto) ctoVerified = false;
-
-      const regs = Array.isArray(client.productionFacility?.regulationsCoveredUnderCto) ? client.productionFacility.regulationsCoveredUnderCto : [];
-      const needsWater = regs.includes('Water');
-      const needsAir = regs.includes('Air');
-      const needsHazardousWaste = regs.some((r) => {
-          const lower = (r || '').toString().trim().toLowerCase();
-          return lower === 'hazardous waste' || lower === 'hazardous wate';
-      });
-      const ctoAdditionalDetails = hasCto ? isVerified('cto_additional_details') : true;
-      const ctoRegulations = hasCto ? isVerified('cto_regulations') : true;
-      const ctoWater = hasCto ? (!needsWater || isVerified('cto_water')) : true;
-      const ctoAir = hasCto ? (!needsAir || isVerified('cto_air')) : true;
-      const ctoHazardous = hasCto ? (!needsHazardousWaste || isVerified('cto_hazardous')) : true;
-
-      // Overall Status
-      const isComplete = engagementLetter && basicInfo && addressDetails && companyDocuments && msmeDetails && 
-                         (!hasCte || cteVerified) && (!hasCto || ctoVerified) &&
-                         ctoAdditionalDetails && ctoRegulations && ctoWater && ctoAir && ctoHazardous;
-                         
-      const validationStatus = isComplete ? 'Verified' : 'In Progress';
-
-      const payload = {
-        validationStatus,
-        verifiedItemIds,
-        validationDetails: {
-            engagementLetter,
-            basicInfo,
-            addressDetails,
-            companyDocuments,
-            msmeDetails,
-            cteDetails: hasCte ? cteVerified : false,
-            ctoDetails: hasCto ? ctoVerified : false,
-            ctoAdditionalDetails,
-            ctoRegulations,
-            ctoWater,
-            ctoAir,
-            ctoHazardous,
-            verificationProgress: verificationState,
-            remarks: 'Validation completed via dashboard.'
-        }
-      };
-      
-      const response = await api.put(API_ENDPOINTS.CLIENT.VALIDATE(id), payload);
-      
-      if (response.data.success) {
+      if (isComplete || payload.validationStatus === 'In Progress') {
             if (isComplete) {
                 try {
-                    generateValidationPDF(client, payload.validationDetails);
+                    generateValidationPDF(validatedClient, payload.validationDetails);
                 } catch (pdfErr) {
                     console.error("PDF Generation failed", pdfErr);
                 }
@@ -923,10 +955,10 @@ Date: ___________________`;
   };
 
   return (
-    <div className={embedded ? "p-0" : "p-6"}>
+    <div className={embedded ? "p-0" : "p-3 md:p-4 lg:p-6"}>
       {!embedded && (
-      <div className="mb-6 flex justify-between items-center">
-        <div className="flex items-center gap-4">
+      <div className="mb-5 md:mb-6 flex flex-col lg:flex-row justify-between lg:items-center gap-4">
+        <div className="flex items-start md:items-center gap-3 md:gap-4">
           <button
             onClick={() => navigate('/dashboard/clients')}
             className="group flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-500 shadow-md transition-all hover:bg-primary-600 hover:text-white"
@@ -935,7 +967,7 @@ Date: ___________________`;
             <FaArrowLeft className="transition-transform group-hover:-translate-x-1" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Validate: {client.clientName}</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Validate: {client.clientName}</h1>
             <p className="text-sm text-gray-500">Verify client details and documents</p>
             {client.validationDetails?.validatedBy && (
               <p className="text-sm text-green-600 mt-1 font-medium">
@@ -945,17 +977,17 @@ Date: ___________________`;
             )}
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex w-full lg:w-auto flex-wrap gap-3">
             <button
                 onClick={() => generateValidationPDF(client, client.validationDetails || {})}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 font-semibold shadow-md"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-semibold shadow-md"
             >
                 <FaFilePdf />
                 Download Report
             </button>
             <button
                 onClick={handleCompleteValidation}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 font-semibold shadow-md"
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 font-semibold shadow-md"
             >
                 <FaCheckDouble />
                 Complete Validation
@@ -964,9 +996,9 @@ Date: ___________________`;
       </div>
       )}
 
-      <div className={`bg-white rounded-lg shadow-md ${embedded ? "border-0 shadow-none" : "p-6"}`}>
+      <div className={`bg-white rounded-lg shadow-md ${embedded ? "border-0 shadow-none" : "p-4 md:p-5 lg:p-6"}`}>
         {/* Tabs */}
-        <div className="mb-8">
+        <div className="mb-6 md:mb-8">
             <div className="bg-gray-100 p-1.5 rounded-lg">
                 <div className="flex flex-wrap gap-2">
                     {tabs.map((tab) => {
@@ -1148,16 +1180,16 @@ Date: ___________________`;
           )}
 
           {activeTab === 3 && (
-            <div className="w-full mx-auto space-y-6">
+            <div className="w-full mx-auto space-y-5 md:space-y-6">
               <div className="rounded-xl border border-gray-200 bg-white">
-                <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl flex justify-between items-center">
+                <div className="px-5 py-3.5 md:px-6 md:py-4 border-b bg-gray-50 rounded-t-xl flex justify-between items-center">
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
                     <FaMapMarkerAlt className="text-primary-600" />
                     Company Address Details
                   </span>
                   <VerifyButton id="tab3_address" />
                 </div>
-                <div className="p-6">
+                <div className="p-5 md:p-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="p-4 bg-gray-50 rounded-lg border">
                       <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Registered Address</p>
@@ -1176,13 +1208,13 @@ Date: ___________________`;
           {activeTab === 4 && (
             <div className="w-full mx-auto">
               <div className="rounded-xl border border-gray-200 bg-white">
-                <div className="px-6 py-4 border-b bg-gray-50 rounded-t-xl">
+                <div className="px-5 py-3.5 md:px-6 md:py-4 border-b bg-gray-50 rounded-t-xl">
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
                     <FaFileInvoice className="text-primary-600" />
                     Company Documents
                   </span>
                 </div>
-                <div className="p-6 space-y-3">
+                <div className="p-5 md:p-6 space-y-3">
                   {(() => {
                       const isEwaste = client.wasteType === 'E-Waste' || client.wasteType === 'E_WASTE';
                       const requiredDocs = ['PAN', 'GST', 'CIN'];
@@ -1270,7 +1302,7 @@ Date: ___________________`;
                             </tr>
                           ))}
                           {(client.msmeDetails || []).length === 0 && (
-                            <tr><td colSpan="6" className="p-6 text-center text-gray-400">No MSME details</td></tr>
+                            <tr><td colSpan="6" className="p-5 md:p-6 text-center text-gray-400">No MSME details</td></tr>
                           )}
                         </tbody>
                       </table>
@@ -1281,7 +1313,7 @@ Date: ___________________`;
           )}
 
           {activeTab === 5 && (
-            <div className="w-full mx-auto space-y-8">
+            <div className="w-full mx-auto space-y-6 md:space-y-8">
               {(() => {
                 const pf = client.productionFacility || {};
                 const plantGroups = {};
@@ -1338,7 +1370,7 @@ Date: ___________________`;
 
                             return (
                                 <div key={pIdx} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden mb-8">
-                                    <div className="px-6 py-5 border-b bg-gradient-to-r from-gray-50 to-white flex justify-between items-center">
+                                    <div className="px-5 py-4 md:px-6 md:py-5 border-b bg-gradient-to-r from-gray-50 to-white flex justify-between items-center">
                                         <div className="flex items-center gap-3">
                                             <div className="h-10 w-10 rounded-lg bg-primary-50 flex items-center justify-center text-primary-600">
                                                 <FaBuilding className="text-xl" />
@@ -1351,7 +1383,7 @@ Date: ___________________`;
                                         <VerifyButton id={`plant_${pIdx}`} />
                                     </div>
 
-                                    <div className="p-6 space-y-8">
+                                    <div className="p-5 md:p-6 space-y-6 md:space-y-8">
                                         {/* CTE Details Section */}
                                         {cteDetails.length > 0 && (
                                             <div className="space-y-4">

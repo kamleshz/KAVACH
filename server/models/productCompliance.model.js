@@ -6,6 +6,10 @@ const dateField = {
 };
 
 const rowSchema = new mongoose.Schema({
+  rowKey: { type: String, default: "" },
+  skuKey: { type: String, default: "" },
+  componentKey: { type: String, default: "" },
+  supplierKey: { type: String, default: "" },
   generate: { type: String, default: "No" },
   systemCode: { type: String, default: "" },
   packagingType: { type: String, default: "" },
@@ -37,6 +41,10 @@ const rowSchema = new mongoose.Schema({
 }, { _id: false });
 
 const componentRowSchema = new mongoose.Schema({
+  rowKey: { type: String, default: "" },
+  skuKey: { type: String, default: "" },
+  componentKey: { type: String, default: "" },
+  supplierKey: { type: String, default: "" },
   systemCode: { type: String, default: "" },
   skuCode: { type: String, default: "" },
   componentCode: { type: String, default: "" },
@@ -55,6 +63,10 @@ const componentRowSchema = new mongoose.Schema({
 }, { _id: false });
 
 const supplierComplianceRowSchema = new mongoose.Schema({
+  rowKey: { type: String, default: "" },
+  skuKey: { type: String, default: "" },
+  componentKey: { type: String, default: "" },
+  supplierKey: { type: String, default: "" },
   systemCode: { type: String, default: "" },
   componentCode: { type: String, default: "" },
   componentDescription: { type: String, default: "" },
@@ -71,10 +83,13 @@ const supplierComplianceRowSchema = new mongoose.Schema({
   ctoPlantName: { type: String, default: "" },
   ctoStartDate: dateField,
   ctoValidUpto: dateField,
+  ctoExpiryAlertSentAt: dateField,
+  ctoExpiryAlertSentFor: dateField,
   ctoCcaDocument: { type: String, default: "" }
 }, { _id: false });
 
 const skuComplianceRowSchema = new mongoose.Schema({
+  skuKey: { type: String, default: "" },
   skuCode: { type: String, default: "" },
   skuDescription: { type: String, default: "" },
   skuUom: { type: String, default: "" },
@@ -82,6 +97,10 @@ const skuComplianceRowSchema = new mongoose.Schema({
 }, { _id: false });
 
 const recycledQuantityRowSchema = new mongoose.Schema({
+  rowKey: { type: String, default: "" },
+  skuKey: { type: String, default: "" },
+  componentKey: { type: String, default: "" },
+  supplierKey: { type: String, default: "" },
   systemCode: { type: String, default: "" },
   componentCode: { type: String, default: "" },
   componentDescription: { type: String, default: "" },
@@ -103,6 +122,8 @@ const supplierCtoCheckRowSchema = new mongoose.Schema({
   ctoPlantName: { type: String, default: "" },
   ctoStartDate: dateField,
   ctoValidUpto: dateField,
+  ctoExpiryAlertSentAt: dateField,
+  ctoExpiryAlertSentFor: dateField,
   ctoCcaDocument: { type: String, default: "" }
 }, { _id: false });
 
@@ -113,6 +134,10 @@ const plasticAnalysisSchema = new mongoose.Schema({
 }, { _id: false });
 
 const procurementSchema = new mongoose.Schema({
+  rowKey: { type: String, default: "" },
+  skuKey: { type: String, default: "" },
+  componentKey: { type: String, default: "" },
+  supplierKey: { type: String, default: "" },
   systemCode: { type: String, default: "" },
   skuCode: { type: String, default: "" },
   supplierName: { type: String, default: "" },
@@ -131,6 +156,7 @@ const procurementSchema = new mongoose.Schema({
   purchaseQty: { type: Number, default: 0 },
   uom: { type: String, default: "" },
   perPieceWeightKg: { type: Number, default: 0 },
+  ppwUom: { type: String, default: "KG" },
   monthlyPurchaseMt: { type: Number, default: 0 },
   recycledPercent: { type: Number, default: 0 },
   recycledQty: { type: Number, default: 0 },
@@ -164,7 +190,8 @@ const productComplianceSchema = new mongoose.Schema({
   supplierCompliance: { type: [supplierComplianceRowSchema], default: [] },
   recycledQuantityUsed: { type: [recycledQuantityRowSchema], default: [] },
   plasticAnalysis: { type: plasticAnalysisSchema, default: {} },
-  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }
+  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+  changeHistory: { type: [changeHistorySchema], default: [] }
 }, { timestamps: true });
 
 productComplianceSchema.index(

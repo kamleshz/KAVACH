@@ -130,8 +130,8 @@ const ClientConnect = () => {
 
   if (isError) {
     return (
-      <div className="p-4 md:p-6 min-h-screen">
-        <div className="bg-white border border-red-200 rounded-xl p-6 text-center shadow-sm">
+      <div className="p-4 md:p-5 2xl:p-6 min-h-screen">
+        <div className="bg-white border border-red-200 rounded-xl p-5 md:p-6 text-center shadow-sm">
           <h2 className="text-lg font-semibold text-red-600">
             Failed to load clients
           </h2>
@@ -146,19 +146,19 @@ const ClientConnect = () => {
   }
 
   return (
-    <div className="p-4 md:p-6 min-h-screen">
-        <div className="space-y-5">
+      <div className="p-3 md:p-4 lg:p-5 2xl:p-6 min-h-screen">
+        <div className="space-y-4 lg:space-y-5">
         {/* Header */}
         <GsapRevealGroup
-          className="flex flex-col md:flex-row md:items-end justify-between gap-4"
-          animateKey={`client-connect-header-${filteredClients.length}-${clients.length}`}
+          className="flex flex-col md:flex-row md:items-end justify-between gap-3"
+          animateKey="client-connect-header"
         >
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary-500 to-orange-600 text-white flex items-center justify-center shadow-md">
+            <div className="w-10 h-10 md:w-11 md:h-11 rounded-xl bg-gradient-to-br from-primary-500 to-orange-600 text-white flex items-center justify-center shadow-md">
               <FaUsers className="text-lg" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900">
                 Client Connect
               </h1>
               <p className="text-sm text-gray-500">
@@ -167,16 +167,16 @@ const ClientConnect = () => {
               </p>
             </div>
           </div>
-          <div className="text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg px-4 py-2 shadow-sm">
+          <div className="text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg px-3.5 py-2 shadow-sm">
             <GsapCountUp
               value={filteredClients.length}
-              animateKey={`client-connect-filtered-${filteredClients.length}`}
+              animateKey="client-connect-filtered"
               className="text-primary-600 text-base"
             />
             <span className="text-gray-400 mx-1">/</span>
             <GsapCountUp
               value={clients.length}
-              animateKey={`client-connect-total-${clients.length}`}
+              animateKey="client-connect-total"
               className="text-gray-700"
             />
             <span className="text-gray-500 ml-1 font-normal">clients</span>
@@ -185,7 +185,7 @@ const ClientConnect = () => {
 
         {/* Waste Type Stats Cards */}
         <GsapRevealGroup
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4"
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4"
           animateKey={`client-connect-waste-stats-${wasteType}-${clients.length}`}
         >
           {Object.entries(WASTE_CONFIG).map(([type, cfg]) => {
@@ -198,7 +198,7 @@ const ClientConnect = () => {
                 type="button"
                 onClick={() => setWasteType(isActive ? "ALL" : type)}
                 className={`
-                  relative flex items-center gap-4 px-5 py-4 rounded-xl border-2 transition-all duration-200 text-left
+                  relative flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 transition-all duration-200 text-left
                   ${
                     isActive
                       ? "shadow-md scale-[1.02]"
@@ -212,7 +212,7 @@ const ClientConnect = () => {
                 }
               >
                 <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                  className="w-10 h-10 md:w-11 md:h-11 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{
                     backgroundColor: isActive ? cfg.color + "22" : "#f3f4f6",
                   }}
@@ -224,12 +224,12 @@ const ClientConnect = () => {
                 </div>
                 <div className="min-w-0">
                   <div
-                    className="text-2xl font-extrabold leading-tight"
+                    className="text-xl md:text-2xl font-extrabold leading-tight"
                     style={{ color: isActive ? cfg.color : "#1f2937" }}
                   >
                     <GsapCountUp
                       value={count}
-                      animateKey={`client-connect-${type}-${count}`}
+                      animateKey={`client-connect-${type}`}
                     />
                   </div>
                   <div className="text-xs font-semibold text-gray-500 truncate leading-tight mt-0.5">
@@ -251,10 +251,10 @@ const ClientConnect = () => {
 
         {/* Search & Filter Bar */}
         <GsapRevealGroup
-          className="bg-white rounded-xl border border-gray-200 shadow-sm p-3.5"
-          animateKey={`client-connect-filters-${wasteType}-${searchTerm}`}
+          className="bg-white rounded-xl border border-gray-200 shadow-sm p-3 md:p-3.5"
+          animateKey={`client-connect-filters-${wasteType}`}
         >
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
               <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
               <input
@@ -262,7 +262,7 @@ const ClientConnect = () => {
                 placeholder="Search by client name, group or entity type..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-9 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all placeholder:text-gray-400"
+                className="w-full pl-9 pr-9 py-2.25 md:py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none transition-all placeholder:text-gray-400"
               />
               {searchTerm && (
                 <button
@@ -278,7 +278,7 @@ const ClientConnect = () => {
             <Select
               value={wasteType}
               onChange={(value) => setWasteType(value)}
-              className="min-w-[180px]"
+              className="w-full md:w-auto md:min-w-[180px]"
               size="large"
               popupMatchSelectWidth={false}
             >
@@ -301,8 +301,8 @@ const ClientConnect = () => {
         {/* Client Cards Grid */}
         {filteredClients.length === 0 ? (
           <GsapRevealGroup
-            className="bg-white rounded-xl border border-gray-200 shadow-sm py-16 px-6"
-            animateKey={`client-connect-empty-${wasteType}-${searchTerm}`}
+            className="bg-white rounded-xl border border-gray-200 shadow-sm py-12 md:py-16 px-5 md:px-6"
+            animateKey={`client-connect-empty-${wasteType}`}
           >
             <Empty
               description={
@@ -334,8 +334,8 @@ const ClientConnect = () => {
           </GsapRevealGroup>
         ) : (
           <GsapRevealGroup
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
-            animateKey={`client-connect-grid-${filteredClients.map((client) => client._id).join("-")}`}
+            className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3 md:gap-4"
+            animateKey={`client-connect-grid-${wasteType}`}
           >
             {filteredClients.map((client) => {
               const wt = client.wasteType || WASTE_TYPES.PLASTIC;
@@ -374,11 +374,11 @@ const ClientConnect = () => {
                     style={{ backgroundColor: cfg.color }}
                   />
 
-                  <div className="p-4">
+                  <div className="p-3.5 md:p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 min-w-0 flex-1">
                         <div
-                          className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold text-sm shadow-sm"
+                          className="w-10 h-10 md:w-11 md:h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold text-sm shadow-sm"
                           style={{
                             background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}cc)`,
                           }}

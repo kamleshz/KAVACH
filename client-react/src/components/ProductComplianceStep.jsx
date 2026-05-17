@@ -285,21 +285,27 @@ const GenericTable = ({
                     <FaDownload /> Export Excel
                 </button>
                 <button 
+                    type="button"
                     onClick={() => setRows([])}
                     className="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200 border border-red-200"
+                    aria-label="Delete all rows from this table"
                 >
                     <FaTrash /> Delete All
                 </button>
                 <button 
+                    type="button"
                     onClick={onSave}
                     disabled={loading}
                     className="flex items-center gap-2 px-3 py-1.5 bg-orange-600 text-white rounded text-sm hover:bg-orange-700"
+                    aria-label="Save all rows in this table"
                 >
                     {loading ? <FaSpinner className="animate-spin" /> : <FaSave />} Save All
                 </button>
                 <button 
+                    type="button"
                     onClick={onAddRow}
                     className="flex items-center gap-2 px-3 py-1.5 bg-white border border-orange-500 text-orange-600 rounded text-sm hover:bg-orange-50"
+                    aria-label="Add a new row to this table"
                 >
                     <FaPlus /> Add Row
                 </button>
@@ -342,8 +348,14 @@ const GenericTable = ({
                                 ))}
                                 <td className="px-4 py-2 text-right">
                                     <button 
-                                        onClick={() => onDeleteRow(idx)}
+                                        type="button"
+                                        onClick={() => {
+                                            if (window.confirm(`Delete row ${idx + 1}? This change will remain until you save or refresh.`)) {
+                                                onDeleteRow(idx);
+                                            }
+                                        }}
                                         className="text-red-500 hover:text-red-700 p-1"
+                                        aria-label={`Delete row ${idx + 1}`}
                                     >
                                         <FaTrash />
                                     </button>
@@ -1054,7 +1066,7 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
     ].filter(col => !(isManager && col.field === 'systemCode'));
 
     const handleDeleteRow = (idx) => {
-        if (!window.confirm("Are you sure you want to delete this row?")) return;
+        if (!window.confirm(`Delete row ${idx + 1}? This will remove it from the current table.`)) return;
         setRows(prev => prev.filter((_, i) => i !== idx));
         setLastSavedRows(prev => prev.filter((_, i) => i !== idx));
     };
@@ -1407,17 +1419,21 @@ const ProductComplianceTable = ({ client, type, index, initialData, refreshData,
                                     {!isManager && (
                                         <td className="px-4 py-2 text-right flex items-center justify-end gap-2">
                                             <button 
+                                                type="button"
                                                 onClick={() => saveRow(globalIdx)}
                                                 disabled={savingRow === globalIdx}
                                                 className="p-1 text-green-600 hover:text-green-800 disabled:opacity-50"
                                                 title="Save Row"
+                                                aria-label={`Save row ${globalIdx + 1}`}
                                             >
                                                 {savingRow === globalIdx ? <FaSpinner className="animate-spin" /> : <FaSave />}
                                             </button>
                                             <button 
+                                                type="button"
                                                 onClick={() => handleDeleteRow(globalIdx)}
                                                 className="text-red-500 hover:text-red-700 p-1"
                                                 title="Delete Row"
+                                                aria-label={`Delete row ${globalIdx + 1}`}
                                             >
                                                 <FaTrash />
                                             </button>
@@ -1554,7 +1570,7 @@ const SupplierComplianceTable = ({ client, type, index, initialData, refreshData
     };
 
     const handleDeleteRow = (idx) => {
-        if (!window.confirm("Are you sure you want to delete this row?")) return;
+        if (!window.confirm(`Delete row ${idx + 1}? This will remove it from the current table.`)) return;
         setRows(prev => prev.filter((_, i) => i !== idx));
         setLastSavedRows(prev => prev.filter((_, i) => i !== idx));
         // Note: For full consistency, we might want to trigger a save or delete API here, 
@@ -1850,7 +1866,8 @@ const ComponentDetailsTable = ({ client, type, index, initialData, refreshData, 
     };
 
     const handleDeleteRow = (idx) => {
-        if (!window.confirm("Are you sure you want to delete this row?")) return;
+        if (!window.confirm(`Delete row ${idx + 1}? This will remove it from the current table.`)) return;
+        if (!window.confirm(`Delete row ${idx + 1}? This will remove it from the current table.`)) return;
         setRows(prev => prev.filter((_, i) => i !== idx));
         setLastSavedRows(prev => prev.filter((_, i) => i !== idx));
     };
@@ -2056,17 +2073,21 @@ const ComponentDetailsTable = ({ client, type, index, initialData, refreshData, 
                                     {!isManager && (
                                         <td className="px-4 py-2 text-right flex items-center justify-end gap-2">
                                             <button 
+                                                type="button"
                                                 onClick={() => saveRow(globalIdx)}
                                                 disabled={savingRow === globalIdx}
                                                 className="p-1 text-green-600 hover:text-green-800 disabled:opacity-50"
                                                 title="Save Row"
+                                                aria-label={`Save row ${globalIdx + 1}`}
                                             >
                                                 {savingRow === globalIdx ? <FaSpinner className="animate-spin" /> : <FaSave />}
                                             </button>
                                             <button 
+                                                type="button"
                                                 onClick={() => handleDeleteRow(globalIdx)}
                                                 className="text-red-500 hover:text-red-700 p-1"
                                                 title="Delete Row"
+                                                aria-label={`Delete row ${globalIdx + 1}`}
                                             >
                                                 <FaTrash />
                                             </button>
@@ -2548,17 +2569,21 @@ const RecycledQuantityTable = ({ client, type, index, initialData, refreshData, 
                                     {!isManager && (
                                         <td className="px-4 py-2 text-right flex items-center justify-end gap-2">
                                             <button 
+                                                type="button"
                                                 onClick={() => saveRow(globalIdx)}
                                                 disabled={savingRow === globalIdx}
                                                 className="p-1 text-green-600 hover:text-green-800 disabled:opacity-50"
                                                 title="Save Row"
+                                                aria-label={`Save row ${globalIdx + 1}`}
                                             >
                                                 {savingRow === globalIdx ? <FaSpinner className="animate-spin" /> : <FaSave />}
                                             </button>
                                             <button 
+                                                type="button"
                                                 onClick={() => handleDeleteRow(globalIdx)}
                                                 className="text-red-500 hover:text-red-700 p-1"
                                                 title="Delete Row"
+                                                aria-label={`Delete row ${globalIdx + 1}`}
                                             >
                                                 <FaTrash />
                                             </button>

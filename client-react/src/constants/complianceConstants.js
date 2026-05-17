@@ -38,6 +38,21 @@ export const PACKAGING_TYPES = [
   'Tertiary Packaging'
 ];
 
+export const INDUSTRY_CATEGORY_OPTIONS = [
+  'Food & Beverage Packaging',
+  'Personal Care & Cosmetics',
+  'Home Care / Household Products',
+  'Pharmaceutical & Healthcare',
+  'Agriculture & Allied Products',
+  'Electrical & Electronics Packaging',
+  'Industrial & Institutional Packaging',
+  'Retail & Carry Bags',
+  'Transport / Secondary / Tertiary Packaging',
+  'Consumer Durables Packaging',
+  'Multi-Layered Plastic (MLP) Packaging',
+  'Others / Miscellaneous Plastics'
+];
+
 export const CONTAINER_CAPACITIES = [
   'containers < 0.9 l',
   'containers > 0.9l and < 4.9 l',

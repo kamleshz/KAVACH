@@ -878,6 +878,62 @@
             <div class="card muted">No SKU summary data available.</div>
             {{/if}}
         </div>
+
+        {{#if portalSummary.supplierTypeWise.length}}
+        <div class="section">
+            <div class="section-title">3.3 Supplier Type Summary</div>
+            <div class="grid-3" style="margin-bottom: 14px;">
+                {{#each portalSummary.supplierTypeWise}}
+                <div class="card">
+                    <div class="card-label">{{this.name}}</div>
+                    <div class="card-value">{{this.totalSku}}</div>
+                    <div class="muted" style="margin-top: 4px; font-size: 10px;">Total SKU</div>
+                </div>
+                {{/each}}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Supplier Type</th>
+                        <th>Total SKU</th>
+                        <th>Annual Purchase MT</th>
+                        <th>Recycled Target Qty</th>
+                        <th>Recycled Achieved (MT)</th>
+                        <th>Recycled Shortfall (MT)</th>
+                        <th>Virgin Target Qty (MT)</th>
+                        <th>Virgin Achieved (MT)</th>
+                        <th>Virgin Shortfall (MT)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each portalSummary.supplierTypeWise}}
+                    <tr>
+                        <td>{{this.name}}</td>
+                        <td>{{this.totalSku}}</td>
+                        <td>{{this.monthlyPurchaseMt}}</td>
+                        <td>{{this.recycledTargetQty}}</td>
+                        <td>{{this.recycledAchievedMt}}</td>
+                        <td>{{this.recycledShortfallArrow}} {{this.recycledShortfallAbs}}</td>
+                        <td>{{this.virginTargetQty}}</td>
+                        <td>{{this.virginAchievedMt}}</td>
+                        <td>{{this.virginShortfallArrow}} {{this.virginShortfallAbs}}</td>
+                    </tr>
+                    {{/each}}
+                    <tr>
+                        <td><strong>Total</strong></td>
+                        <td>-</td>
+                        <td>{{portalSummary.supplierTypeWiseTotals.monthlyPurchaseMt}}</td>
+                        <td>{{portalSummary.supplierTypeWiseTotals.recycledTargetQty}}</td>
+                        <td>{{portalSummary.supplierTypeWiseTotals.recycledAchievedMt}}</td>
+                        <td>{{portalSummary.supplierTypeWiseTotals.recycledShortfallArrow}} {{portalSummary.supplierTypeWiseTotals.recycledShortfallAbs}}</td>
+                        <td>{{portalSummary.supplierTypeWiseTotals.virginTargetQty}}</td>
+                        <td>{{portalSummary.supplierTypeWiseTotals.virginAchievedMt}}</td>
+                        <td>{{portalSummary.supplierTypeWiseTotals.virginShortfallArrow}} {{portalSummary.supplierTypeWiseTotals.virginShortfallAbs}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {{/if}}
     </div>
 
     {{#if supplierCtoTable.length}}
@@ -892,7 +948,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">3.3 Supplier CTO Summary</div>
+            <div class="section-title">3.4 Supplier CTO Summary</div>
             <div class="grid-3">
                 <div class="card">
                     <div class="card-label">Total Supplier CTO</div>
@@ -922,7 +978,7 @@
         </div>
 
         <div class="section">
-            <div class="section-title">3.4 Supplier CTO Check Table</div>
+            <div class="section-title">3.5 Supplier CTO Check Table</div>
             <table>
                 <thead>
                     <tr>

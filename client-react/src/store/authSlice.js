@@ -2,6 +2,19 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import api, { clearAccessToken, setAccessToken } from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 
+const AUTH_STORAGE_KEY = 'epr-kavach-auth-user';
+
+const readCachedUser = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
 export const checkAuth = createAsyncThunk('auth/checkAuth', async (_, { rejectWithValue }) => {
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const maxAttempts = 8;
@@ -90,8 +103,8 @@ export const logout = createAsyncThunk('auth/logout', async () => {
 });
 
 const initialState = {
-  user: null,
-  loading: true,
+  user: readCachedUser(),
+  loading: !readCachedUser(),
   error: null,
 };
 
@@ -104,12 +117,14 @@ const authSlice = createSlice({
     },
     setUser: (state, action) => {
       state.user = action.payload;
+      state.loading = false;
+      state.error = null;
     },
   },
   extraReducers: (builder) => {
     builder
       .addCase(checkAuth.pending, (state) => {
-        state.loading = true;
+        state.loading = !state.user;
         state.error = null;
       })
       .addCase(checkAuth.fulfilled, (state, action) => {
@@ -122,9 +137,11 @@ const authSlice = createSlice({
         state.error = action.payload || action.error.message;
       })
       .addCase(login.pending, (state) => {
+        state.loading = true;
         state.error = null;
       })
       .addCase(login.fulfilled, (state, action) => {
+        state.loading = false;
         if (action.payload.requireOtp) {
             // Do not set user yet
         } else {
@@ -132,6 +149,7 @@ const authSlice = createSlice({
         }
       })
       .addCase(login.rejected, (state, action) => {
+        state.loading = false;
         state.user = null;
         state.error = action.payload || action.error.message;
       })
@@ -149,6 +167,7 @@ const authSlice = createSlice({
         state.error = action.payload || action.error.message;
       })
       .addCase(logout.fulfilled, (state) => {
+        state.loading = false;
         state.user = null;
       });
   },

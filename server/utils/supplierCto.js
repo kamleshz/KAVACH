@@ -65,6 +65,8 @@ export const buildSupplierMetaByName = (supplierComplianceRows = []) => {
 
       supplierMetaByName.set(supplierName, {
         supplierStatus: normalizeText(row?.supplierStatus),
+        supplierState: normalizeText(row?.supplierState),
+        supplierType: normalizeText(row?.supplierType),
         eprCertificateNumber: normalizeText(row?.eprCertificateNumber),
       });
     },

@@ -136,3 +136,66 @@ export const buildCategoryWiseProcurement = ({
       return toText(a.category).localeCompare(toText(b.category));
     });
 };
+
+export const buildGroupedProcurementCards = ({
+  rows = [],
+  getBucketKey = () => "",
+  getBucketLabel = () => "",
+  getPrimaryKey = () => "",
+  safeNumber = (value) => Number(value) || 0,
+} = {}) => {
+  return Object.values(
+    (Array.isArray(rows) ? rows : []).reduce((acc, row, index) => {
+      const bucketKey = toText(getBucketKey(row, index));
+      const bucketLabel = toText(getBucketLabel(row, index)) || bucketKey;
+
+      if (!bucketKey || !bucketLabel) return acc;
+
+      if (!acc[bucketKey]) {
+        acc[bucketKey] = {
+          key: `${bucketKey}-${index}`,
+          name: bucketLabel,
+          primaryKeys: new Set(),
+          monthlyPurchaseMt: 0,
+          recycledQty: 0,
+          virginQty: 0,
+          recycledAmount: 0,
+          virginAmount: 0,
+        };
+      }
+
+      const primaryKey = toText(getPrimaryKey(row, index));
+      if (primaryKey) {
+        acc[bucketKey].primaryKeys.add(primaryKey);
+      }
+
+      acc[bucketKey].monthlyPurchaseMt += safeNumber(row?.monthlyPurchaseMt);
+      acc[bucketKey].recycledQty += safeNumber(row?.recycledQty);
+      acc[bucketKey].virginQty += safeNumber(row?.virginQty);
+      acc[bucketKey].recycledAmount += safeNumber(row?.recycledQrtAmount);
+      acc[bucketKey].virginAmount += safeNumber(row?.virginQtyAmount);
+      return acc;
+    }, {}),
+  )
+    .map((item) => {
+      const recycledShare = item.monthlyPurchaseMt
+        ? (item.recycledQty / item.monthlyPurchaseMt) * 100
+        : 0;
+      const virginShare = Math.max(0, 100 - recycledShare);
+
+      return {
+        ...item,
+        totalSku: item.primaryKeys.size,
+        recycledShare: formatCategoryShare(recycledShare),
+        virginShare: formatCategoryShare(virginShare),
+        recycledShareRaw: recycledShare,
+        recycledVsVirginLeftPct: Math.min(100, Math.max(0, recycledShare)),
+        recycledVsVirginRightPct: Math.min(100, Math.max(0, virginShare)),
+      };
+    })
+    .sort((a, b) => {
+      const purchaseDiff = b.monthlyPurchaseMt - a.monthlyPurchaseMt;
+      if (purchaseDiff !== 0) return purchaseDiff;
+      return toText(a.name).localeCompare(toText(b.name));
+    });
+};

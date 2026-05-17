@@ -23,16 +23,22 @@ const routeNameMap = {
 const Breadcrumbs = () => {
   const location = useLocation();
   const pathnames = location.pathname.split('/').filter((x) => x);
+  const clientNameFromState =
+    location.state?.clientName ||
+    location.state?.breadcrumbLabel ||
+    location.state?.context?.clientName ||
+    '';
 
   // If we are just on dashboard, don't show breadcrumbs or just show Home
   if (pathnames.length === 0) return null;
   if (pathnames.length === 1 && pathnames[0] === 'dashboard') return null;
 
   return (
-    <nav className="mb-4 flex items-center text-sm text-gray-500 animate-fadeIn">
+    <nav className="theme-text-secondary mb-4 flex items-center text-sm animate-fadeIn">
       <Link 
         to="/dashboard" 
-        className="flex items-center hover:text-orange-600 transition-colors"
+        className="flex items-center transition-colors hover:opacity-80"
+        style={{ color: 'var(--brand-primary)' }}
       >
         <HomeOutlined className="mr-1" />
         <span>Home</span>
@@ -53,7 +59,10 @@ const Breadcrumbs = () => {
         if (isId) {
             // Check context from previous segment to give better name
             const prev = pathnames[index - 1];
-            if (prev === 'client' || prev === 'view-client') displayName = 'Client Details';
+            if ((prev === 'client' || prev === 'view-client') && clientNameFromState) {
+              displayName = clientNameFromState;
+            }
+            else if (prev === 'client' || prev === 'view-client') displayName = 'Client Details';
             else if (prev === 'process-plant' || prev === 'process-ewaste') displayName = 'Audit Step';
             else displayName = 'Details';
         }
@@ -65,15 +74,19 @@ const Breadcrumbs = () => {
 
         return (
           <div key={to} className="flex items-center">
-            <RightOutlined className="mx-2 text-[10px] text-gray-400" />
+            <RightOutlined className="theme-text-muted mx-2 text-[10px]" />
             {isLast ? (
-              <span className="font-medium text-gray-800 bg-gray-100 px-2 py-0.5 rounded-md">
+              <span
+                className="theme-text-primary rounded-md px-2 py-0.5 font-medium"
+                style={{ background: 'var(--app-bg-muted)' }}
+              >
                 {displayName}
               </span>
             ) : (
               <Link 
                 to={to} 
-                className="hover:text-orange-600 transition-colors hover:underline decoration-orange-600/30 underline-offset-4"
+                className="theme-text-secondary transition-colors hover:underline underline-offset-4"
+                style={{ textDecorationColor: 'color-mix(in srgb, var(--brand-primary) 30%, transparent)' }}
               >
                 {displayName}
               </Link>

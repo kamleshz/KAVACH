@@ -1,5 +1,13 @@
 import mongoose from "mongoose";
 
+const statusHistorySchema = new mongoose.Schema({
+    from: { type: String, default: "" },
+    to: { type: String, default: "" },
+    changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    changedAt: { type: Date, default: Date.now },
+    reason: { type: String, default: "" }
+}, { _id: false });
+
 const documentSchema = new mongoose.Schema({
     documentType: {
         type: String,
@@ -63,7 +71,8 @@ const pwpSchema = new mongoose.Schema({
     },
     financialYear: {
         type: String,
-        default: ""
+        default: "",
+        match: [/^\d{4}-\d{2}$/, "Financial year must be in YYYY-YY format"]
     },
     entityType: {
         type: String,
@@ -83,15 +92,18 @@ const pwpSchema = new mongoose.Schema({
     companyDetails: {
         pan: {
             type: String,
-            default: ""
+            default: "",
+            match: [/^[A-Z]{5}[0-9]{4}[A-Z]$/, "Invalid PAN format"]
         },
         cin: {
             type: String,
-            default: ""
+            default: "",
+            match: [/^[LU][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}$/, "Invalid CIN format"]
         },
         gst: {
             type: String,
-            default: ""
+            default: "",
+            match: [/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, "Invalid GST format"]
         },
         udyamRegistration: {
             type: String,
@@ -441,10 +453,22 @@ const pwpSchema = new mongoose.Schema({
         validatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
         validatedAt: { type: Date, default: null },
         verificationProgress: { type: Map, of: Boolean, default: {} }
+    },
+    clientStatus: {
+        type: String,
+        enum: ['DRAFT', 'SUBMITTED', 'PRE_VALIDATION', 'AUDIT'],
+        default: 'DRAFT'
+    },
+    statusHistory: {
+        type: [statusHistorySchema],
+        default: []
     }
 }, {
     timestamps: true
 });
+
+pwpSchema.index({ "companyDetails.pan": 1 }, { sparse: true, name: "idx_pwp_company_pan" });
+pwpSchema.index({ "companyDetails.cin": 1 }, { sparse: true, name: "idx_pwp_company_cin" });
 
 const PWPModel = mongoose.model("PWP", pwpSchema);
 

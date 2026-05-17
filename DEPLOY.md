@@ -2,6 +2,19 @@
 
 This guide explains how to deploy the EPRKAVACH application (Frontend + Backend) to cloud platforms.
 
+Before deploying to a real production environment, also follow:
+
+- `PRODUCTION_READINESS.md`
+- `server/.env.example`
+
+Run these checks before go-live:
+
+```bash
+npm run build
+npm run smoke
+npm --prefix server run preflight:prod
+```
+
 ## Prerequisites
 
 1.  **GitHub Account**: You need a GitHub account.

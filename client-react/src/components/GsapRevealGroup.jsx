@@ -1,15 +1,13 @@
 import { useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
+import usePrefersReducedMotion from "../hooks/usePrefersReducedMotion";
 
 const GsapRevealGroup = ({ children, className = "", animateKey = "default" }) => {
   const containerRef = useRef(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useLayoutEffect(() => {
     if (!containerRef.current || typeof window === "undefined") return undefined;
-
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
 
     if (prefersReducedMotion) return undefined;
 
@@ -50,7 +48,7 @@ const GsapRevealGroup = ({ children, className = "", animateKey = "default" }) =
     }, containerRef);
 
     return () => ctx.revert();
-  }, [animateKey, children]);
+  }, [animateKey, prefersReducedMotion]);
 
   return (
     <div ref={containerRef} className={className}>

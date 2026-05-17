@@ -48,18 +48,18 @@ const ClientGroupSearch = ({ onProcess, isEmbedded = false }) => {
   };
 
   return (
-    <div className={`w-full ${isEmbedded ? '' : 'p-4 md:p-8 min-h-screen'}`}>
+    <div className={`w-full ${isEmbedded ? '' : 'p-4 md:p-6 2xl:p-8 min-h-screen'}`}>
       <div className="w-full mx-auto">
         {!isEmbedded && (
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
+            <div className="mb-6 md:mb-8">
+                <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
                 Client Group Search
                 </h1>
                 <p className="text-gray-600 mt-2">Search clients by Company Name</p>
             </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 md:p-6 mb-6 md:mb-8">
             <form onSubmit={handleSearch} className="flex gap-4 items-end">
                 <div className="flex-1">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -74,14 +74,14 @@ const ClientGroupSearch = ({ onProcess, isEmbedded = false }) => {
                             allowClear
                             prefix={<FaSearch className="text-gray-400" />}
                             className="rounded-xl"
-                            style={{ height: '50px' }}
+                            style={{ height: '46px' }}
                         />
                     </div>
                 </div>
                 <button
                     type="submit"
                     disabled={loading || !searchTerm.trim()}
-                    className="px-8 py-3 bg-primary-600 text-white font-semibold rounded-xl hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-6 py-2.5 bg-primary-600 text-white font-semibold rounded-xl hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                     {loading ? <FaSpinner className="animate-spin" /> : <FaSearch />}
                     Search
@@ -162,7 +162,7 @@ const ClientGroupSearch = ({ onProcess, isEmbedded = false }) => {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="4" className="p-8 text-center text-gray-500">
+                                    <td colSpan="4" className="p-6 md:p-8 text-center text-gray-500">
                                         <div className="flex flex-col items-center justify-center">
                                             <FaSearch className="text-4xl text-gray-200 mb-3" />
                                             <p>No clients found matching "{searchTerm}"</p>

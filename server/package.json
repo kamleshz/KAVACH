@@ -9,9 +9,12 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "test": "node --test \"tests/**/*.test.js\"",
     "worker:pdf": "node workers/pdf.worker.js",
     "build": "node --check index.js && node --check workers/pdf.worker.js",
     "smoke": "node scripts/smoke-test.js",
+    "preflight:prod": "node scripts/production-preflight.js",
+    "verify:routes": "node scripts/verify-routes.js",
     "lint": "eslint . --ext .js",
     "format:check": "prettier --check \"{config,controllers,cron,middleware,models,queues,routes,scripts,services,utils,validators,workers}/**/*.js\" \"index.js\""
   },

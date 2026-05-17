@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Tabs,
@@ -63,7 +63,7 @@ import AuditStepper from "../components/AuditStepper";
 import DocumentViewerModal from "../components/DocumentViewerModal";
 import GsapCountUp from "../components/GsapCountUp";
 import GsapRevealGroup from "../components/GsapRevealGroup";
-import GsapStepTransition from "../components/GsapStepTransition";
+import GsapPageTransition from "../components/GsapPageTransition";
 import {
   ArrowLeftOutlined,
   CalendarOutlined,
@@ -82,24 +82,31 @@ import useAuth from "../hooks/useAuth";
 import { resolveClientFileUrl } from "../utils/fileAccess";
 import { useClientDetailQuery } from "../hooks/queries/useClientDetailQuery";
 import { useClientConnectSummaryQuery } from "../hooks/queries/useClientConnectSummaryQuery";
-import { buildCategoryWiseProcurement } from "../features/clientDetail/utils/categorySummary";
+import {
+  buildCategoryWiseProcurement,
+  buildGroupedProcurementCards,
+} from "../features/clientDetail/utils/categorySummary";
+import indiaSvgMap from "@svg-maps/india";
 import ClientHeader from "../features/clientDetail/components/ClientHeader";
 import ClientDocuments from "../features/clientDetail/components/ClientDocuments";
 import ClientSummaryPanel from "../features/clientDetail/components/ClientSummaryPanel";
 import ClientComplianceTable from "../features/clientDetail/components/ClientComplianceTable";
+import IndustrySummarySection from "../features/clientDetail/components/IndustrySummarySection";
+import ClientOverviewSection from "../features/clientDetail/components/ClientOverviewSection";
+import StateWiseSummarySection from "../features/clientDetail/components/StateWiseSummarySection";
+import SupplierCtoSummarySection from "../features/clientDetail/components/SupplierCtoSummarySection";
+import {
+  isPastDate,
+  normalizeStateName,
+} from "../features/clientDetail/utils/stateSummaryHelpers";
+import { buildSupplierCtoSummary } from "../features/clientDetail/utils/supplierCtoSummary";
+import { createSupplierCtoTableColumns } from "../features/clientDetail/utils/summaryTableColumns.jsx";
 
 import { ClientProvider } from "../context/ClientContext";
 
-const WASTE_THEME = {
-  "Plastic Waste": { color: "#059669", bg: "#ecfdf5", icon: FaRecycle },
-  "E-Waste": { color: "#7c3aed", bg: "#f5f3ff", icon: FaBolt },
-  "Battery Waste": { color: "#dc2626", bg: "#fef2f2", icon: FaBatteryFull },
-  ELV: { color: "#0284c7", bg: "#f0f9ff", icon: FaCarSide },
-  "Used Oil": { color: "#b45309", bg: "#fffbeb", icon: FaOilCan },
-};
-
 const ClientDetail = ({
   clientId,
+  initialClientData = null,
   embedded = false,
   initialViewMode,
   onAuditComplete,
@@ -113,6 +120,9 @@ const ClientDetail = ({
     typeof user?.role === "string" ? user.role : user?.role?.name;
   const isClientUser = roleName === "CLIENT";
   const linkedClientId = user?.linkedClient?._id;
+  const fallbackClientRoute = isClientUser ? "/dashboard/client-connect" : "/dashboard/clients";
+  const returnTo = location.state?.from || fallbackClientRoute;
+  const clientNameFromState = location.state?.clientName || "";
 
   const derivedId =
     clientId ||
@@ -122,8 +132,8 @@ const ClientDetail = ({
   const isProcessMode =
     initialViewMode === "process" || location.state?.viewMode === "process";
 
-  const [client, setClient] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [client, setClient] = useState(initialClientData);
+  const [loading, setLoading] = useState(!initialClientData);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState(isProcessMode ? 4 : 1);
   const [expandedSections, setExpandedSections] = useState(
@@ -169,6 +179,10 @@ const ClientDetail = ({
   const [supplierOnlyShortfall, setSupplierOnlyShortfall] = useState(false);
   const [supplierOnlyNoRecycled, setSupplierOnlyNoRecycled] = useState(false);
   const [supplierTopN, setSupplierTopN] = useState("All");
+  const [selectedSupplierState, setSelectedSupplierState] = useState("All States");
+  const [indiaMapLabels, setIndiaMapLabels] = useState([]);
+  const [indiaMapSvgVersion, setIndiaMapSvgVersion] = useState(0);
+  const [hoveredStateMapDetails, setHoveredStateMapDetails] = useState(null);
   const [summaryDrawerOpen, setSummaryDrawerOpen] = useState(false);
   const [summaryDrawerType, setSummaryDrawerType] = useState(null);
   const [summaryDrawerRecord, setSummaryDrawerRecord] = useState(null);
@@ -179,15 +193,25 @@ const ClientDetail = ({
   const [closingBrandOwnerSku, setClosingBrandOwnerSku] = useState(null);
   const [brandOwnerComponentStatusFilter, setBrandOwnerComponentStatusFilter] =
     useState(null);
-  const isProducerEntity = (client?.entityType || "")
+  const indiaMapSvgRef = useRef(null);
+  const normalizedEntityType = (client?.entityType || "")
     .toString()
-    .toLowerCase()
-    .includes("producer");
+    .trim()
+    .toLowerCase();
+  const isProducerEntity = normalizedEntityType.includes("producer");
+  const isBrandOwnerEntity = normalizedEntityType.includes("brand owner");
+  const showPlantLocationMarkers = isBrandOwnerEntity || isProducerEntity;
 
   const safeNumber = (value) => {
     const parsed = parseFloat(value);
     return Number.isFinite(parsed) ? parsed : 0;
   };
+  const attachIndiaMapSvgRef = useCallback((node) => {
+    indiaMapSvgRef.current = node;
+    if (node) {
+      setIndiaMapSvgVersion((prev) => prev + 1);
+    }
+  }, []);
 
   const formatWithCommas = (value, digits = 3) =>
     safeNumber(value).toLocaleString("en-IN", {
@@ -279,7 +303,10 @@ const ClientDetail = ({
     return { type: computedType, itemId: computedItemId };
   }, [client]);
 
-  const clientDetailQuery = useClientDetailQuery(derivedId);
+  const clientDetailQuery = useClientDetailQuery(derivedId, {
+    view: embedded && initialViewMode === "process" ? "audit" : undefined,
+    initialData: initialClientData,
+  });
   const summaryQuery = useClientConnectSummaryQuery({
     clientId: id,
     type,
@@ -797,6 +824,556 @@ const ClientDetail = ({
     isProducerEntity,
   ]);
 
+  const producerClientConnectSkuData = useMemo(() => {
+    if (!isProducerEntity) return [];
+
+    const productMetaBySku = new Map();
+    (summaryProductRows || []).forEach((product) => {
+      const skuKey =
+        (product?.skuCode || "").toString().trim() ||
+        (product?.componentCode || "").toString().trim();
+      if (!skuKey || productMetaBySku.has(skuKey)) return;
+
+      productMetaBySku.set(skuKey, {
+        skuDescription: product?.skuDescription || product?.componentDescription || "-",
+        industryCategory: product?.industryCategory || "-",
+        productImage: product?.productImage || product?.componentImage,
+      });
+    });
+
+    const grouped = new Map();
+
+    (skuTableData || []).forEach((item, index) => {
+      const skuKey =
+        (item?.skuCode || "").toString().trim() ||
+        (item?.componentCode || "").toString().trim();
+      if (!skuKey) return;
+
+      if (!grouped.has(skuKey)) {
+        const meta = productMetaBySku.get(skuKey) || {};
+        grouped.set(skuKey, {
+          key: `producer-client-connect-${skuKey}-${index}`,
+          skuCode: skuKey,
+          skuDescription: meta.skuDescription || item?.skuDescription || item?.componentDescription || "-",
+          industryCategory: meta.industryCategory || item?.industryCategory || "-",
+          productImage: meta.productImage || item?.productImage || item?.componentImage,
+          foodGrade: item?.foodGrade || "-",
+          details: [],
+          seenDetailKeys: new Set(),
+        });
+      }
+
+      const bucket = grouped.get(skuKey);
+      const detailKey =
+        item?.key ||
+        [
+          skuKey,
+          (item?.componentCode || "").toString().trim(),
+          (item?.supplierName || "").toString().trim(),
+          (item?.monthlyPurchaseMt || "").toString().trim(),
+        ].join("::");
+
+      if (!bucket.seenDetailKeys.has(detailKey)) {
+        bucket.seenDetailKeys.add(detailKey);
+        bucket.details.push(item);
+      }
+
+      if ((!bucket.foodGrade || bucket.foodGrade === "-") && item?.foodGrade) {
+        bucket.foodGrade = item.foodGrade;
+      }
+    });
+
+    return Array.from(grouped.values())
+      .map((bucket) => {
+        const details = Array.isArray(bucket.details) ? bucket.details : [];
+        const hasNonCompliant = details.some((detail) => {
+          const status = (
+            detail?.componentComplianceStatus ||
+            detail?.complianceStatus ||
+            ""
+          )
+            .toString()
+            .trim();
+          return status === "Non-Compliant";
+        });
+        const hasCompliant = details.some((detail) => {
+          const status = (
+            detail?.componentComplianceStatus ||
+            detail?.complianceStatus ||
+            ""
+          )
+            .toString()
+            .trim();
+          return status === "Compliant";
+        });
+        const recycledQty = details.reduce(
+          (sum, detail) => sum + safeNumber(detail?.recycledQty),
+          0,
+        );
+        const remarks = [
+          ...new Set(
+            details
+              .map((detail) => {
+                const remark = (detail?.auditorRemarks || "").toString().trim();
+                if (!remark) return "";
+                const componentCode = (detail?.componentCode || "").toString().trim();
+                return componentCode ? `${componentCode}: ${remark}` : remark;
+              })
+              .filter(Boolean),
+          ),
+        ].join("\n");
+        const managerRemarks = [
+          ...new Set(
+            details
+              .map((detail) => {
+                const remark = (detail?.managerRemarks || "").toString().trim();
+                if (!remark) return "";
+                const componentCode = (detail?.componentCode || "").toString().trim();
+                return componentCode ? `${componentCode}: ${remark}` : remark;
+              })
+              .filter(Boolean),
+          ),
+        ].join("\n");
+
+        return {
+          key: bucket.key,
+          skuCode: bucket.skuCode,
+          skuDescription: bucket.skuDescription,
+          industryCategory: bucket.industryCategory,
+          productImage: bucket.productImage,
+          foodGrade: bucket.foodGrade,
+          recycledQty: recycledQty.toFixed(3),
+          productComplianceStatus: hasNonCompliant
+            ? "Non-Compliant"
+            : hasCompliant
+              ? "Compliant"
+              : "Pending",
+          computedRemarks: remarks,
+          computedManagerRemarks: managerRemarks,
+          details,
+        };
+      })
+      .sort((left, right) =>
+        (left?.skuCode || "").localeCompare(right?.skuCode || ""),
+      );
+  }, [isProducerEntity, safeNumber, skuTableData, summaryProductRows]);
+
+  const stateWiseSupplierSummary = useMemo(() => {
+    const normalizeText = (value) => (value || "").toString().trim();
+    const normalizeKey = (value) => normalizeText(value).toLowerCase();
+
+    const supplierMetaByPair = new Map();
+    const supplierMetaByName = new Map();
+    const productSkuByPair = new Map();
+    const productSkuByComponent = new Map();
+
+    (summaryProductRows || []).forEach((row) => {
+      const supplierName = normalizeText(row?.supplierName);
+      const componentCode = normalizeText(row?.componentCode);
+      const effectiveSkuKey =
+        normalizeText(row?.skuCode) ||
+        normalizeText(row?.systemCode) ||
+        normalizeText(row?.componentCode);
+
+      if (!effectiveSkuKey) return;
+
+      if (componentCode) {
+        productSkuByComponent.set(normalizeKey(componentCode), effectiveSkuKey);
+      }
+
+      if (supplierName && componentCode) {
+        productSkuByPair.set(
+          `${normalizeKey(supplierName)}::${normalizeKey(componentCode)}`,
+          effectiveSkuKey,
+        );
+      }
+    });
+
+    const registerSupplierMeta = (row) => {
+      const supplierName = normalizeText(row?.supplierName);
+      if (!supplierName) return;
+      const componentCode = normalizeText(row?.componentCode);
+      const supplierState = normalizeText(row?.supplierState) || "Unknown State";
+      const supplierType = normalizeText(row?.supplierType) || "-";
+      const supplierStatus = normalizeText(row?.supplierStatus) || "-";
+      const skuCode =
+        normalizeText(row?.skuCode) ||
+        normalizeText(row?.systemCode) ||
+        normalizeText(row?.componentCode);
+
+      const meta = {
+        supplierName,
+        supplierState,
+        supplierType,
+        supplierStatus,
+        skuCode,
+      };
+
+      if (componentCode) {
+        supplierMetaByPair.set(
+          `${normalizeKey(supplierName)}::${normalizeKey(componentCode)}`,
+          meta,
+        );
+      }
+
+      if (!supplierMetaByName.has(normalizeKey(supplierName))) {
+        supplierMetaByName.set(normalizeKey(supplierName), meta);
+      }
+    };
+
+    (summarySupplierRows || []).forEach(registerSupplierMeta);
+    (summaryProductRows || []).forEach(registerSupplierMeta);
+
+    const stateBuckets = new Map();
+
+    const getStateBucket = (stateName) => {
+      const safeState = normalizeText(stateName) || "Unknown State";
+      const stateKey = normalizeKey(safeState) || "unknown-state";
+      if (!stateBuckets.has(stateKey)) {
+        stateBuckets.set(stateKey, {
+          key: stateKey,
+          stateName: safeState,
+          supplierNames: new Set(),
+          skuSet: new Set(),
+          annualPurchaseMt: 0,
+          recycledQty: 0,
+          virginQty: 0,
+          recycledAmount: 0,
+          virginAmount: 0,
+          supplierRows: new Map(),
+          plantLocations: new Map(),
+        });
+      }
+      return stateBuckets.get(stateKey);
+    };
+
+    const ensureSupplierRow = (bucket, supplierName, meta) => {
+      const supplierKey = normalizeKey(supplierName) || `supplier-${bucket.supplierRows.size + 1}`;
+      if (!bucket.supplierRows.has(supplierKey)) {
+        bucket.supplierRows.set(supplierKey, {
+          key: `${bucket.key}-${supplierKey}`,
+          supplierName: meta?.supplierName || supplierName || "Unknown Supplier",
+          supplierState: meta?.supplierState || bucket.stateName,
+          supplierType: meta?.supplierType || "-",
+          supplierStatus: meta?.supplierStatus || "-",
+          totalSkuSet: new Set(),
+          annualPurchaseMt: 0,
+          monthlyPurchaseMt: 0,
+          recycledQty: 0,
+          virginQty: 0,
+          recycledAmount: 0,
+          virginAmount: 0,
+        });
+      }
+      return bucket.supplierRows.get(supplierKey);
+    };
+
+    (summaryMonthlyRows || []).forEach((row, index) => {
+      const supplierName = normalizeText(row?.supplierName) || `Unknown Supplier ${index + 1}`;
+      const componentCode = normalizeText(row?.componentCode);
+      const supplierMeta =
+        supplierMetaByPair.get(
+          `${normalizeKey(supplierName)}::${normalizeKey(componentCode)}`,
+        ) || supplierMetaByName.get(normalizeKey(supplierName));
+      const supplierState =
+        normalizeText(row?.supplierState) ||
+        normalizeText(supplierMeta?.supplierState) ||
+        "Unknown State";
+      const bucket = getStateBucket(supplierState);
+      bucket.supplierNames.add(supplierName);
+
+      const skuKey =
+        productSkuByPair.get(
+          `${normalizeKey(supplierName)}::${normalizeKey(componentCode)}`,
+        ) ||
+        productSkuByComponent.get(normalizeKey(componentCode)) ||
+        normalizeText(row?.skuCode) ||
+        normalizeText(row?.systemCode) ||
+        normalizeText(supplierMeta?.skuCode) ||
+        normalizeText(row?.componentCode) ||
+        `state-sku-${index + 1}`;
+      if (skuKey) bucket.skuSet.add(skuKey);
+
+      const annualPurchaseMt = safeNumber(row?.monthlyPurchaseMt);
+      const monthlyPurchaseMt = annualPurchaseMt / 12;
+      const recycledQty = safeNumber(row?.recycledQty);
+      const virginQty = safeNumber(row?.virginQty);
+      const recycledAmount = safeNumber(
+        row?.recycledQrtAmount ?? row?.recycledAmount,
+      );
+      const virginAmount = safeNumber(
+        row?.virginQtyAmount ?? row?.virginAmount,
+      );
+
+      bucket.annualPurchaseMt += annualPurchaseMt;
+      bucket.recycledQty += recycledQty;
+      bucket.virginQty += virginQty;
+      bucket.recycledAmount += recycledAmount;
+      bucket.virginAmount += virginAmount;
+
+      const supplierRow = ensureSupplierRow(bucket, supplierName, {
+        ...supplierMeta,
+        supplierName,
+        supplierState,
+      });
+      if (skuKey) supplierRow.totalSkuSet.add(skuKey);
+      supplierRow.annualPurchaseMt += annualPurchaseMt;
+      supplierRow.monthlyPurchaseMt += monthlyPurchaseMt;
+      supplierRow.recycledQty += recycledQty;
+      supplierRow.virginQty += virginQty;
+      supplierRow.recycledAmount += recycledAmount;
+      supplierRow.virginAmount += virginAmount;
+    });
+
+    if (showPlantLocationMarkers) {
+      const facilityState = normalizeText(client?.productionFacility?.state);
+      const clientDisplayName =
+        normalizeText(client?.tradeName) || normalizeText(client?.clientName);
+      const knownStateNames = Array.from(
+        new Set([
+          ...Array.from(stateBuckets.values()).map((bucket) => bucket.stateName),
+          ...(indiaSvgMap.locations || []).map((location) => location?.name).filter(Boolean),
+        ]),
+      );
+
+      const resolvePlantStateName = (...sources) => {
+        const rawValues = sources
+          .map((value) => normalizeText(value))
+          .filter(Boolean);
+
+        for (const rawValue of rawValues) {
+          const normalizedValue = normalizeStateName(rawValue);
+          const exactMatch = knownStateNames.find(
+            (stateName) => normalizeStateName(stateName) === normalizedValue,
+          );
+          if (exactMatch) return exactMatch;
+        }
+
+        for (const rawValue of rawValues) {
+          const normalizedValue = normalizeStateName(rawValue);
+          const partialMatch = knownStateNames.find((stateName) => {
+            const normalizedState = normalizeStateName(stateName);
+            return (
+              normalizedValue.includes(normalizedState) ||
+              normalizedState.includes(normalizedValue)
+            );
+          });
+          if (partialMatch) return partialMatch;
+        }
+
+        return "";
+      };
+
+      const rawPlantFacilityRows = [
+        ...(client?.productionFacility?.ctoDetailsList || []).map((row) => ({
+          ...row,
+          sourceType: "plant",
+          consentType: "CTO",
+        })),
+        ...(client?.productionFacility?.cteDetailsList || []).map((row) => ({
+          ...row,
+          sourceType: "plant",
+          consentType: "CTE",
+        })),
+      ];
+      if (isProducerEntity && !rawPlantFacilityRows.length && facilityState) {
+        rawPlantFacilityRows.push({
+          plantName: clientDisplayName || "Producer Client",
+          plantLocation: facilityState,
+          plantAddress: normalizeText(client?.productionFacility?.address),
+          clientName: clientDisplayName,
+          sourceType: "plant",
+          consentType: "CLIENT",
+        });
+      }
+
+      const mergedPlantFacilityRows = Array.from(
+        rawPlantFacilityRows.reduce((acc, row, index) => {
+          const plantName = normalizeText(row?.plantName);
+          const plantLocation = normalizeText(row?.plantLocation);
+          const plantAddress = normalizeText(row?.plantAddress);
+          const mergeKey =
+            normalizeKey(plantName) ||
+            normalizeKey(plantLocation) ||
+            normalizeKey(plantAddress) ||
+            `plant-${index + 1}`;
+
+          const existing = acc.get(mergeKey);
+          if (existing) {
+            acc.set(mergeKey, {
+              ...existing,
+              plantName: existing.plantName || plantName,
+              plantLocation: existing.plantLocation || plantLocation,
+              plantAddress: existing.plantAddress || plantAddress,
+              clientName: existing.clientName || normalizeText(row?.clientName),
+              sourceType:
+                existing.sourceType === "plant" ||
+                normalizeText(row?.sourceType) === "plant"
+                  ? "plant"
+                  : existing.sourceType || normalizeText(row?.sourceType) || "",
+            });
+            return acc;
+          }
+
+          acc.set(mergeKey, {
+            plantName,
+            plantLocation,
+            plantAddress,
+            clientName: normalizeText(row?.clientName),
+            sourceType: normalizeText(row?.sourceType),
+          });
+          return acc;
+        }, new Map()).values(),
+      );
+
+      mergedPlantFacilityRows.forEach((row, index) => {
+        const plantName = normalizeText(row?.plantName) || `Plant ${index + 1}`;
+        const plantLocation = normalizeText(row?.plantLocation);
+        const plantAddress = normalizeText(row?.plantAddress);
+        const sourceClientName = normalizeText(row?.clientName);
+        const matchedStateName = resolvePlantStateName(
+          plantLocation,
+          plantAddress,
+          facilityState,
+        );
+        if (!matchedStateName) return;
+
+        const stateBucket = getStateBucket(matchedStateName);
+
+        const plantIdentity =
+          normalizeKey(plantLocation) ||
+          normalizeKey(plantName) ||
+          normalizeKey(plantAddress);
+        const plantKey = `${stateBucket.key}::${plantIdentity}`;
+        if (!plantIdentity) return;
+
+        const existingPlant = stateBucket.plantLocations.get(plantKey);
+        if (existingPlant) {
+          stateBucket.plantLocations.set(plantKey, {
+            ...existingPlant,
+            plantName: existingPlant.plantName || plantName,
+            plantLocation:
+              existingPlant.plantLocation || plantLocation || matchedStateName,
+            plantAddress: existingPlant.plantAddress || plantAddress,
+            clientName:
+              existingPlant.clientName || sourceClientName || clientDisplayName,
+            sourceType: existingPlant.sourceType || normalizeText(row?.sourceType),
+          });
+          return;
+        }
+
+        stateBucket.plantLocations.set(plantKey, {
+          key: `${stateBucket.key}-plant-${stateBucket.plantLocations.size + 1}`,
+          plantName,
+          plantLocation: plantLocation || matchedStateName,
+          plantAddress,
+          clientName: sourceClientName || clientDisplayName,
+          sourceType: normalizeText(row?.sourceType),
+        });
+      });
+    }
+
+    return Array.from(stateBuckets.values())
+      .map((bucket) => {
+        const supplierRows = Array.from(bucket.supplierRows.values())
+          .map((row) => ({
+            ...row,
+            totalSku: row.totalSkuSet.size,
+          }))
+          .sort(
+            (left, right) =>
+              safeNumber(right?.annualPurchaseMt) - safeNumber(left?.annualPurchaseMt),
+          );
+
+        return {
+          key: bucket.key,
+          stateName: bucket.stateName,
+          totalSuppliers: bucket.supplierNames.size,
+          totalSku: bucket.skuSet.size,
+          annualPurchaseMt: bucket.annualPurchaseMt,
+          monthlyPurchaseMt: bucket.annualPurchaseMt / 12,
+          recycledQty: bucket.recycledQty,
+          virginQty: bucket.virginQty,
+          recycledAmount: bucket.recycledAmount,
+          virginAmount: bucket.virginAmount,
+          supplierRows,
+          plantLocations: Array.from(bucket.plantLocations.values()),
+        };
+      })
+      .sort(
+        (left, right) =>
+          safeNumber(right?.annualPurchaseMt) - safeNumber(left?.annualPurchaseMt),
+      );
+  }, [
+    client,
+    isProducerEntity,
+    showPlantLocationMarkers,
+    summaryMonthlyRows,
+    summaryProductRows,
+    summarySupplierRows,
+  ]);
+
+  useEffect(() => {
+    if (!Array.isArray(stateWiseSupplierSummary) || !stateWiseSupplierSummary.length) {
+      if (selectedSupplierState !== "All States") {
+        setSelectedSupplierState("All States");
+      }
+      return;
+    }
+
+    const exists = stateWiseSupplierSummary.some(
+      (row) => row.stateName === selectedSupplierState,
+    );
+
+    if (!exists) {
+      setSelectedSupplierState(stateWiseSupplierSummary[0].stateName);
+    }
+  }, [selectedSupplierState, stateWiseSupplierSummary]);
+
+  useEffect(() => {
+    const svg = indiaMapSvgRef.current;
+    if (!svg || !Array.isArray(stateWiseSupplierSummary) || !stateWiseSupplierSummary.length) {
+      if (!svg) {
+        setIndiaMapLabels([]);
+        return;
+      }
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      const nextLabels = (indiaSvgMap.locations || [])
+        .map((location) => {
+          const matchingRow = (stateWiseSupplierSummary || []).find(
+            (row) =>
+              normalizeStateName(row?.stateName) ===
+              normalizeStateName(location?.name),
+          );
+
+          const pathElement = svg.querySelector(
+            `path[data-state-id="${location.id}"]`,
+          );
+          if (!pathElement || typeof pathElement.getBBox !== "function") {
+            return null;
+          }
+
+          const bbox = pathElement.getBBox();
+          if (!bbox.width || !bbox.height) return null;
+
+          return {
+            id: location.id,
+            name: matchingRow?.stateName || location?.name || "",
+            x: bbox.x + bbox.width / 2,
+            y: bbox.y + bbox.height / 2,
+            hasData: Boolean(matchingRow),
+          };
+        })
+        .filter((item) => item?.name);
+
+      setIndiaMapLabels(nextLabels);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [clientConnectTab, indiaMapSvgVersion, stateWiseSupplierSummary]);
+
   const industrySkuSummaryData = useMemo(() => {
     const asList = (value) => {
       if (Array.isArray(value))
@@ -881,6 +1458,108 @@ const ClientDetail = ({
       savedMarkingBySku.set(code, row);
     });
 
+    if (isProducerEntity) {
+      const groupedByProducerSku = new Map();
+
+      [...(skuTableData || [])].forEach((item, index) => {
+        const skuCode = (item?.skuCode || item?.componentCode || "")
+          .toString()
+          .trim();
+        if (!skuCode) return;
+
+        if (!groupedByProducerSku.has(skuCode)) {
+          groupedByProducerSku.set(skuCode, {
+            key: `producer-sku-${skuCode}-${index}`,
+            industryCategory: item?.industryCategory || "Uncategorized",
+            skuCode,
+            skuDescription: item?.skuDescription || "Component summary",
+            componentCodes: new Set(),
+            statuses: [],
+            remarks: [],
+            solutions: [],
+          });
+        }
+
+        const bucket = groupedByProducerSku.get(skuCode);
+        const componentCode = (item?.componentCode || "").toString().trim();
+        if (componentCode) bucket.componentCodes.add(componentCode);
+
+        const status = (
+          item?.productComplianceStatus ||
+          item?.componentComplianceStatus ||
+          item?.complianceStatus ||
+          ""
+        )
+          .toString()
+          .trim();
+        if (status) bucket.statuses.push(status);
+
+        if ((item?.auditorRemarks || "").toString().trim()) {
+          bucket.remarks.push(
+            componentCode
+              ? `${componentCode}: ${item.auditorRemarks}`
+              : item.auditorRemarks,
+          );
+        }
+
+        if (
+          status === "Non-Compliant" &&
+          (item?.managerRemarks || "").toString().trim()
+        ) {
+          bucket.solutions.push(
+            componentCode
+              ? `${componentCode}: ${item.managerRemarks}`
+              : item.managerRemarks,
+          );
+        }
+      });
+
+      return Array.from(groupedByProducerSku.values())
+        .map((item) => {
+          const statusList = item.statuses || [];
+          let complianceStatus = "Pending";
+          if (statusList.includes("Non-Compliant")) {
+            complianceStatus = "Non-Compliant";
+          } else if (
+            statusList.length > 0 &&
+            statusList.every((status) => status === "Compliant")
+          ) {
+            complianceStatus = "Compliant";
+          } else if (statusList.length > 0) {
+            complianceStatus = "Partially Compliant";
+          }
+
+          const matchingSupplierRows = (summarySupplierRows || []).filter((row) =>
+            item.componentCodes.has((row?.componentCode || "").toString().trim()),
+          );
+          const { registeredSuppliers, unregisteredSuppliers } =
+            resolveUniqueSupplierCounts(matchingSupplierRows);
+
+          return {
+            key: item.key,
+            industryCategory: item.industryCategory,
+            skuCode: item.skuCode,
+            skuDescription: item.skuDescription,
+            complianceStatus,
+            markingLabelingStatus: "Pending",
+            supplierRegisteredCount: registeredSuppliers,
+            supplierUnregisteredCount: unregisteredSuppliers,
+            remarks: [...new Set(item.remarks)].join("\n"),
+            solution:
+              complianceStatus === "Non-Compliant"
+                ? [...new Set(item.solutions)].join("\n")
+                : "",
+          };
+        })
+        .sort((left, right) => {
+          const industryCompare = (left.industryCategory || "").localeCompare(
+            right.industryCategory || "",
+          );
+          if (industryCompare !== 0) return industryCompare;
+          return (left.skuCode || "").localeCompare(right.skuCode || "");
+        });
+    }
+
     return [...(skuTableData || [])]
       .map((item, index) => {
         const skuCode = (item?.skuCode || "").toString().trim();
@@ -927,8 +1606,8 @@ const ClientDetail = ({
   }, [skuTableData, skuComplianceData, isProducerEntity, summarySupplierRows]);
 
   useEffect(() => {
-    setLoading(clientDetailQuery.isLoading);
-  }, [clientDetailQuery.isLoading]);
+    setLoading(!client && clientDetailQuery.isLoading);
+  }, [client, clientDetailQuery.isLoading]);
 
   useEffect(() => {
     if (clientDetailQuery.data) {
@@ -1016,7 +1695,7 @@ const ClientDetail = ({
         </div>
         {!embedded && (
           <button
-            onClick={() => navigate("/dashboard/clients")}
+            onClick={() => navigate(returnTo)}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
           >
             Back to Clients
@@ -1035,7 +1714,7 @@ const ClientDetail = ({
           </h2>
           {!embedded && (
             <button
-              onClick={() => navigate("/dashboard/clients")}
+              onClick={() => navigate(returnTo)}
               className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
             >
               Back to Clients
@@ -1092,567 +1771,9 @@ const ClientDetail = ({
     </div>
   );
 
-  const renderOverviewSection = () => {
-    const wasteType = client.wasteType || "Plastic Waste";
-    const theme = WASTE_THEME[wasteType] || WASTE_THEME["Plastic Waste"];
-    const WasteIcon = theme.icon;
-    const pf = client.productionFacility || {};
-    const regs = Array.isArray(pf.regulationsCoveredUnderCto)
-      ? pf.regulationsCoveredUnderCto
-      : [];
-    const capacityRows = Array.isArray(pf.ctoProductionCapacityValidation)
-      ? pf.ctoProductionCapacityValidation
-      : [];
-    const hasWater = regs.includes("Water");
-    const waterRegs = Array.isArray(pf.waterRegulations)
-      ? pf.waterRegulations
-      : [];
-    const hasAir = regs.includes("Air");
-    const airRegs = Array.isArray(pf.airRegulations) ? pf.airRegulations : [];
-    const hasHazardousWaste = regs.some((r) => {
-      const lower = (r || "").toString().trim().toLowerCase();
-      return lower === "hazardous waste" || lower === "hazardous wate";
-    });
-    const hazardousRegs = Array.isArray(pf.hazardousWasteRegulations)
-      ? pf.hazardousWasteRegulations
-      : [];
-
-    const InfoItem = ({
-      icon: Icon,
-      label,
-      value,
-      iconColor = "text-gray-400",
-    }) => (
-      <div className="flex items-start gap-3 py-2.5">
-        <div className="mt-0.5">
-          <Icon className={`text-sm ${iconColor}`} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
-            {label}
-          </p>
-          <p className="text-sm text-gray-900 font-medium mt-0.5 truncate">
-            {value || "N/A"}
-          </p>
-        </div>
-      </div>
-    );
-
-    const PersonCard = ({ title, person, icon: Icon }) => {
-      if (!person?.name) return null;
-      return (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
-            <Icon className="text-primary-600 text-sm" />
-            <h4 className="text-sm font-semibold text-gray-700">{title}</h4>
-          </div>
-          <div className="p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-sm">
-                {(person.name || "U")[0].toUpperCase()}
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-900">
-                  {person.name}
-                </p>
-                {person.designation && (
-                  <p className="text-xs text-gray-500">{person.designation}</p>
-                )}
-              </div>
-            </div>
-            <div className="space-y-2 ml-[52px]">
-              {person.number && (
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <FaPhone className="text-gray-400 text-[10px]" />
-                  <span>{person.number}</span>
-                </div>
-              )}
-              {person.email && (
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <FaEnvelope className="text-gray-400 text-[10px]" />
-                  <span className="truncate">{person.email}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      );
-    };
-
-    return (
-      <GsapRevealGroup
-        className="w-full mx-auto space-y-5"
-        animateKey={`client-overview-${client?._id || id || "default"}`}
-      >
-        {/* Hero Card */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div
-            className="h-1.5 w-full"
-            style={{ backgroundColor: theme.color }}
-          />
-          <div className="p-5 md:p-6">
-            <div className="flex flex-col md:flex-row md:items-start gap-5">
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg flex-shrink-0"
-                style={{
-                  background: `linear-gradient(135deg, ${theme.color}, ${theme.color}bb)`,
-                }}
-              >
-                {(client.clientName || "U")[0].toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
-                  <h2 className="text-xl font-bold text-gray-900 truncate">
-                    {client.clientName}
-                  </h2>
-                  <span
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold w-fit"
-                    style={{
-                      color: theme.color,
-                      backgroundColor: theme.bg,
-                      border: `1px solid ${theme.color}33`,
-                    }}
-                  >
-                    <WasteIcon className="text-[10px]" />
-                    {wasteType}
-                  </span>
-                </div>
-                {client.tradeName && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    Trade Name: {client.tradeName}
-                  </p>
-                )}
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3">
-                  {client.entityType && (
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                      <FaBuilding className="text-gray-400 text-xs" />
-                      <span>{client.entityType}</span>
-                    </div>
-                  )}
-                  {client.companyGroupName && (
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                      <FaIndustry className="text-gray-400 text-xs" />
-                      <span>{client.companyGroupName}</span>
-                    </div>
-                  )}
-                  {client.financialYear && (
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                      <FaCalendarAlt className="text-gray-400 text-xs" />
-                      <span>FY {client.financialYear}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Company Details */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
-              <FaBuilding className="text-primary-600 text-sm" />
-              <h4 className="text-sm font-semibold text-gray-700">
-                Company Information
-              </h4>
-            </div>
-            <div className="p-5 grid grid-cols-2 gap-x-6">
-              <InfoItem
-                icon={FaBuilding}
-                label="Client Name"
-                value={client.clientName}
-                iconColor="text-primary-500"
-              />
-              <InfoItem
-                icon={FaIdCard}
-                label="Trade Name"
-                value={client.tradeName}
-              />
-              <InfoItem
-                icon={FaIndustry}
-                label="Company Group"
-                value={client.companyGroupName}
-              />
-              <InfoItem
-                icon={FaListAlt}
-                label="Company Type"
-                value={client.companyType}
-              />
-              <InfoItem
-                icon={FaCalendarAlt}
-                label="Financial Year"
-                value={client.financialYear}
-              />
-              <InfoItem
-                icon={FaCheckCircle}
-                label="Entity Type"
-                value={client.entityType}
-              />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
-              <FaUserTie className="text-primary-600 text-sm" />
-              <h4 className="text-sm font-semibold text-gray-700">
-                Assignment Details
-              </h4>
-            </div>
-            <div className="p-5">
-              <div className="grid grid-cols-2 gap-x-6">
-                <InfoItem
-                  icon={FaUserTie}
-                  label="Assigned To"
-                  value={client.assignedTo?.name || "Unassigned"}
-                  iconColor="text-blue-500"
-                />
-                <InfoItem
-                  icon={FaEnvelope}
-                  label="Assigned Email"
-                  value={client.assignedTo?.email}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Contact Person Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <PersonCard
-            title="Authorised Person"
-            person={client.authorisedPerson}
-            icon={FaUser}
-          />
-          <PersonCard
-            title="Coordinating Person"
-            person={client.coordinatingPerson}
-            icon={FaUserTie}
-          />
-        </div>
-
-        {initialViewMode !== "client-connect" &&
-          (regs.length > 0 || capacityRows.length > 0) && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
-                <FaIndustry className="text-primary-600 text-sm" />
-                <h4 className="text-sm font-semibold text-gray-700">
-                  CTO Regulations & Capacity
-                </h4>
-              </div>
-              <div className="p-5 space-y-5">
-                <div>
-                  <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
-                    Regulations Covered under CTO
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {regs.length ? (
-                      regs.map((r) => (
-                        <span
-                          key={r}
-                          className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        >
-                          {r}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-gray-400 text-sm italic">
-                        Not selected
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {(hasWater || hasAir || hasHazardousWaste) && (
-                  <div className="space-y-4">
-                    {hasWater && (
-                      <div>
-                        <div className="text-sm font-bold text-gray-700 mb-2">
-                          Water
-                        </div>
-                        <div className="overflow-x-auto rounded-lg border border-gray-200">
-                          <table className="w-full text-left border-collapse">
-                            <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
-                              <tr>
-                                <th className="p-3 font-semibold border-b w-20">
-                                  SR No
-                                </th>
-                                <th className="p-3 font-semibold border-b">
-                                  Description (water consumption / waste)
-                                </th>
-                                <th className="p-3 font-semibold border-b w-48">
-                                  Permitted quantity
-                                </th>
-                                <th className="p-3 font-semibold border-b w-24">
-                                  UOM
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="text-sm divide-y divide-gray-100">
-                              {(waterRegs.length ? waterRegs : [{}]).map(
-                                (row, idx) => (
-                                  <tr key={idx} className="hover:bg-gray-50">
-                                    <td className="p-3 font-bold text-gray-800">
-                                      {idx + 1}
-                                    </td>
-                                    <td className="p-3 text-gray-700">
-                                      {row?.description || "-"}
-                                    </td>
-                                    <td className="p-3 text-gray-700">
-                                      {row?.permittedQuantity || "-"}
-                                    </td>
-                                    <td className="p-3 text-gray-700">
-                                      {row?.uom || "-"}
-                                    </td>
-                                  </tr>
-                                ),
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {hasAir && (
-                      <div>
-                        <div className="text-sm font-bold text-gray-700 mb-2">
-                          Air
-                        </div>
-                        <div className="overflow-x-auto rounded-lg border border-gray-200">
-                          <table className="w-full text-left border-collapse">
-                            <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
-                              <tr>
-                                <th className="p-3 font-semibold border-b w-20">
-                                  SR No
-                                </th>
-                                <th className="p-3 font-semibold border-b">
-                                  Parameters
-                                </th>
-                                <th className="p-3 font-semibold border-b w-80">
-                                  Permissible annual / daily limit
-                                </th>
-                                <th className="p-3 font-semibold border-b w-24">
-                                  UOM
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="text-sm divide-y divide-gray-100">
-                              {(airRegs.length ? airRegs : [{}]).map(
-                                (row, idx) => (
-                                  <tr key={idx} className="hover:bg-gray-50">
-                                    <td className="p-3 font-bold text-gray-800">
-                                      {idx + 1}
-                                    </td>
-                                    <td className="p-3 text-gray-700">
-                                      {row?.parameter || "-"}
-                                    </td>
-                                    <td className="p-3 text-gray-700">
-                                      {row?.permittedLimit || "-"}
-                                    </td>
-                                    <td className="p-3 text-gray-700">
-                                      {row?.uom || "-"}
-                                    </td>
-                                  </tr>
-                                ),
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {hasHazardousWaste && (
-                      <div>
-                        <div className="text-sm font-bold text-gray-700 mb-2">
-                          Hazardous Waste
-                        </div>
-                        <div className="overflow-x-auto rounded-lg border border-gray-200">
-                          <table className="w-full text-left border-collapse">
-                            <thead className="bg-green-100 text-gray-700 text-xs uppercase tracking-wider">
-                              <tr>
-                                <th className="p-3 font-semibold border-b w-20">
-                                  SR No
-                                </th>
-                                <th className="p-3 font-semibold border-b">
-                                  Name of Hazardous Waste
-                                </th>
-                                <th className="p-3 font-semibold border-b">
-                                  Facility &amp; Mode of Disposal
-                                </th>
-                                <th className="p-3 font-semibold border-b w-40">
-                                  Quantity MT/YR
-                                </th>
-                                <th className="p-3 font-semibold border-b w-24">
-                                  UOM
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="text-sm divide-y divide-gray-100">
-                              {(hazardousRegs.length
-                                ? hazardousRegs
-                                : [{}]
-                              ).map((row, idx) => (
-                                <tr key={idx} className="hover:bg-gray-50">
-                                  <td className="p-3 font-bold text-gray-800">
-                                    {idx + 1}
-                                  </td>
-                                  <td className="p-3 text-gray-700">
-                                    {row?.nameOfHazardousWaste || "-"}
-                                  </td>
-                                  <td className="p-3 text-gray-700">
-                                    {row?.facilityModeOfDisposal || "-"}
-                                  </td>
-                                  <td className="p-3 text-gray-700">
-                                    {row?.quantityMtYr || "-"}
-                                  </td>
-                                  <td className="p-3 text-gray-700">
-                                    {row?.uom || "-"}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {capacityRows.length > 0 && (
-                  <div className="overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="w-full text-left border-collapse">
-                      <thead className="bg-gray-50 text-gray-700 text-xs uppercase tracking-wider">
-                        <tr>
-                          <th className="p-3 font-semibold border-b">
-                            Product Name
-                          </th>
-                          <th className="p-3 font-semibold border-b">
-                            Machine name
-                          </th>
-                          <th className="p-3 font-semibold border-b">
-                            Production output in one HR
-                          </th>
-                          <th className="p-3 font-semibold border-b">UOM</th>
-                          <th className="p-3 font-semibold border-b">
-                            Power per hr KWH
-                          </th>
-                          <th className="p-3 font-semibold border-b">
-                            Machine working days
-                          </th>
-                          <th className="p-3 font-semibold border-b">
-                            Machine Total working hours per day
-                          </th>
-                          <th className="p-3 font-semibold border-b">
-                            Total monthly capacity (KG)
-                          </th>
-                          <th className="p-3 font-semibold border-b">
-                            Total monthly capacity (MT)
-                          </th>
-                          <th className="p-3 font-semibold border-b">
-                            Total electricity per month KWH
-                          </th>
-                          <th className="p-3 font-semibold border-b">
-                            Consent capacity
-                          </th>
-                          <th className="p-3 font-semibold border-b">UOM</th>
-                          <th className="p-3 font-semibold border-b">
-                            Utilization %
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-sm divide-y divide-gray-100">
-                        {capacityRows.map((r, idx) => {
-                          const fmt = (v) => {
-                            if (v === null || v === undefined) return "";
-                            const n = Number(v);
-                            if (!Number.isFinite(n)) return "";
-                            return (Math.round(n * 100) / 100).toString();
-                          };
-                          const uom = (r.uom || "")
-                            .toString()
-                            .trim()
-                            .toUpperCase();
-                          const consentUom = (r.consentUom || uom || "")
-                            .toString()
-                            .trim()
-                            .toUpperCase();
-                          const totalMonthlyCapacity =
-                            Number(r.totalMonthlyCapacity) || 0;
-                          const totalMonthlyCapacityMt =
-                            Number(r.totalMonthlyCapacityMt) ||
-                            (uom === "KG" ? totalMonthlyCapacity / 1000 : 0);
-                          const consentCapacity =
-                            Number(r.consentCapacity) || 0;
-                          const util = Number.isFinite(
-                            Number(r.utilizationPercent),
-                          )
-                            ? Number(r.utilizationPercent)
-                            : consentCapacity > 0
-                              ? ((uom === "KG" && consentUom === "MT"
-                                  ? totalMonthlyCapacity / 1000
-                                  : totalMonthlyCapacity) /
-                                  consentCapacity) *
-                                100
-                              : 0;
-                          const isHigh = util >= 100;
-                          return (
-                            <tr key={idx} className="hover:bg-gray-50">
-                              <td className="p-3 text-gray-700">
-                                {r.productName || "-"}
-                              </td>
-                              <td className="p-3 text-gray-700">
-                                {r.machineName || "-"}
-                              </td>
-                              <td className="p-3 text-gray-700">
-                                {fmt(r.productionOutputPerHr)}
-                              </td>
-                              <td className="p-3 text-gray-700">
-                                {uom || "-"}
-                              </td>
-                              <td className="p-3 text-gray-700">
-                                {fmt(r.powerPerHrKwh)}
-                              </td>
-                              <td className="p-3 text-gray-700">
-                                {fmt(r.workingDays)}
-                              </td>
-                              <td className="p-3 text-gray-700">
-                                {fmt(r.workingHoursPerDay)}
-                              </td>
-                              <td className="p-3 text-gray-700">
-                                {fmt(totalMonthlyCapacity)}
-                              </td>
-                              <td className="p-3 text-gray-700">
-                                {uom === "KG"
-                                  ? fmt(totalMonthlyCapacityMt)
-                                  : "NA"}
-                              </td>
-                              <td className="p-3 text-gray-700">
-                                {fmt(r.totalElectricityConsumptionPerMonthKwh)}
-                              </td>
-                              <td className="p-3 text-gray-700">
-                                {fmt(consentCapacity)}
-                              </td>
-                              <td className="p-3 text-gray-700">
-                                {uom === "KG" ? "MT" : consentUom || "-"}
-                              </td>
-                              <td
-                                className={`p-3 ${isHigh ? "text-red-600 font-semibold" : "text-gray-700"}`}
-                              >
-                                {fmt(util)}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-      </GsapRevealGroup>
-    );
-  };
-
+  const renderOverviewSection = () => (
+    <ClientOverviewSection client={client} id={id} initialViewMode={initialViewMode} />
+  );
   const renderCteCtoSection = () => (
     <div className="w-full mx-auto space-y-8">
       {(() => {
@@ -3114,22 +3235,26 @@ const ClientDetail = ({
       setClosingBrandOwnerSku(null);
     };
 
+    const connectSkuData = isProducerEntity
+      ? producerClientConnectSkuData
+      : skuTableData;
+
     const categories = [
       "All",
       ...new Set(
-        skuTableData.map((item) => item.industryCategory).filter(Boolean),
+        connectSkuData.map((item) => item.industryCategory).filter(Boolean),
       ),
     ];
     const foodGrades = [
       "All",
-      ...new Set(skuTableData.map((item) => item.foodGrade).filter(Boolean)),
+      ...new Set(connectSkuData.map((item) => item.foodGrade).filter(Boolean)),
     ];
     const complianceOptions = ["All", "Compliant", "Non-Compliant"];
 
     const filteredByIndustry =
       selectedIndustryCategory === "All"
-        ? skuTableData
-        : skuTableData.filter(
+        ? connectSkuData
+        : connectSkuData.filter(
             (item) => item.industryCategory === selectedIndustryCategory,
           );
 
@@ -3362,7 +3487,7 @@ const ClientDetail = ({
     const expandedRowRender = (record) => {
       return (
         <Table
-          columns={detailColumns}
+          columns={isProducerEntity ? producerDetailColumns : detailColumns}
           dataSource={record.details}
           pagination={false}
           size="small"
@@ -3373,14 +3498,7 @@ const ClientDetail = ({
       );
     };
 
-    let columns = [];
-
-    if (isProducerEntity) {
-      // Use standard component table columns for Producer (flat view)
-      columns = producerDetailColumns;
-    } else {
-      // Standard SKU -> Component Table for Brand Owners
-      columns = [
+    const columns = [
         {
           title: "SKU Code",
           dataIndex: "skuCode",
@@ -3509,7 +3627,6 @@ const ClientDetail = ({
           ),
         },
       ];
-    }
 
     if (summaryLoading) {
       return (
@@ -3519,7 +3636,7 @@ const ClientDetail = ({
       );
     }
 
-    if (!skuTableData.length) {
+    if (!connectSkuData.length) {
       return (
         <div className="text-center py-12 text-gray-400 text-sm">
           No SKU data available.
@@ -3578,7 +3695,7 @@ const ClientDetail = ({
                       : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
-                  Cards
+                  List
                 </button>
                 <button
                   onClick={() => setProducerViewMode("table")}
@@ -3664,285 +3781,464 @@ const ClientDetail = ({
         </div>
 
         {isProducerEntity && producerViewMode === "cards" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredData.map((item, idx) => {
-              const cardKey = item.key || `${item.componentCode}-${idx}`;
-              const status =
-                item.componentComplianceStatus ||
-                item.productComplianceStatus ||
-                "Pending";
-              const isOpen = producerCardOpen.has(cardKey);
-              const toggleOpen = () => {
-                setProducerCardOpen((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(cardKey)) next.delete(cardKey);
-                  else next.add(cardKey);
-                  return next;
-                });
-              };
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filteredData.map((sku, idx) => {
+              const skuKey = sku.key || sku._id || sku.skuCode || `sku-${idx}`;
+              const isExpanded = producerCardOpen.has(skuKey);
+              const status = sku.productComplianceStatus || "Pending";
+              const borderClass =
+                status === "Compliant"
+                  ? "border-l-green-500"
+                  : status === "Non-Compliant"
+                    ? "border-l-red-500"
+                    : "border-l-gray-300";
+              const componentCount = new Set(
+                (sku.details || [])
+                  .map((d) => (d.componentCode || "").trim())
+                  .filter(Boolean),
+              ).size;
+              const compliantCount = (sku.details || []).filter((d) => {
+                const st = (
+                  d.componentComplianceStatus ||
+                  d.complianceStatus ||
+                  "Pending"
+                ).toString();
+                return st === "Compliant";
+              }).length;
+              const nonCompliantCount = (sku.details || []).filter((d) => {
+                const st = (
+                  d.componentComplianceStatus ||
+                  d.complianceStatus ||
+                  "Pending"
+                ).toString();
+                return st === "Non-Compliant";
+              }).length;
 
               return (
                 <div
-                  key={cardKey}
-                  className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden"
+                  key={skuKey}
+                  className={`border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm border-l-4 ${borderClass} ${isExpanded ? "lg:col-span-2" : ""}`}
                 >
-                  <div className="h-1 bg-purple-500" />
+                  <div
+                    className={`px-4 py-4 ${status === "Compliant" ? "bg-green-50/30" : status === "Non-Compliant" ? "bg-red-50/30" : "bg-gray-50/30"}`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="h-12 w-12 rounded-lg border border-gray-200 bg-white flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {sku.productImage ? (
+                            <Image
+                              src={
+                                typeof sku.productImage === "string"
+                                  ? resolveUrl(sku.productImage)
+                                  : ""
+                              }
+                              alt="Product"
+                              className="w-full h-full object-cover"
+                              preview={
+                                sku.productImage
+                                  ? {
+                                      src:
+                                        typeof sku.productImage === "string"
+                                          ? resolveUrl(sku.productImage)
+                                          : "",
+                                    }
+                                  : false
+                              }
+                            />
+                          ) : (
+                            <div className="text-[10px] text-gray-400 text-center leading-tight px-2">
+                              No Image
+                            </div>
+                          )}
+                        </div>
 
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[11px] font-semibold">
-                        {item.componentCode || "-"}
-                      </span>
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold border ${
-                          status === "Compliant"
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : status === "Non-Compliant"
-                              ? "bg-red-50 text-red-700 border-red-200"
-                              : "bg-yellow-50 text-amber-700 border-yellow-200"
-                        }`}
-                      >
-                        {status}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 flex items-start gap-3">
-                      <div className="h-14 w-14 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {item.componentImage ? (
-                          <Image
-                            src={
-                              typeof item.componentImage === "string"
-                                ? resolveUrl(item.componentImage)
-                                : ""
-                            }
-                            alt="Component"
-                            className="w-full h-full object-cover"
-                            preview={
-                              item.componentImage
-                                ? {
-                                    src:
-                                      typeof item.componentImage === "string"
-                                        ? resolveUrl(item.componentImage)
-                                        : "",
-                                  }
-                                : false
-                            }
-                          />
-                        ) : (
-                          <div className="text-[10px] text-gray-400 text-center leading-tight px-2">
-                            No Image
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[11px] font-semibold">
+                              {sku.skuCode || "—"}
+                            </span>
+                            {sku.industryCategory ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-semibold border border-blue-200">
+                                {sku.industryCategory}
+                              </span>
+                            ) : null}
                           </div>
-                        )}
+                          <div className="mt-1 text-base font-semibold text-gray-900 truncate">
+                            {sku.skuDescription || "—"}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 leading-snug">
-                          {item.componentDescription || "-"}
+
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <span
+                          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold border ${
+                            status === "Compliant"
+                              ? "bg-green-50 text-green-700 border-green-200"
+                              : status === "Non-Compliant"
+                                ? "bg-red-50 text-red-700 border-red-200"
+                                : "bg-gray-50 text-gray-700 border-gray-200"
+                          }`}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+                          {status}
+                        </span>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+                          <FaRecycle className="text-green-600" />
+                          <span className="text-gray-500">Recycled Qty:</span>
+                          <span className="text-gray-900">
+                            {sku.recycledQty || "0.000"}
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="border-t border-gray-100 p-4 space-y-4">
-                    <div>
-                      <div className="w-full flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-md">
-                        <FaUser className="text-[11px] text-blue-700" />
-                        <span>SUPPLIER</span>
-                      </div>
-                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                        <div className="col-span-2">
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            SUPPLIER NAME
-                          </div>
-                          <div className="mt-0.5 text-gray-900 font-semibold">
-                            {item.supplierName || "—"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            SUPPLIER STATUS
-                          </div>
-                          <div className="mt-0.5">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-                                (item.supplierStatus || "")
-                                  .toLowerCase()
-                                  .includes("reg")
-                                  ? "bg-green-50 text-green-700 border-green-200"
-                                  : (item.supplierStatus || "")
-                                        .toLowerCase()
-                                        .includes("unreg")
-                                    ? "bg-red-50 text-red-700 border-red-200"
-                                    : "bg-gray-50 text-gray-700 border-gray-200"
-                              }`}
-                            >
-                              {item.supplierStatus || "—"}
-                            </span>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            EPR CERT. NO
-                          </div>
-                          <div className="mt-0.5 text-gray-900 font-semibold">
-                            {item.eprCertificateNumber || "—"}
-                          </div>
-                        </div>
-                      </div>
+                  <div className="px-4 py-3 border-t border-gray-100 bg-white flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] font-bold tracking-wider text-gray-600">
+                        {componentCount} COMPONENTS
+                      </span>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-green-50 text-green-700 border-green-200">
+                        Compliant: {compliantCount}
+                      </span>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-red-50 text-red-700 border-red-200">
+                        Non-Compliant: {nonCompliantCount}
+                      </span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProducerCardOpen((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(skuKey)) next.delete(skuKey);
+                          else next.add(skuKey);
+                          return next;
+                        });
+                      }}
+                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800"
+                    >
+                      <span>{isExpanded ? "Collapse" : "View Components"}</span>
+                      <FaChevronDown
+                        className={`text-xs transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                  </div>
 
-                    <div>
-                      <div className="w-full flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-md">
-                        <FaRecycle className="text-[11px] text-emerald-700" />
-                        <span>POLYMER DETAILS</span>
-                      </div>
-                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            POLYMER TYPE
-                          </div>
-                          <div className="mt-1">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
-                              {item.polymerType || "—"}
-                            </span>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            RECYCLED POLYMER
-                          </div>
-                          <div className="mt-1 text-gray-900 font-semibold">
-                            {item.recycledPolymerUsed || "—"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  <div
+                    className={`border-t border-gray-100 bg-white overflow-hidden transition-all duration-300 ease-in-out ${
+                      isExpanded
+                        ? "max-h-[6000px] opacity-100"
+                        : "max-h-0 opacity-0"
+                    }`}
+                  >
+                    {isExpanded && (
+                      <div className="px-4 py-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {(sku.details || []).map((comp, cidx) => {
+                            const compKey =
+                              comp.key ||
+                              comp._id ||
+                              `${comp.componentCode || "comp"}-${comp.supplierName || "supp"}-${cidx}`;
+                            const normalizedSkuCode = (sku.skuCode || "")
+                              .toString()
+                              .trim()
+                              .toLowerCase();
+                            const normalizedComponentCode = (
+                              comp.componentCode || ""
+                            )
+                              .toString()
+                              .trim()
+                              .toLowerCase();
+                            const showComponentCodeBadge =
+                              Boolean(normalizedComponentCode) &&
+                              normalizedComponentCode !== normalizedSkuCode;
+                            const compStatus =
+                              comp.componentComplianceStatus ||
+                              comp.complianceStatus ||
+                              "Pending";
+                            const supplierStatus = (
+                              comp.supplierStatus || ""
+                            ).toString();
+                            const isRegistered = supplierStatus
+                              .toLowerCase()
+                              .includes("reg");
+                            const isUnregistered = supplierStatus
+                              .toLowerCase()
+                              .includes("unreg");
 
-                    <div>
-                      <div className="w-full flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-purple-50 text-purple-700 px-2.5 py-1.5 rounded-md">
-                        <FaIdCard className="text-[11px] text-purple-700" />
-                        <span>CLASSIFICATION</span>
-                      </div>
-                      <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            CATEGORY
-                          </div>
-                          <div className="mt-1">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-semibold">
-                              {item.category || "—"}
-                            </span>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            CATEGORY II TYPE
-                          </div>
-                          <div className="mt-1 text-gray-900 font-semibold">
-                            {item.categoryIIType || "—"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            MULTILAYER/MONOLAYER
-                          </div>
-                          <div className="mt-1 text-gray-900 font-semibold">
-                            {normalizeLayerType(item.layerType)}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            CONTAINER CAPACITY
-                          </div>
-                          <div className="mt-1 text-gray-900 font-semibold">
-                            {item.containerCapacity || "—"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            THICKNESS (M)
-                          </div>
-                          <div className="mt-1 text-gray-900 font-semibold">
-                            {item.thickness || "—"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="w-full flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-orange-50 text-orange-700 px-2.5 py-1.5 rounded-md">
-                        <FaChartLine className="text-[11px] text-orange-700" />
-                        <span>MEASUREMENTS</span>
-                      </div>
-                      <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            MONTHLY (MT)
-                          </div>
-                          <div className="mt-1 text-gray-900 font-semibold">
-                            {item.monthlyPurchaseMt || "—"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            RECYCLED QTY
-                          </div>
-                          <div className="mt-1 text-gray-900 font-semibold">
-                            {item.recycledQty || "—"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="border-t border-gray-100 pt-3">
-                      <div className="w-full flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-gray-50 text-gray-700 px-2.5 py-1.5 rounded-md">
-                        <FaFile className="text-[11px] text-gray-500" />
-                        <span>REMARKS & DOCUMENTS</span>
-                      </div>
-                      <div className="mt-2 space-y-2 text-xs">
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            AUDITOR REMARKS
-                          </div>
-                          <div className="mt-0.5 text-gray-900 font-semibold whitespace-pre-wrap">
-                            {item.auditorRemarks || "—"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            ADDITIONAL DOCUMENT
-                          </div>
-                          <div className="mt-0.5">
-                            {item.additionalDocument ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const url =
-                                    typeof item.additionalDocument === "string"
-                                      ? resolveUrl(item.additionalDocument)
-                                      : "";
-                                  if (url) window.open(url, "_blank");
-                                }}
-                                className="text-[11px] font-semibold text-primary-600 hover:text-primary-800 underline"
+                            return (
+                              <div
+                                key={compKey}
+                                className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden"
                               >
-                                View
-                              </button>
-                            ) : (
-                              <span className="text-gray-900 font-semibold">
-                                —
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-gray-500 tracking-wider">
-                            MANAGER REMARKS
-                          </div>
-                          <div className="mt-0.5 text-gray-900 font-semibold whitespace-pre-wrap">
-                            {item.managerRemarks || "—"}
-                          </div>
+                                <div className="h-1 bg-gray-200" />
+                                <div className="p-4">
+                                  <div className="flex items-start justify-between gap-3">
+                                    {showComponentCodeBadge ? (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[11px] font-semibold">
+                                        {comp.componentCode}
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-50 text-gray-500 text-[11px] font-semibold border border-gray-200">
+                                        Component Details
+                                      </span>
+                                    )}
+                                    <span
+                                      className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold border ${
+                                        compStatus === "Compliant"
+                                          ? "bg-green-50 text-green-700 border-green-200"
+                                          : compStatus === "Non-Compliant"
+                                            ? "bg-red-50 text-red-700 border-red-200"
+                                            : "bg-gray-50 text-gray-700 border-gray-200"
+                                      }`}
+                                    >
+                                      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+                                      {compStatus}
+                                    </span>
+                                  </div>
+
+                                  <div className="mt-3 flex items-start gap-3">
+                                    <div className="h-14 w-14 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                      {comp.componentImage ? (
+                                        <Image
+                                          src={
+                                            typeof comp.componentImage ===
+                                            "string"
+                                              ? resolveUrl(comp.componentImage)
+                                              : ""
+                                          }
+                                          alt="Component"
+                                          className="w-full h-full object-cover"
+                                          preview={
+                                            comp.componentImage
+                                              ? {
+                                                  src:
+                                                    typeof comp.componentImage ===
+                                                    "string"
+                                                      ? resolveUrl(
+                                                          comp.componentImage,
+                                                        )
+                                                      : "",
+                                                }
+                                              : false
+                                          }
+                                        />
+                                      ) : (
+                                        <div className="text-[10px] text-gray-400 text-center leading-tight px-2">
+                                          No Image
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-semibold text-gray-900 leading-snug">
+                                        {comp.componentDescription || "—"}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-4 space-y-3">
+                                    <div>
+                                      <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-md -mx-0.5">
+                                        <FaUser className="text-[11px]" />
+                                        SUPPLIER
+                                      </div>
+                                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                                        <div className="text-gray-500 font-bold">
+                                          Supplier Name
+                                        </div>
+                                        <div className="text-gray-900 font-semibold truncate">
+                                          {comp.supplierName || "—"}
+                                        </div>
+                                        <div className="text-gray-500 font-bold">
+                                          Supplier Status
+                                        </div>
+                                        <div>
+                                          <span
+                                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                                              isRegistered
+                                                ? "bg-green-50 text-green-700 border-green-200"
+                                                : isUnregistered
+                                                  ? "bg-red-50 text-red-700 border-red-200"
+                                                  : "bg-gray-50 text-gray-700 border-gray-200"
+                                            }`}
+                                          >
+                                            {supplierStatus || "—"}
+                                          </span>
+                                        </div>
+                                        <div className="text-gray-500 font-bold">
+                                          EPR Cert. No
+                                        </div>
+                                        <div className="text-gray-900 font-semibold">
+                                          {comp.eprCertificateNumber || "—"}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-md -mx-0.5">
+                                        <FaRecycle className="text-[11px]" />
+                                        POLYMER DETAILS
+                                      </div>
+                                      <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Polymer Type
+                                          </div>
+                                          <div className="mt-1">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
+                                              {comp.polymerType || "—"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Comp. Polymer
+                                          </div>
+                                          <div className="mt-1 text-gray-900 font-semibold">
+                                            {comp.componentPolymer || "—"}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-purple-50 text-purple-700 px-2.5 py-1.5 rounded-md -mx-0.5">
+                                        <FaIdCard className="text-[11px]" />
+                                        CLASSIFICATION
+                                      </div>
+                                      <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Category
+                                          </div>
+                                          <div className="mt-1">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-semibold">
+                                              {comp.category || "—"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Category II Type
+                                          </div>
+                                          <div className="mt-1 text-gray-900 font-semibold">
+                                            {comp.categoryIIType || "—"}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Multilayer/Monolayer
+                                          </div>
+                                          <div className="mt-1 text-gray-900 font-semibold">
+                                            {normalizeLayerType(comp.layerType)}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Container Capacity
+                                          </div>
+                                          <div className="mt-1 text-gray-900 font-semibold">
+                                            {comp.containerCapacity || "—"}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Thickness (M)
+                                          </div>
+                                          <div className="mt-1 text-gray-900 font-semibold">
+                                            {comp.thickness || "—"}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider bg-orange-50 text-orange-700 px-2.5 py-1.5 rounded-md -mx-0.5">
+                                        <FaChartLine className="text-[11px]" />
+                                        MEASUREMENTS
+                                      </div>
+                                      <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Monthly Purchase (MT)
+                                          </div>
+                                          <div className="mt-1 text-gray-900 font-semibold">
+                                            {comp.monthlyPurchaseMt || "—"}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Recycled Qty
+                                          </div>
+                                          <div className="mt-1 text-gray-900 font-semibold">
+                                            {comp.recycledQty || "—"}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="border-t border-gray-100 pt-3">
+                                      <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-wider text-gray-600">
+                                        <FaFile className="text-[11px] text-gray-400" />
+                                        REMARKS & DOCUMENTS
+                                      </div>
+                                      <div className="mt-2 space-y-2 text-xs">
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Auditor Remarks
+                                          </div>
+                                          <div className="mt-0.5 text-gray-900 font-semibold whitespace-pre-wrap">
+                                            {comp.auditorRemarks || "—"}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Additional Document
+                                          </div>
+                                          <div className="mt-0.5">
+                                            {comp.additionalDocument ? (
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const url =
+                                                    typeof comp.additionalDocument ===
+                                                    "string"
+                                                      ? resolveUrl(
+                                                          comp.additionalDocument,
+                                                        )
+                                                      : "";
+                                                  if (url)
+                                                    window.open(url, "_blank");
+                                                }}
+                                                className="text-[11px] font-semibold text-primary-600 hover:text-primary-800 underline"
+                                              >
+                                                View
+                                              </button>
+                                            ) : (
+                                              <span className="text-gray-900 font-semibold">
+                                                —
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-500 font-bold">
+                                            Manager Remarks
+                                          </div>
+                                          <div className="mt-0.5 text-gray-900 font-semibold whitespace-pre-wrap">
+                                            {comp.managerRemarks || "—"}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               );
@@ -4446,15 +4742,11 @@ const ClientDetail = ({
               }
               scroll={{ x: 1200 }}
               size="middle"
-              expandable={
-                isProducerEntity
-                  ? undefined
-                  : {
-                      expandedRowRender,
-                      rowExpandable: (record) =>
-                        record.details && record.details.length > 0,
-                    }
-              }
+              expandable={{
+                expandedRowRender,
+                rowExpandable: (record) =>
+                  record.details && record.details.length > 0,
+              }}
             />
           </div>
         )}
@@ -4593,41 +4885,6 @@ const ClientDetail = ({
       });
     };
 
-    const deriveProducerComponentTotals = () => {
-      const components = new Map();
-      const rows = Array.isArray(skuTableData) ? skuTableData : [];
-      rows.forEach((row, index) => {
-        const componentCode = (row?.componentCode || "").toString().trim();
-        if (!componentCode) return;
-        const key = componentCode || `component-${index}`;
-        const status = (
-          row?.componentComplianceStatus ||
-          row?.productComplianceStatus ||
-          row?.complianceStatus ||
-          ""
-        )
-          .toString()
-          .trim();
-
-        const prev = components.get(key) || {
-          hasCompliant: false,
-          hasNonCompliant: false,
-        };
-        if (status === "Non-Compliant") prev.hasNonCompliant = true;
-        else if (status === "Compliant") prev.hasCompliant = true;
-        components.set(key, prev);
-      });
-
-      let compliant = 0;
-      let nonCompliant = 0;
-      components.forEach((meta) => {
-        if (meta.hasNonCompliant) nonCompliant += 1;
-        else if (meta.hasCompliant) compliant += 1;
-      });
-
-      return { total: components.size, compliant, nonCompliant };
-    };
-
     const totalSku = industrySkuSummaryData.length;
     const compliantSku = industrySkuSummaryData.filter(
       (item) => item.complianceStatus === "Compliant",
@@ -4641,18 +4898,9 @@ const ClientDetail = ({
           (item) => item.markingLabelingStatus === "Non-Compliant",
         ).length;
 
-    const producerComponentTotals = isProducerEntity
-      ? deriveProducerComponentTotals()
-      : null;
-    const totalPrimary = isProducerEntity
-      ? producerComponentTotals.total
-      : totalSku;
-    const compliantPrimary = isProducerEntity
-      ? producerComponentTotals.compliant
-      : compliantSku;
-    const nonCompliantPrimary = isProducerEntity
-      ? producerComponentTotals.nonCompliant
-      : nonCompliantSku;
+    const totalPrimary = totalSku;
+    const compliantPrimary = compliantSku;
+    const nonCompliantPrimary = nonCompliantSku;
     const { registeredSuppliers, unregisteredSuppliers } =
       resolveUniqueSupplierCounts(summarySupplierRows);
 
@@ -4861,298 +5109,19 @@ const ClientDetail = ({
       },
     ];
 
-    const supplierStatusByName = new Map();
-    (summarySupplierRows || []).forEach((row) => {
-      const supplierName = (row?.supplierName || "").toString().trim();
-      if (!supplierName || supplierStatusByName.has(supplierName)) return;
-      supplierStatusByName.set(
-        supplierName,
-        (row?.supplierStatus || "").toString().trim(),
-      );
+    const {
+      supplierCtoSummary,
+      supplierCtoSummaryCards,
+      supplierCtoTableRows,
+    } = buildSupplierCtoSummary({
+      summarySupplierRows,
+      summarySupplierCtoRows,
+      isPastDate,
     });
 
-    const supplierCtoSummaryByName = new Map();
-    (summarySupplierCtoRows || []).forEach((row, index) => {
-      const supplierName = (row?.supplierName || "").toString().trim();
-      const supplierKey = supplierName || `supplier-cto-${index}`;
-      const supplierStatus = (supplierStatusByName.get(supplierName) || "")
-        .toString()
-        .trim()
-        .toLowerCase();
-      const registrationStatusRaw = (row?.registrationStatus || "")
-        .toString()
-        .trim();
-      const registrationStatus =
-        supplierStatus === "registered"
-          ? "Approved"
-          : ["Approved", "In Progress", "Pending"].includes(
-                registrationStatusRaw,
-              )
-            ? registrationStatusRaw
-            : "Pending";
-      const ctoAvailability =
-        (row?.ctoAvailability || "Available").toString().trim() ===
-        "Not Available"
-          ? "Not Available"
-          : "Available";
-      const hasDocument = !!(row?.ctoCcaDocument || "").toString().trim();
-
-      const existing = supplierCtoSummaryByName.get(supplierKey);
-      if (!existing) {
-        supplierCtoSummaryByName.set(supplierKey, {
-          supplierName,
-          registrationStatus,
-          hasAvailable: ctoAvailability === "Available",
-          hasNotAvailable: ctoAvailability === "Not Available",
-          hasDocument,
-        });
-        return;
-      }
-
-      const registrationPriority = {
-        Approved: 3,
-        "In Progress": 2,
-        Pending: 1,
-      };
-      if (
-        (registrationPriority[registrationStatus] || 0) >
-        (registrationPriority[existing.registrationStatus] || 0)
-      ) {
-        existing.registrationStatus = registrationStatus;
-      }
-      existing.hasAvailable =
-        existing.hasAvailable || ctoAvailability === "Available";
-      existing.hasNotAvailable =
-        existing.hasNotAvailable || ctoAvailability === "Not Available";
-      existing.hasDocument = existing.hasDocument || hasDocument;
+    const supplierCtoTableColumns = createSupplierCtoTableColumns({
+      handleViewDocument,
     });
-
-    const supplierCtoSummary = Array.from(
-      supplierCtoSummaryByName.values(),
-    ).reduce(
-      (acc, item) => {
-        acc.total += 1;
-        if (item.registrationStatus === "Approved") acc.approved += 1;
-        else if (item.registrationStatus === "In Progress") acc.inProgress += 1;
-        else acc.pending += 1;
-
-        if (item.hasAvailable) acc.available += 1;
-        if (!item.hasAvailable && item.hasNotAvailable) acc.notAvailable += 1;
-        if (item.hasDocument) acc.documentUploaded += 1;
-        return acc;
-      },
-      {
-        total: 0,
-        approved: 0,
-        inProgress: 0,
-        pending: 0,
-        available: 0,
-        notAvailable: 0,
-        documentUploaded: 0,
-      },
-    );
-
-    const supplierCtoSummaryCards = [
-      {
-        label: "Total Supplier CTO",
-        value: supplierCtoSummary.total,
-        tone: "text-blue-700 bg-blue-50 border-blue-200",
-        icon: FaUsers,
-      },
-      {
-        label: "Approved",
-        value: supplierCtoSummary.approved,
-        tone: "text-emerald-700 bg-emerald-50 border-emerald-200",
-        icon: FaCheckCircle,
-      },
-      {
-        label: "In Progress",
-        value: supplierCtoSummary.inProgress,
-        tone: "text-sky-700 bg-sky-50 border-sky-200",
-        icon: FaSpinner,
-      },
-      {
-        label: "Pending",
-        value: supplierCtoSummary.pending,
-        tone: "text-orange-700 bg-orange-50 border-orange-200",
-        icon: FaClipboardCheck,
-      },
-      {
-        label: "CTO Available",
-        value: supplierCtoSummary.available,
-        tone: "text-green-700 bg-green-50 border-green-200",
-        icon: FaFileContract,
-      },
-      {
-        label: "CTO Uploaded",
-        value: supplierCtoSummary.documentUploaded,
-        tone: "text-violet-700 bg-violet-50 border-violet-200",
-        icon: FaFile,
-      },
-    ];
-
-    const supplierCtoTableRows = (summarySupplierCtoRows || []).map(
-      (row, index) => {
-        const supplierName = (row?.supplierName || "").toString().trim() || "-";
-        const supplierStatus =
-          (
-            supplierStatusByName.get(
-              (row?.supplierName || "").toString().trim(),
-            ) || ""
-          )
-            .toString()
-            .trim() || "-";
-        const eprCertificateNumber = (() => {
-          const supplierMatch = (summarySupplierRows || []).find(
-            (item) =>
-              (item?.supplierName || "").toString().trim().toLowerCase() ===
-              supplierName.toLowerCase(),
-          );
-          return (
-            (supplierMatch?.eprCertificateNumber || "").toString().trim() || "-"
-          );
-        })();
-        const registrationStatusRaw = (row?.registrationStatus || "")
-          .toString()
-          .trim();
-        const registrationStatus =
-          supplierStatus.toLowerCase() === "registered"
-            ? "Approved"
-            : ["Approved", "In Progress", "Pending"].includes(
-                  registrationStatusRaw,
-                )
-              ? registrationStatusRaw
-              : "Pending";
-
-        return {
-          key: `supplier-cto-row-${index}`,
-          supplierName,
-          supplierStatus,
-          registrationStatus,
-          eprCertificateNumber,
-          ctoAvailability:
-            (row?.ctoAvailability || "Available").toString().trim() ||
-            "Available",
-          ctoPlantNo: (row?.ctoPlantNo || "").toString().trim() || "-",
-          ctoPlantName: (row?.ctoPlantName || "").toString().trim() || "-",
-          ctoStartDate: (row?.ctoStartDate || "").toString().trim() || "-",
-          ctoValidUpto: (row?.ctoValidUpto || "").toString().trim() || "-",
-          ctoCcaDocument: (row?.ctoCcaDocument || "").toString().trim(),
-        };
-      },
-    );
-
-    const supplierCtoTableColumns = [
-      {
-        title: "Supplier Name",
-        dataIndex: "supplierName",
-        key: "supplierName",
-        fixed: "left",
-        width: 240,
-        render: (value) => (
-          <span className="font-medium text-gray-800">{value}</span>
-        ),
-      },
-      {
-        title: "Supplier Status",
-        dataIndex: "supplierStatus",
-        key: "supplierStatus",
-        width: 140,
-        render: (value) => (
-          <span
-            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold whitespace-nowrap ${
-              value === "Registered"
-                ? "bg-green-50 text-green-700"
-                : value === "Unregistered"
-                  ? "bg-amber-50 text-amber-700"
-                  : "bg-gray-100 text-gray-500"
-            }`}
-          >
-            {value || "-"}
-          </span>
-        ),
-      },
-      {
-        title: "Registration Status",
-        dataIndex: "registrationStatus",
-        key: "registrationStatus",
-        width: 150,
-        render: (value) => (
-          <span
-            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold whitespace-nowrap ${
-              value === "Approved"
-                ? "bg-green-50 text-green-700"
-                : value === "In Progress"
-                  ? "bg-blue-50 text-blue-700"
-                  : "bg-amber-50 text-amber-700"
-            }`}
-          >
-            {value}
-          </span>
-        ),
-      },
-      {
-        title: "EPR Certificate Number",
-        dataIndex: "eprCertificateNumber",
-        key: "eprCertificateNumber",
-        width: 170,
-      },
-      {
-        title: "CTO Av/NA",
-        dataIndex: "ctoAvailability",
-        key: "ctoAvailability",
-        width: 120,
-      },
-      {
-        title: "CTO Plant No",
-        dataIndex: "ctoPlantNo",
-        key: "ctoPlantNo",
-        width: 120,
-      },
-      {
-        title: "CTO Plant Name",
-        dataIndex: "ctoPlantName",
-        key: "ctoPlantName",
-        width: 150,
-      },
-      {
-        title: "CTO Start Date",
-        dataIndex: "ctoStartDate",
-        key: "ctoStartDate",
-        width: 130,
-      },
-      {
-        title: "CTO Valid Upto",
-        dataIndex: "ctoValidUpto",
-        key: "ctoValidUpto",
-        width: 130,
-      },
-      {
-        title: "CTO/CCA Document",
-        dataIndex: "ctoCcaDocument",
-        key: "ctoCcaDocument",
-        width: 150,
-        render: (value) =>
-          value ? (
-            <Button
-              size="small"
-              type="link"
-              className="!px-0"
-              onClick={() =>
-                handleViewDocument(
-                  value,
-                  "CTO/CCA Document",
-                  "CTO/CCA Document",
-                )
-              }
-            >
-              View
-            </Button>
-          ) : (
-            <span className="text-xs text-gray-400">No file</span>
-          ),
-      },
-    ];
 
     const virginShortfall = totalVirginQty - virginTargetQty;
 
@@ -5191,6 +5160,233 @@ const ClientDetail = ({
       financialYear: client?.financialYear || "",
       safeNumber,
     });
+
+    const normalizeSummaryText = (value) => (value || "").toString().trim();
+    const resolveSummaryPrimaryKey = (row, index = 0) =>
+      isProducerEntity
+        ? normalizeSummaryText(row?.skuCode) ||
+          normalizeSummaryText(row?.systemCode) ||
+          normalizeSummaryText(row?.componentCode) ||
+          `sku-${index + 1}`
+        : normalizeSummaryText(row?.skuCode) ||
+          normalizeSummaryText(row?.systemCode) ||
+          normalizeSummaryText(row?.componentCode) ||
+          `sku-${index + 1}`;
+
+    const componentPolymerByCode = new Map();
+    (summaryComponentRows || []).forEach((row) => {
+      const componentCode = normalizeSummaryText(row?.componentCode);
+      const polymerName =
+        normalizeSummaryText(row?.componentPolymer) ||
+        normalizeSummaryText(row?.polymerType) ||
+        normalizeSummaryText(row?.recycledPolymerUsed);
+      if (componentCode && polymerName && !componentPolymerByCode.has(componentCode)) {
+        componentPolymerByCode.set(componentCode, polymerName);
+      }
+    });
+
+    const summaryMetaByKey = new Map();
+    const registerSummaryMeta = (key, meta) => {
+      const normalizedKey = normalizeSummaryText(key);
+      if (!normalizedKey) return;
+      const existing = summaryMetaByKey.get(normalizedKey) || {};
+      summaryMetaByKey.set(normalizedKey, {
+        skuCode: existing.skuCode || meta.skuCode || "",
+        clientName: existing.clientName || meta.clientName || "",
+        polymerName: existing.polymerName || meta.polymerName || "",
+      });
+    };
+
+    (summaryProductRows || []).forEach((row, index) => {
+      const componentCode = normalizeSummaryText(row?.componentCode);
+      const polymerName = componentPolymerByCode.get(componentCode) || "";
+      const meta = {
+        skuCode: normalizeSummaryText(row?.skuCode),
+        clientName: normalizeSummaryText(row?.clientName),
+        polymerName,
+      };
+      registerSummaryMeta(row?.skuCode, meta);
+      registerSummaryMeta(row?.systemCode, meta);
+      registerSummaryMeta(row?.componentCode, meta);
+      registerSummaryMeta(resolveSummaryPrimaryKey(row, index), meta);
+    });
+
+    const resolveSummaryMeta = (row, index = 0) => {
+      const candidates = [
+        normalizeSummaryText(row?.componentCode),
+        normalizeSummaryText(row?.systemCode),
+        normalizeSummaryText(row?.skuCode),
+        resolveSummaryPrimaryKey(row, index),
+      ].filter(Boolean);
+
+      for (const candidate of candidates) {
+        const found = summaryMetaByKey.get(candidate);
+        if (found) return found;
+      }
+
+      return {};
+    };
+
+    const resolveSummarySkuKey = (row, index = 0) => {
+      const directSkuCode = normalizeSummaryText(row?.skuCode);
+      if (directSkuCode) return directSkuCode;
+
+      const candidates = [
+        normalizeSummaryText(row?.componentCode),
+        normalizeSummaryText(row?.systemCode),
+        resolveSummaryPrimaryKey(row, index),
+      ].filter(Boolean);
+
+      for (const candidate of candidates) {
+        const found = summaryMetaByKey.get(candidate);
+        const resolvedSkuCode = normalizeSummaryText(found?.skuCode);
+        if (resolvedSkuCode) return resolvedSkuCode;
+      }
+
+      return "";
+    };
+
+    const producerUniqueSkuTotal = isProducerEntity
+      ? new Set(
+          (industrySkuSummaryData || [])
+            .map((row) => normalizeSummaryText(row?.skuCode))
+            .filter(Boolean),
+        ).size
+      : 0;
+
+    const producerClientWiseSummary = isProducerEntity
+      ? buildGroupedProcurementCards({
+          rows: summaryMonthlyRows || [],
+          getBucketKey: (row, index) =>
+            normalizeSummaryText(resolveSummaryMeta(row, index)?.clientName) ||
+            "Unassigned Client",
+          getBucketLabel: (row, index) =>
+            normalizeSummaryText(resolveSummaryMeta(row, index)?.clientName) ||
+            "Unassigned Client",
+          getPrimaryKey: resolveSummarySkuKey,
+          safeNumber,
+        })
+      : [];
+
+    const producerPolymerWiseSummary = isProducerEntity
+      ? buildGroupedProcurementCards({
+          rows: summaryMonthlyRows || [],
+          getBucketKey: (row, index) =>
+            normalizeSummaryText(row?.componentPolymer) ||
+            normalizeSummaryText(row?.polymerType) ||
+            normalizeSummaryText(row?.recycledPolymerUsed) ||
+            normalizeSummaryText(resolveSummaryMeta(row, index)?.polymerName) ||
+            "Unspecified Polymer",
+          getBucketLabel: (row, index) =>
+            normalizeSummaryText(row?.componentPolymer) ||
+            normalizeSummaryText(row?.polymerType) ||
+            normalizeSummaryText(row?.recycledPolymerUsed) ||
+            normalizeSummaryText(resolveSummaryMeta(row, index)?.polymerName) ||
+            "Unspecified Polymer",
+          getPrimaryKey: resolveSummarySkuKey,
+          safeNumber,
+        })
+      : [];
+
+    const renderProcurementBreakdownCards = (
+      title,
+      description,
+      rows,
+      options = {},
+    ) => {
+      const breakdownTotals = (rows || []).reduce(
+        (acc, row) => {
+          acc.totalSku += safeNumber(row?.totalSku);
+          acc.monthlyPurchaseMt += safeNumber(row?.monthlyPurchaseMt);
+          acc.recycledQty += safeNumber(row?.recycledQty);
+          acc.virginQty += safeNumber(row?.virginQty);
+          acc.recycledAmount += safeNumber(row?.recycledAmount);
+          acc.virginAmount += safeNumber(row?.virginAmount);
+          return acc;
+        },
+        {
+          totalSku: 0,
+          monthlyPurchaseMt: 0,
+          recycledQty: 0,
+          virginQty: 0,
+          recycledAmount: 0,
+          virginAmount: 0,
+        },
+      );
+      if (Number.isFinite(options.totalSkuOverride)) {
+        breakdownTotals.totalSku = options.totalSkuOverride;
+      }
+      const totalRecycledShare =
+        breakdownTotals.monthlyPurchaseMt > 0
+          ? (breakdownTotals.recycledQty / breakdownTotals.monthlyPurchaseMt) * 100
+          : 0;
+      return (
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+          <p className="text-xs text-gray-500 mt-1">{description}</p>
+        </div>
+        <div className="p-5">
+          <Table
+            columns={options.columns || []}
+            dataSource={rows}
+            rowKey="key"
+            size="middle"
+            bordered
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: false,
+            }}
+            scroll={{ x: 1200 }}
+            summary={() => (
+              <Table.Summary.Row className="bg-amber-50">
+                <Table.Summary.Cell index={0}>
+                  <span className="font-semibold text-gray-900">Total</span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={1} align="center">
+                  <span className="font-semibold text-gray-900">
+                    {options.hideTotalSkuInSummary
+                      ? "-"
+                      : formatWithCommas(breakdownTotals.totalSku, 0)}
+                  </span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={2} align="center">
+                  <span className="font-semibold text-gray-900">
+                    {formatWithCommas(breakdownTotals.monthlyPurchaseMt, 3)}
+                  </span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={3} align="center">
+                  <span className="font-semibold text-green-700">
+                    {formatWithCommas(breakdownTotals.recycledQty, 3)}
+                  </span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={4} align="center">
+                  <span className="font-semibold text-blue-700">
+                    {formatWithCommas(breakdownTotals.virginQty, 3)}
+                  </span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={5} align="center">
+                  <span className="font-semibold text-emerald-700">
+                    {formatWithCommas(totalRecycledShare, 1)}%
+                  </span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={6} align="center">
+                  <span className="font-semibold text-emerald-700">
+                    {formatWithCommas(breakdownTotals.recycledAmount, 3)}
+                  </span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={7} align="center">
+                  <span className="font-semibold text-indigo-700">
+                    {formatWithCommas(breakdownTotals.virginAmount, 3)}
+                  </span>
+                </Table.Summary.Cell>
+              </Table.Summary.Row>
+            )}
+          />
+        </div>
+      </div>
+      );
+    };
 
     const quickInfo = [
       { label: "Client Name", value: client?.clientName || "N/A" },
@@ -5291,6 +5487,118 @@ const ClientDetail = ({
       </AntdTooltip>
     );
 
+    const buildBreakdownTableColumns = (nameLabel, dataKey = "name") => [
+      {
+        title: headerCell(
+          nameLabel,
+          `${nameLabel} grouped summary entry`,
+        ),
+        dataIndex: dataKey,
+        key: dataKey,
+        fixed: "left",
+        width: 240,
+        render: (value) => (
+          <span className="font-medium text-gray-800">{value}</span>
+        ),
+      },
+      {
+        title: headerCell(
+          "Total SKU",
+          "Distinct Producer SKU count in this group",
+        ),
+        dataIndex: "totalSku",
+        key: "totalSku",
+        align: "center",
+        width: 110,
+      },
+      {
+        title: headerCell(
+          "Annual Purchase MT",
+          "Sum of annual purchase quantity for this group",
+        ),
+        dataIndex: "monthlyPurchaseMt",
+        key: "monthlyPurchaseMt",
+        align: "center",
+        width: 170,
+        render: (value) => formatWithCommas(value, 3),
+      },
+      {
+        title: headerCell(
+          "Recycled Qty",
+          "Sum of recycled quantity for this group",
+          "text-green-700",
+        ),
+        dataIndex: "recycledQty",
+        key: "recycledQty",
+        align: "center",
+        width: 150,
+        render: (value) => (
+          <span className="font-semibold text-green-700">
+            {formatWithCommas(value, 3)}
+          </span>
+        ),
+      },
+      {
+        title: headerCell(
+          "Virgin Qty",
+          "Sum of virgin quantity for this group",
+          "text-blue-700",
+        ),
+        dataIndex: "virginQty",
+        key: "virginQty",
+        align: "center",
+        width: 150,
+        render: (value) => (
+          <span className="font-semibold text-blue-700">
+            {formatWithCommas(value, 3)}
+          </span>
+        ),
+      },
+      {
+        title: headerCell(
+          "Recycled Share",
+          "Recycled quantity as a percentage of annual purchase",
+          "text-emerald-700",
+        ),
+        dataIndex: "recycledShareRaw",
+        key: "recycledShareRaw",
+        align: "center",
+        width: 150,
+        render: (value) => `${formatWithCommas(value, 1)}%`,
+      },
+      {
+        title: headerCell(
+          "Recycled Amount",
+          "Sum of recycled material amount for this group",
+          "text-emerald-700",
+        ),
+        dataIndex: "recycledAmount",
+        key: "recycledAmount",
+        align: "center",
+        width: 170,
+        render: (value) => formatWithCommas(value, 3),
+      },
+      {
+        title: headerCell(
+          "Virgin Amount",
+          "Sum of virgin material amount for this group",
+          "text-indigo-700",
+        ),
+        dataIndex: "virginAmount",
+        key: "virginAmount",
+        align: "center",
+        width: 170,
+        render: (value) => formatWithCommas(value, 3),
+      },
+    ];
+
+    const producerClientWiseColumns = buildBreakdownTableColumns(
+      "Client Name",
+    );
+    const producerPolymerWiseColumns = buildBreakdownTableColumns(
+      "Polymer Name",
+    );
+
     const topIndustryColumns = [
       {
         title: headerCell(
@@ -5317,8 +5625,8 @@ const ClientDetail = ({
       },
       {
         title: headerCell(
-          "Monthly Purchase Qty",
-          "Sum of monthlyPurchaseMt for this industry",
+          "Annual Purchase MT",
+          "Sum of annual purchase quantity for this industry",
         ),
         dataIndex: "monthlyPurchaseMt",
         key: "monthlyPurchaseMt",
@@ -5329,7 +5637,7 @@ const ClientDetail = ({
       {
         title: headerCell(
           "Recycled Target Qty",
-          "Monthly Purchase Qty × UREP target % (FY)",
+          "Annual Purchase MT × UREP target % (FY)",
           "text-gray-700",
         ),
         dataIndex: "recycledTargetMt",
@@ -5380,7 +5688,7 @@ const ClientDetail = ({
       {
         title: headerCell(
           "Virgin Target Qty (MT)",
-          "Monthly Purchase Qty − Recycled Target Qty",
+          "Annual Purchase MT − Recycled Target Qty",
           "text-indigo-700",
         ),
         dataIndex: "virginTargetMt",
@@ -5465,6 +5773,273 @@ const ClientDetail = ({
       {},
     );
 
+    const clientConnectSupplierTypeSummaryCards = (() => {
+          const supplierTypeOptions = [
+            "Manufacture",
+            "Importer of raw material",
+            "Importer",
+            "Producer",
+            "Brand Owner",
+            "PWP",
+            "Seller",
+          ];
+          const supplierTypeAliasMap = new Map([
+            ["manufacture", "Manufacture"],
+            ["manufacturer", "Manufacture"],
+            ["importer of raw material", "Importer of raw material"],
+            ["importer of raw materials", "Importer of raw material"],
+            ["importer raw material", "Importer of raw material"],
+            ["importer", "Importer"],
+            ["producer", "Producer"],
+            ["brand owner", "Brand Owner"],
+            ["producer & brand owner", "Brand Owner"],
+            ["pwp", "PWP"],
+            ["seller", "Seller"],
+          ]);
+
+          const normalizeSupplierTypeLabel = (value) => {
+            const raw = (value || "").toString().trim();
+            if (!raw) return "";
+            const aliasMatch = supplierTypeAliasMap.get(raw.toLowerCase());
+            if (aliasMatch) return aliasMatch;
+            const exactMatch = supplierTypeOptions.find(
+              (option) => option.toLowerCase() === raw.toLowerCase(),
+            );
+            return exactMatch || raw;
+          };
+
+          const supplierTypeBySupplierComponent = new Map();
+          const addSupplierTypeLookup = (row) => {
+            const supplierName = (row?.supplierName || "").toString().trim().toLowerCase();
+            const componentCode = (row?.componentCode || "").toString().trim().toLowerCase();
+            const supplierType = normalizeSupplierTypeLabel(row?.supplierType);
+            if (!supplierType) return;
+
+            if (supplierName && componentCode) {
+              supplierTypeBySupplierComponent.set(
+                `${supplierName}::${componentCode}`,
+                supplierType,
+              );
+            }
+            if (supplierName) {
+              supplierTypeBySupplierComponent.set(supplierName, supplierType);
+            }
+          };
+
+          (summarySupplierRows || []).forEach(addSupplierTypeLookup);
+          (summaryProductRows || []).forEach(addSupplierTypeLookup);
+          (summarySupplierCtoRows || []).forEach(addSupplierTypeLookup);
+
+          const groupedByType = new Map();
+          supplierTypeOptions.forEach((supplierType) => {
+            groupedByType.set(supplierType, {
+              key: `supplier-type-${supplierType.toLowerCase().replace(/\s+/g, "-")}`,
+              supplierType,
+              totalSku: 0,
+              monthlyPurchaseMt: 0,
+              recycledTargetMt: 0,
+              recycledAchievedMt: 0,
+              recycledShortfallMt: 0,
+              virginTargetMt: 0,
+              virginAchievedMt: 0,
+              virginShortfallMt: 0,
+            });
+          });
+
+          const skuSetByType = new Map();
+          supplierTypeOptions.forEach((supplierType) => {
+            skuSetByType.set(supplierType, new Set());
+          });
+
+          (summaryMonthlyRows || []).forEach((row, index) => {
+            const supplierName = (row?.supplierName || "").toString().trim().toLowerCase();
+            const componentCode = (row?.componentCode || "").toString().trim().toLowerCase();
+            const supplierType =
+              supplierTypeBySupplierComponent.get(
+                `${supplierName}::${componentCode}`,
+              ) ||
+              supplierTypeBySupplierComponent.get(supplierName) ||
+              "";
+
+            if (!supplierType) return;
+            if (!groupedByType.has(supplierType)) {
+              groupedByType.set(supplierType, {
+                key: `supplier-type-${supplierType.toLowerCase().replace(/\s+/g, "-")}`,
+                supplierType,
+                totalSku: 0,
+                monthlyPurchaseMt: 0,
+                recycledTargetMt: 0,
+                recycledAchievedMt: 0,
+                recycledShortfallMt: 0,
+                virginTargetMt: 0,
+                virginAchievedMt: 0,
+                virginShortfallMt: 0,
+              });
+            }
+            if (!skuSetByType.has(supplierType)) {
+              skuSetByType.set(supplierType, new Set());
+            }
+
+            const bucket = groupedByType.get(supplierType);
+            const purchase = safeNumber(row?.monthlyPurchaseMt);
+            const recycledAchieved = safeNumber(row?.recycledQty);
+            const virginAchieved = safeNumber(row?.virginQty);
+            const recycledTarget = purchase * (totalTargetPct / 100);
+            const virginTarget = Math.max(purchase - recycledTarget, 0);
+
+            bucket.monthlyPurchaseMt += purchase;
+            bucket.recycledTargetMt += recycledTarget;
+            bucket.recycledAchievedMt += recycledAchieved;
+            bucket.recycledShortfallMt += recycledAchieved - recycledTarget;
+            bucket.virginTargetMt += virginTarget;
+            bucket.virginAchievedMt += virginAchieved;
+            bucket.virginShortfallMt += virginAchieved - virginTarget;
+
+            const skuKey =
+              (row?.skuCode || "").toString().trim() ||
+              (row?.systemCode || "").toString().trim() ||
+              (row?.componentCode || "").toString().trim() ||
+              `supplier-type-row-${index + 1}`;
+            if (skuKey) skuSetByType.get(supplierType)?.add(skuKey);
+          });
+
+          return Array.from(groupedByType.keys())
+            .map((supplierType) => {
+              const bucket = groupedByType.get(supplierType);
+              return {
+                ...bucket,
+                totalSku: skuSetByType.get(supplierType)?.size || 0,
+              };
+            })
+            .filter(
+              (row) =>
+                safeNumber(row?.totalSku) > 0 ||
+                safeNumber(row?.monthlyPurchaseMt) > 0 ||
+                safeNumber(row?.recycledAchievedMt) > 0 ||
+                safeNumber(row?.virginAchievedMt) > 0,
+            )
+            .sort((a, b) => {
+              const aIndex = supplierTypeOptions.findIndex(
+                (item) => item === a.supplierType,
+              );
+              const bIndex = supplierTypeOptions.findIndex(
+                (item) => item === b.supplierType,
+              );
+              if (aIndex === -1 && bIndex === -1) {
+                return a.supplierType.localeCompare(b.supplierType);
+              }
+              if (aIndex === -1) return 1;
+              if (bIndex === -1) return -1;
+              return aIndex - bIndex;
+            });
+        })();
+
+    const supplierTypeSummaryColumns = [
+      {
+        title: "Supplier Type",
+        dataIndex: "supplierType",
+        key: "supplierType",
+        width: 220,
+        render: (value) => (
+          <span className="font-medium text-gray-800">{value}</span>
+        ),
+      },
+      {
+        title: "Total SKU",
+        dataIndex: "totalSku",
+        key: "totalSku",
+        align: "center",
+        width: 140,
+        render: (value) => formatWithCommas(value, 0),
+      },
+      {
+        title: "Annual Purchase MT",
+        dataIndex: "monthlyPurchaseMt",
+        key: "monthlyPurchaseMt",
+        align: "center",
+        width: 160,
+        render: (value) => formatWithCommas(value, 2),
+      },
+      {
+        title: "Recycled Target Qty",
+        dataIndex: "recycledTargetMt",
+        key: "recycledTargetMt",
+        align: "center",
+        width: 160,
+        render: (value) => formatWithCommas(value, 2),
+      },
+      {
+        title: "Recycled Achieved (MT)",
+        dataIndex: "recycledAchievedMt",
+        key: "recycledAchievedMt",
+        align: "center",
+        width: 170,
+        render: (value) => (
+          <span className="font-semibold text-green-700">
+            {formatWithCommas(value, 2)}
+          </span>
+        ),
+      },
+      {
+        title: "Recycled Shortfall (MT)",
+        dataIndex: "recycledShortfallMt",
+        key: "recycledShortfallMt",
+        align: "center",
+        width: 180,
+        render: (value) => (
+          <span
+            className={`inline-flex items-center justify-center gap-1 font-semibold ${safeNumber(value) >= 0 ? "text-green-700" : "text-red-600"}`}
+          >
+            {safeNumber(value) >= 0 ? (
+              <FaArrowUp className="text-green-600" />
+            ) : (
+              <FaArrowDown className="text-red-600" />
+            )}
+            {formatWithCommas(Math.abs(safeNumber(value)), 2)}
+          </span>
+        ),
+      },
+      {
+        title: "Virgin Target Qty (MT)",
+        dataIndex: "virginTargetMt",
+        key: "virginTargetMt",
+        align: "center",
+        width: 170,
+        render: (value) => formatWithCommas(value, 2),
+      },
+      {
+        title: "Virgin Achieved (MT)",
+        dataIndex: "virginAchievedMt",
+        key: "virginAchievedMt",
+        align: "center",
+        width: 160,
+        render: (value) => (
+          <span className="font-semibold text-emerald-700">
+            {formatWithCommas(value, 2)}
+          </span>
+        ),
+      },
+      {
+        title: "Virgin Shortfall (MT)",
+        dataIndex: "virginShortfallMt",
+        key: "virginShortfallMt",
+        align: "center",
+        width: 170,
+        render: (value) => (
+          <span
+            className={`inline-flex items-center justify-center gap-1 font-semibold ${safeNumber(value) >= 0 ? "text-green-700" : "text-red-600"}`}
+          >
+            {safeNumber(value) >= 0 ? (
+              <FaArrowUp className="text-green-600" />
+            ) : (
+              <FaArrowDown className="text-red-600" />
+            )}
+            {formatWithCommas(Math.abs(safeNumber(value)), 2)}
+          </span>
+        ),
+      },
+    ];
+
     const supplierWiseRows = Object.keys(supplierWiseProcurement)
       .sort(
         (a, b) =>
@@ -5527,8 +6102,8 @@ const ClientDetail = ({
       },
       {
         title: headerCell(
-          "Monthly Purchase Qty",
-          "Sum of monthlyPurchaseMt for this supplier",
+          "Annual Purchase MT",
+          "Sum of annual purchase quantity for this supplier",
         ),
         dataIndex: "monthlyPurchaseMt",
         key: "monthlyPurchaseMt",
@@ -5539,7 +6114,7 @@ const ClientDetail = ({
       {
         title: headerCell(
           "Recycled Target Qty",
-          "Monthly Purchase Qty × UREP target % (FY)",
+          "Annual Purchase MT × UREP target % (FY)",
         ),
         dataIndex: "recycledTargetMt",
         key: "recycledTargetMt",
@@ -5589,7 +6164,7 @@ const ClientDetail = ({
       {
         title: headerCell(
           "Virgin Target Qty (MT)",
-          "Monthly Purchase Qty − Recycled Target Qty",
+          "Annual Purchase MT − Recycled Target Qty",
           "text-indigo-700",
         ),
         dataIndex: "virginTargetMt",
@@ -5694,6 +6269,97 @@ const ClientDetail = ({
       topN: supplierTopN,
     });
 
+    const buildTargetTableTotals = (rows) =>
+      (rows || []).reduce(
+        (acc, row) => {
+          acc.totalSku += safeNumber(row?.totalSku);
+          acc.monthlyPurchaseMt += safeNumber(row?.monthlyPurchaseMt);
+          acc.recycledTargetMt += safeNumber(row?.recycledTargetMt);
+          acc.recycledAchievedMt += safeNumber(row?.recycledAchievedMt);
+          acc.recycledShortfallMt += safeNumber(row?.recycledShortfallMt);
+          acc.virginTargetMt += safeNumber(row?.virginTargetMt);
+          acc.virginAchievedMt += safeNumber(row?.virginAchievedMt);
+          acc.virginShortfallMt += safeNumber(row?.virginShortfallMt);
+          return acc;
+        },
+        {
+          totalSku: 0,
+          monthlyPurchaseMt: 0,
+          recycledTargetMt: 0,
+          recycledAchievedMt: 0,
+          recycledShortfallMt: 0,
+          virginTargetMt: 0,
+          virginAchievedMt: 0,
+          virginShortfallMt: 0,
+        },
+      );
+
+    const renderTargetTableSummary = (rows, options = {}) => {
+      const totals = buildTargetTableTotals(rows);
+      const renderArrowValue = (value, greenWhenPositive = true) => {
+        const numericValue = safeNumber(value);
+        const isPositive = numericValue >= 0;
+        const tone =
+          greenWhenPositive && isPositive ? "text-green-700" : "text-red-600";
+        return (
+          <span
+            className={`inline-flex items-center justify-center gap-1 font-semibold ${tone}`}
+          >
+            {isPositive ? (
+              <FaArrowUp className="text-green-600" />
+            ) : (
+              <FaArrowDown className="text-red-600" />
+            )}
+            {formatWithCommas(Math.abs(numericValue), 2)}
+          </span>
+        );
+      };
+
+      return (
+        <Table.Summary.Row className="bg-amber-50">
+          <Table.Summary.Cell index={0}>
+            <span className="font-semibold text-gray-900">Total</span>
+          </Table.Summary.Cell>
+          <Table.Summary.Cell index={1} align="center">
+            <span className="font-semibold text-gray-900">
+              {options.hideTotalSku ? "-" : formatWithCommas(totals.totalSku, 0)}
+            </span>
+          </Table.Summary.Cell>
+          <Table.Summary.Cell index={2} align="center">
+            <span className="font-semibold text-gray-900">
+              {formatWithCommas(totals.monthlyPurchaseMt, 2)}
+            </span>
+          </Table.Summary.Cell>
+          <Table.Summary.Cell index={3} align="center">
+            <span className="font-semibold text-gray-900">
+              {formatWithCommas(totals.recycledTargetMt, 2)}
+            </span>
+          </Table.Summary.Cell>
+          <Table.Summary.Cell index={4} align="center">
+            <span className="font-semibold text-green-700">
+              {formatWithCommas(totals.recycledAchievedMt, 2)}
+            </span>
+          </Table.Summary.Cell>
+          <Table.Summary.Cell index={5} align="center">
+            {renderArrowValue(totals.recycledShortfallMt)}
+          </Table.Summary.Cell>
+          <Table.Summary.Cell index={6} align="center">
+            <span className="font-semibold text-gray-900">
+              {formatWithCommas(totals.virginTargetMt, 2)}
+            </span>
+          </Table.Summary.Cell>
+          <Table.Summary.Cell index={7} align="center">
+            <span className="font-semibold text-emerald-700">
+              {formatWithCommas(totals.virginAchievedMt, 2)}
+            </span>
+          </Table.Summary.Cell>
+          <Table.Summary.Cell index={8} align="center">
+            {renderArrowValue(totals.virginShortfallMt)}
+          </Table.Summary.Cell>
+        </Table.Summary.Row>
+      );
+    };
+
     const topOptions = [
       { label: "All", value: "All" },
       { label: "Top 10", value: 10 },
@@ -5782,48 +6448,16 @@ const ClientDetail = ({
           </div>
 
           <div className="px-5 pb-5">
-            <div className="rounded-2xl border-2 border-amber-400/60 p-3">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div>
-                  <div className="text-sm font-semibold text-gray-800">
-                    Supplier CTO Summary
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Based on Supplier CTO Check data, registration stage, CTO
-                    availability, and uploaded CTO/CCA documents.
-                  </div>
-                </div>
-                <span className="inline-flex items-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 text-xs font-semibold">
-                  {renderAnimatedSummaryValue(supplierCtoSummary.total, {
-                    digits: 0,
-                    className: "",
-                  })}{" "}
-                  Suppliers
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
-                {supplierCtoSummaryCards.map((card) => {
-                  const Icon = card.icon;
-                  return (
-                    <div
-                      key={card.label}
-                      className={`rounded-xl border p-4 ${card.tone}`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs font-semibold uppercase tracking-wide opacity-80">
-                          {card.label}
-                        </div>
-                        {Icon ? <Icon className="text-sm opacity-80" /> : null}
-                      </div>
-                      <div className="mt-2 flex items-baseline gap-2">
-                        {renderAnimatedSummaryValue(card.value)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          <SupplierCtoSummarySection
+            supplierCtoSummary={supplierCtoSummary}
+            supplierCtoSummaryCards={supplierCtoSummaryCards}
+            supplierCtoTableRows={supplierCtoTableRows}
+            supplierCtoTableColumns={supplierCtoTableColumns}
+            renderAnimatedSummaryValue={renderAnimatedSummaryValue}
+            summaryLoading={summaryLoading}
+            showSummary
+            showTable={false}
+          />
           </div>
         </div>
 
@@ -5834,7 +6468,7 @@ const ClientDetail = ({
             </h3>
             <p className="text-xs text-gray-500 mt-1">
               Based on UREP target sum for FY {client?.financialYear || "N/A"}{" "}
-              and total monthly purchase.
+              and total annual purchase.
             </p>
           </div>
           <div className="p-5 space-y-6">
@@ -5842,7 +6476,7 @@ const ClientDetail = ({
               <div className="rounded-xl border p-4 text-gray-800 bg-gray-50 border-gray-200">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xs font-semibold uppercase tracking-wide opacity-80">
-                    Monthly Purchase MT
+                    Annual Purchase MT
                   </div>
                   <FaChartLine className="text-sm opacity-80" />
                 </div>
@@ -6047,7 +6681,7 @@ const ClientDetail = ({
                           {item.category}
                         </div>
                         <div className="mt-1 text-[11px] uppercase tracking-wide text-gray-400">
-                          Monthly Purchase MT
+                          Annual Purchase MT
                         </div>
                         {renderAnimatedSummaryValue(item.monthlyPurchaseMt, {
                           digits: 3,
@@ -6170,87 +6804,105 @@ const ClientDetail = ({
           </div>
         )}
 
-        {!isProducerEntity && (
+        {isProducerEntity &&
+          producerClientWiseSummary.length > 0 &&
+          renderProcurementBreakdownCards(
+            "Client Wise Summary",
+            "Infographic split of procurement quantities and spend by client.",
+            producerClientWiseSummary,
+            {
+              nameLabel: "Client Name",
+              columns: producerClientWiseColumns,
+              totalSkuOverride: producerUniqueSkuTotal,
+            },
+          )}
+
+        {isProducerEntity &&
+          producerPolymerWiseSummary.length > 0 &&
+          renderProcurementBreakdownCards(
+            "Polymer Wise Summary",
+            "Infographic split of procurement quantities and spend by polymer.",
+            producerPolymerWiseSummary,
+            {
+              nameLabel: "Polymer Name",
+              columns: producerPolymerWiseColumns,
+              totalSkuOverride: producerUniqueSkuTotal,
+              hideTotalSkuInSummary: true,
+            },
+          )}
+
+        <IndustrySummarySection
+          industrySearch={industrySearch}
+          setIndustrySearch={setIndustrySearch}
+          industryOnlyShortfall={industryOnlyShortfall}
+          setIndustryOnlyShortfall={setIndustryOnlyShortfall}
+          industryOnlyNoRecycled={industryOnlyNoRecycled}
+          setIndustryOnlyNoRecycled={setIndustryOnlyNoRecycled}
+          industryTopN={industryTopN}
+          setIndustryTopN={setIndustryTopN}
+          topOptions={topOptions}
+          topIndustryColumns={topIndustryColumns}
+          filteredIndustryRows={filteredIndustryRows}
+          summaryLoading={summaryLoading}
+          setSummaryDrawerType={setSummaryDrawerType}
+          setSummaryDrawerRecord={setSummaryDrawerRecord}
+          setSummaryDrawerOpen={setSummaryDrawerOpen}
+          renderTargetTableSummary={renderTargetTableSummary}
+        />
+
+        {clientConnectSupplierTypeSummaryCards.length > 0 && (
           <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
             <div className="px-5 py-4 border-b border-gray-100">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-800">
-                    Industry Wise Summary
-                  </h3>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                    <span>Click a row to view details.</span>
-                    <Tag color="green">Surplus</Tag>
-                    <Tag color="red">Shortfall</Tag>
-                    <Tag color="blue">Target</Tag>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Input
-                    value={industrySearch}
-                    onChange={(e) => setIndustrySearch(e.target.value)}
-                    placeholder="Search industry"
-                    className="w-[220px]"
-                    allowClear
-                    size="middle"
-                  />
-                  <Checkbox
-                    checked={industryOnlyShortfall}
-                    onChange={(e) => setIndustryOnlyShortfall(e.target.checked)}
-                  >
-                    Only shortfall
-                  </Checkbox>
-                  <Checkbox
-                    checked={industryOnlyNoRecycled}
-                    onChange={(e) =>
-                      setIndustryOnlyNoRecycled(e.target.checked)
-                    }
-                  >
-                    Only no recycled
-                  </Checkbox>
-                  <Select
-                    value={industryTopN}
-                    onChange={setIndustryTopN}
-                    options={topOptions}
-                    className="w-[120px]"
-                    size="middle"
-                  />
-                  <Button
-                    onClick={() => {
-                      setIndustrySearch("");
-                      setIndustryOnlyShortfall(false);
-                      setIndustryOnlyNoRecycled(false);
-                      setIndustryTopN("All");
-                    }}
-                  >
-                    Clear
-                  </Button>
-                </div>
+              <h3 className="text-sm font-semibold text-gray-800">
+                Supplier Type Summary
+              </h3>
+              <div className="mt-1 text-xs text-gray-500">
+                Card-wise summary of supplier types from Client Connect data.
               </div>
             </div>
-            <Table
-              columns={topIndustryColumns}
-              dataSource={filteredIndustryRows}
-              rowKey="key"
-              pagination={false}
-              bordered
-              loading={summaryLoading}
-              locale={{
-                emptyText: summaryLoading
-                  ? "Loading summary data..."
-                  : "No summary data available.",
-              }}
-              sticky
-              scroll={{ x: 1500, y: 420 }}
-              rowClassName={() => "cursor-pointer"}
-              onRow={(record) => ({
-                onClick: () => {
-                  setSummaryDrawerType("industry");
-                  setSummaryDrawerRecord(record);
-                  setSummaryDrawerOpen(true);
-                },
-              })}
-            />
+            <div className="p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+                {clientConnectSupplierTypeSummaryCards.map((card) => (
+                  <div
+                    key={card.key}
+                    className="rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-4 shadow-sm"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-gray-800">
+                        {card.supplierType}
+                      </div>
+                      <div className="mt-1 text-[11px] uppercase tracking-wide text-gray-400">
+                        Supplier Type
+                      </div>
+                    </div>
+                    <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3">
+                      <div className="text-[11px] text-emerald-700">
+                        Total SKU
+                      </div>
+                      <div className="mt-1 text-xl font-semibold text-emerald-800">
+                        {formatWithCommas(card.totalSku, 0)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5">
+                <Table
+                  columns={supplierTypeSummaryColumns}
+                  dataSource={clientConnectSupplierTypeSummaryCards}
+                  rowKey="key"
+                  pagination={false}
+                  bordered
+                  size="middle"
+                  scroll={{ x: 1500 }}
+                  summary={() =>
+                    renderTargetTableSummary(clientConnectSupplierTypeSummaryCards, {
+                      hideTotalSku: true,
+                    })
+                  }
+                />
+              </div>
+            </div>
           </div>
         )}
 
@@ -6328,36 +6980,20 @@ const ClientDetail = ({
                 setSummaryDrawerOpen(true);
               },
             })}
+            summary={() => renderTargetTableSummary(filteredSupplierRows)}
           />
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-800">
-              Supplier CTO Check Table
-            </h3>
-            <p className="text-xs text-gray-500 mt-1">
-              Read-only view of saved Supplier CTO Check records from the plant
-              process.
-            </p>
-          </div>
-          <Table
-            columns={supplierCtoTableColumns}
-            dataSource={supplierCtoTableRows}
-            rowKey="key"
-            pagination={false}
-            size="middle"
-            bordered
-            loading={summaryLoading}
-            locale={{
-              emptyText: summaryLoading
-                ? "Loading supplier CTO data..."
-                : "No supplier CTO check data available.",
-            }}
-            scroll={{ x: 1600 }}
-            rowClassName="hover:bg-gray-50"
-          />
-        </div>
+        <SupplierCtoSummarySection
+          supplierCtoSummary={supplierCtoSummary}
+          supplierCtoSummaryCards={supplierCtoSummaryCards}
+          supplierCtoTableRows={supplierCtoTableRows}
+          supplierCtoTableColumns={supplierCtoTableColumns}
+          renderAnimatedSummaryValue={renderAnimatedSummaryValue}
+          summaryLoading={summaryLoading}
+          showSummary={false}
+          showTable
+        />
 
         <Drawer
           open={summaryDrawerOpen}
@@ -6418,7 +7054,7 @@ const ClientDetail = ({
                 fixed: "left",
               },
               {
-                title: "Monthly Purchase (MT)",
+                title: "Annual Purchase (MT)",
                 dataIndex: "monthlyPurchaseMt",
                 key: "monthlyPurchaseMt",
                 align: "right",
@@ -6448,7 +7084,7 @@ const ClientDetail = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="rounded-lg border border-gray-200 bg-white p-3">
                     <div className="text-[11px] uppercase tracking-wide text-gray-500">
-                      Monthly Purchase (MT)
+                      Annual Purchase (MT)
                     </div>
                     <div className="mt-1 text-lg font-bold text-gray-900">
                       {renderAnimatedSummaryValue(record.monthlyPurchaseMt, {
@@ -6497,7 +7133,7 @@ const ClientDetail = ({
                       Top SKUs
                     </div>
                     <div className="text-xs text-gray-500">
-                      By Monthly Purchase
+                      By Annual Purchase
                     </div>
                   </div>
                   <Table
@@ -7247,26 +7883,34 @@ const ClientDetail = ({
 
   return (
     <ClientProvider>
-      <div className={embedded ? "" : "p-6"}>
+      <div className={embedded ? "" : "p-3 md:p-4 lg:p-5 2xl:p-6"}>
         <ClientHeader
           embedded={embedded}
           initialViewMode={initialViewMode}
           isClientUser={isClientUser}
           isProcessMode={isProcessMode}
           client={client}
-          onBack={() =>
-            navigate(
-              isClientUser ? "/dashboard/client-connect" : "/dashboard/clients",
-            )
-          }
+          onBack={() => navigate(returnTo)}
           onStartAudit={() =>
             navigate(`/dashboard/client/${id}/edit`, {
-              state: { activeTab: "Pre - Validation", unlockAudit: true },
+              state: {
+                activeTab: "Pre - Validation",
+                unlockAudit: true,
+                from: returnTo,
+                clientName: client?.clientName || clientNameFromState,
+              },
             })
           }
-          onEdit={() => navigate(`/dashboard/client/${id}/edit`)}
+          onEdit={() =>
+            navigate(`/dashboard/client/${id}/edit`, {
+              state: {
+                from: returnTo,
+                clientName: client?.clientName || clientNameFromState,
+              },
+            })
+          }
         />
-        <div className="flex flex-wrap gap-3 justify-end">
+        <div className="flex flex-wrap gap-2 md:gap-3 justify-end">
           {/* {(client.wasteType || '').toLowerCase().includes('plastic') && initialViewMode !== 'client-connect' && (
             <button
               type="button"
@@ -7303,7 +7947,7 @@ const ClientDetail = ({
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           {initialViewMode !== "client-connect" && tabs.length > 1 && (
-            <div className="p-6 pb-0 mb-6">
+            <div className="p-3 md:p-4 lg:p-5 2xl:p-6 pb-0 mb-4 md:mb-5">
               <AuditStepper
                 steps={tabs}
                 currentStep={activeTab}
@@ -7316,7 +7960,7 @@ const ClientDetail = ({
             {initialViewMode === "client-connect" ? (
               <>
                 {/* Custom Tab Navigation */}
-                <div className="border-b border-gray-200 px-5">
+                <div className="border-b border-gray-200 px-3 md:px-4 lg:px-5">
                   <nav
                     className="flex gap-1 -mb-px overflow-x-auto"
                     role="tablist"
@@ -7328,6 +7972,11 @@ const ClientDetail = ({
                         icon: FaListAlt,
                       },
                       { key: "summary", label: "Summary", icon: FaChartLine },
+                      {
+                        key: "state-summary",
+                        label: "State Wise Summery",
+                        icon: FaMapMarkerAlt,
+                      },
                       ...(!isProducerEntity
                         ? [
                             {
@@ -7340,7 +7989,7 @@ const ClientDetail = ({
                       {
                         key: "industry",
                         label: isProducerEntity
-                          ? "Component Details"
+                          ? "SKU With Component Details"
                           : "Industry SKU & Component",
                         icon: FaIndustry,
                       },
@@ -7364,7 +8013,7 @@ const ClientDetail = ({
                           aria-selected={isActive}
                           onClick={() => setClientConnectTab(tab.key)}
                           className={`
-                          flex items-center gap-2 px-4 py-3.5 text-sm font-medium whitespace-nowrap
+                          flex items-center gap-2 px-3 py-2.5 text-[13px] md:text-sm font-medium whitespace-nowrap
                           border-b-2 transition-all duration-200
                           ${
                             isActive
@@ -7382,9 +8031,9 @@ const ClientDetail = ({
                 </div>
 
                 {/* Tab Content */}
-                <div className="p-5 md:p-6">
+                <div className="p-3 md:p-4 lg:p-5 2xl:p-6">
                   {clientConnectTab === "overview" && (
-                    <div className="space-y-5">
+                    <div className="space-y-4 md:space-y-4 lg:space-y-5">
                       {renderOverviewSection()}
                       <ClientDocuments
                         isOpen={clientDataOpen}
@@ -7400,6 +8049,29 @@ const ClientDetail = ({
                     <ClientSummaryPanel>
                       {renderClientConnectSummary()}
                     </ClientSummaryPanel>
+                  )}
+                  {clientConnectTab === "state-summary" && (
+                    <GsapRevealGroup animateKey="state-summary-tab">
+                      <StateWiseSummarySection
+                        stateWiseSupplierSummary={stateWiseSupplierSummary}
+                        selectedSupplierState={selectedSupplierState}
+                        setSelectedSupplierState={setSelectedSupplierState}
+                        normalizeStateName={normalizeStateName}
+                        safeNumber={safeNumber}
+                        formatWithCommas={formatWithCommas}
+                        renderAnimatedSummaryValue={renderAnimatedSummaryValue}
+                        summarySupplierRows={summarySupplierRows}
+                        producerClientConnectSkuData={producerClientConnectSkuData}
+                        industrySkuSummaryData={industrySkuSummaryData}
+                        isProducerEntity={isProducerEntity}
+                        isBrandOwnerEntity={isBrandOwnerEntity}
+                        showPlantLocationMarkers={showPlantLocationMarkers}
+                        indiaMapLabels={indiaMapLabels}
+                        attachIndiaMapSvgRef={attachIndiaMapSvgRef}
+                        hoveredStateMapDetails={hoveredStateMapDetails}
+                        setHoveredStateMapDetails={setHoveredStateMapDetails}
+                      />
+                    </GsapRevealGroup>
                   )}
                   {!isProducerEntity &&
                     clientConnectTab === "industry-summary" && (
@@ -7424,7 +8096,7 @@ const ClientDetail = ({
                     </GsapRevealGroup>
                   )}
                   {clientConnectTab === "portal" && (
-                    <div className="space-y-8">
+                    <div className="space-y-5 lg:space-y-6 2xl:space-y-8">
                       {isProducerEntity ? (
                         <>
                           <SalesAnalysis
@@ -7483,15 +8155,15 @@ const ClientDetail = ({
                 </div>
               </>
             ) : (
-              <GsapStepTransition
-                className="p-6"
+              <GsapPageTransition
+                className="p-4 md:p-5 2xl:p-6"
                 transitionKey={`client-detail-step-${activeTab}`}
               >
                 {activeTab === 1 && renderOverviewSection()}
                 {activeTab === 2 && renderAddressSection()}
                 {activeTab === 3 && renderDocumentsSection()}
                 {activeTab === 4 && renderCteCtoSection()}
-              </GsapStepTransition>
+              </GsapPageTransition>
             )}
           </div>
         </div>

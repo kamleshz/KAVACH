@@ -1,22 +1,38 @@
 import { useEffect, useState, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import Sidebar from '../components/Sidebar';
 import Breadcrumbs from '../components/Breadcrumbs';
+import ThemeToggle from '../components/ThemeToggle';
 import GsapRevealGroup from '../components/GsapRevealGroup';
 import GsapFloatingPanel from '../components/GsapFloatingPanel';
 import GsapPageTransition from '../components/GsapPageTransition';
 import useAuth from '../hooks/useAuth';
 import useOnClickOutside from '../hooks/useOnClickOutside';
-import { UserOutlined, DownOutlined, LogoutOutlined, BellOutlined } from '@ant-design/icons';
+import {
+  UserOutlined,
+  DownOutlined,
+  LogoutOutlined,
+  BellOutlined,
+  MenuOutlined,
+} from '@ant-design/icons';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 
 const UNREAD_COUNT_POLL_MS = 60 * 1000;
+dayjs.extend(relativeTime);
 
 const DashboardLayout = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isTabletViewport, setIsTabletViewport] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(max-width: 1023px)').matches
+      : false,
+  );
+  const [tabletSidebarOpen, setTabletSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const { user, logout } = useAuth();
@@ -82,20 +98,84 @@ const DashboardLayout = () => {
     fetchNotifications().catch(() => setNotifications([]));
   }, [showNotifications]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const media = window.matchMedia('(max-width: 1023px)');
+    const handleChange = (event) => {
+      setIsTabletViewport(event.matches);
+    };
+
+    setIsTabletViewport(media.matches);
+    media.addEventListener('change', handleChange);
+
+    return () => {
+      media.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isTabletViewport) {
+      setTabletSidebarOpen(false);
+      return;
+    }
+
+    setSidebarCollapsed(false);
+  }, [isTabletViewport]);
+
+  useEffect(() => {
+    if (!isTabletViewport) return;
+    setTabletSidebarOpen(false);
+  }, [isTabletViewport, location.pathname]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    if (!isTabletViewport) return undefined;
+
+    const originalOverflow = document.body.style.overflow;
+    if (tabletSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isTabletViewport, tabletSidebarOpen]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
-      <div className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-gray-200 bg-white/90 px-4 backdrop-blur-md md:px-6">
+    <div className="flex min-h-screen flex-col" style={{ background: 'var(--app-bg)' }}>
+      <div
+        className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b px-4 backdrop-blur-md md:px-6"
+        style={{
+          borderColor: 'var(--app-border)',
+          background: 'var(--app-bg-soft)',
+        }}
+      >
         <GsapRevealGroup
           className="flex w-full items-center justify-between"
           animateKey="dashboard-layout-header"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+            <button
+              type="button"
+              onClick={() => setTabletSidebarOpen((prev) => !prev)}
+              className="theme-surface-muted theme-text-secondary flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 lg:hidden"
+              aria-label={tabletSidebarOpen ? 'Close navigation' : 'Open navigation'}
+            >
+              <MenuOutlined className="text-base" />
+            </button>
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-xl"
+              style={{
+                background: 'var(--brand-primary-soft)',
+                color: 'var(--brand-primary)',
+              }}
+            >
               <svg
                 className="h-5 w-5"
                 viewBox="0 0 24 24"
@@ -106,189 +186,244 @@ const DashboardLayout = () => {
               </svg>
             </div>
             <div className="leading-tight">
-              <div className="text-sm font-semibold text-gray-900">EPR Kavach</div>
-              <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-gray-500">
+              <div className="theme-text-primary text-sm font-semibold">EPR Kavach</div>
+              <div className="theme-text-muted text-[10px] font-medium uppercase tracking-[0.16em]">
                 Audit Platform
               </div>
             </div>
           </div>
 
           <div className="flex items-center justify-end gap-2">
-          <div className="relative" ref={notificationRef}>
-            <button
-              type="button"
-              onClick={() => setShowNotifications((prev) => !prev)}
-              className="relative flex h-10 w-10 items-center justify-center rounded-xl hover:bg-gray-50 transition-all duration-200"
-              aria-label="Notifications"
-            >
-              <BellOutlined className="text-base text-gray-500" />
-              {unreadCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white shadow">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
-            </button>
+            <ThemeToggle />
 
-            {showNotifications && (
-              <GsapFloatingPanel
-                animateKey={`notifications-${notifications.length}-${unreadCount}`}
-                className="absolute right-0 mt-2 w-80 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl"
+            <div className="relative" ref={notificationRef}>
+              <button
+                type="button"
+                onClick={() => setShowNotifications((prev) => !prev)}
+                className="theme-surface-muted theme-text-secondary relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200"
+                aria-label="Notifications"
               >
-                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-                  <p className="text-sm font-semibold text-gray-900">Notifications</p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        await api.patch(API_ENDPOINTS.NOTIFICATION.MARK_ALL_READ);
-                        await fetchUnreadCount();
-                        await fetchNotifications();
-                      } finally {
-                        setShowNotifications(false);
-                      }
-                    }}
-                    className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+                <BellOutlined className="text-base" />
+                {unreadCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white shadow">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <GsapFloatingPanel
+                  animateKey={`notifications-${notifications.length}-${unreadCount}`}
+                  className="theme-surface absolute right-0 mt-2 w-[min(20rem,calc(100vw-1rem))] overflow-hidden rounded-xl"
+                >
+                  <div
+                    className="flex items-center justify-between border-b px-4 py-3"
+                    style={{ borderColor: 'var(--app-border)' }}
                   >
-                    Mark all read
-                  </button>
-                </div>
+                    <p className="theme-text-primary text-sm font-semibold">Notifications</p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await api.patch(API_ENDPOINTS.NOTIFICATION.MARK_ALL_READ);
+                          await fetchUnreadCount();
+                          await fetchNotifications();
+                        } finally {
+                          setShowNotifications(false);
+                        }
+                      }}
+                      className="text-xs font-semibold transition-colors"
+                      style={{ color: 'var(--brand-primary)' }}
+                    >
+                      Mark all read
+                    </button>
+                  </div>
 
-                <div className="max-h-96 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-sm text-gray-500">No notifications</div>
-                  ) : (
-                    notifications.map((n) => {
-                      const isUnread = !n?.readAt;
-                      const title = (n?.title || '').trim() || 'Notification';
-                      const message = (n?.message || '').trim();
-                      const when = n?.createdAt ? new Date(n.createdAt).toLocaleString() : '';
+                  <div className="max-h-96 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="theme-text-secondary px-4 py-6 text-center text-sm">
+                        No notifications
+                      </div>
+                    ) : (
+                      notifications.map((n) => {
+                        const isUnread = !n?.readAt;
+                        const title = (n?.title || '').trim() || 'Notification';
+                        const message = (n?.message || '').trim();
+                        const when = n?.createdAt ? dayjs(n.createdAt).fromNow() : '';
 
-                      return (
-                        <button
-                          key={n?._id}
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              if (isUnread && n?._id) {
-                                await api.patch(API_ENDPOINTS.NOTIFICATION.MARK_READ(n._id));
+                        return (
+                          <button
+                            key={n?._id}
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                if (isUnread && n?._id) {
+                                  await api.patch(API_ENDPOINTS.NOTIFICATION.MARK_READ(n._id));
+                                }
+                                await fetchUnreadCount();
+                                if (n?.linkPath) {
+                                  navigate(n.linkPath);
+                                }
+                              } finally {
+                                setShowNotifications(false);
                               }
-                              await fetchUnreadCount();
-                              if (n?.linkPath) {
-                                navigate(n.linkPath);
-                              }
-                            } finally {
-                              setShowNotifications(false);
-                            }
-                          }}
-                          className={`w-full px-4 py-3 text-left transition-colors hover:bg-gray-50 ${
-                            isUnread ? 'bg-orange-50/40' : 'bg-white'
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div
-                              className={`mt-1 h-2.5 w-2.5 rounded-full ${
-                                isUnread ? 'bg-orange-500' : 'bg-gray-200'
-                              }`}
-                            />
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-gray-900">{title}</p>
-                              {message && (
-                                <p className="mt-0.5 text-xs text-gray-600 whitespace-normal break-words">{message}</p>
-                              )}
-                              {when && <p className="mt-1 text-[10px] text-gray-400">{when}</p>}
+                            }}
+                            className="w-full px-4 py-3 text-left transition-colors"
+                            style={{
+                              background: isUnread ? 'var(--brand-primary-soft)' : 'transparent',
+                            }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div
+                                className="mt-1 h-2.5 w-2.5 rounded-full"
+                                style={{
+                                  background: isUnread ? 'var(--brand-primary)' : 'var(--app-border)',
+                                }}
+                              />
+                              <div className="min-w-0">
+                                <p className="theme-text-primary truncate text-sm font-semibold">
+                                  {title}
+                                </p>
+                                {message && (
+                                  <p className="theme-text-secondary mt-0.5 whitespace-normal break-words text-xs">
+                                    {message}
+                                  </p>
+                                )}
+                                {when && <p className="theme-text-muted mt-1 text-[10px]">{when}</p>}
+                              </div>
                             </div>
-                          </div>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </GsapFloatingPanel>
-            )}
-          </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </GsapFloatingPanel>
+              )}
+            </div>
 
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="group flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-gray-50 transition-all duration-200"
-            >
-              <div className="hidden text-right leading-tight md:block">
-                <p className="text-sm font-semibold text-gray-800">{user?.name}</p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
-              </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-md transition-transform group-hover:scale-105">
-                <UserOutlined className="text-sm" />
-              </div>
-              <DownOutlined
-                className={`text-[10px] text-gray-400 transition-transform ${
-                  showDropdown ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-
-            {showDropdown && (
-              <GsapFloatingPanel
-                animateKey={`user-dropdown-${showDropdown}`}
-                className="absolute right-0 mt-2 w-64 rounded-xl border border-gray-100 bg-white py-2 shadow-xl"
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="group theme-panel flex items-center gap-3 rounded-xl px-3 py-2 transition-all duration-200"
               >
-                <div className="border-b border-gray-100 px-4 py-3">
-                  <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
-                  <p className="text-xs text-gray-500">{user?.email}</p>
-                  <span className="mt-2 inline-block rounded-full bg-orange-50 px-3 py-1 text-[11px] font-semibold text-orange-600">
-                    {(() => {
+                <div className="hidden text-right leading-tight md:block">
+                  <p className="theme-text-primary text-sm font-semibold">{user?.name}</p>
+                  <p className="theme-text-secondary text-xs">{user?.email}</p>
+                </div>
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-md transition-transform group-hover:scale-105"
+                  style={{ background: 'linear-gradient(135deg, #f97316, var(--brand-primary))' }}
+                >
+                  <UserOutlined className="text-sm" />
+                </div>
+                <DownOutlined
+                  className={`theme-text-muted text-[10px] transition-transform ${
+                    showDropdown ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              {showDropdown && (
+                <GsapFloatingPanel
+                  animateKey={`user-dropdown-${showDropdown}`}
+                  className="theme-surface absolute right-0 mt-2 w-[min(16rem,calc(100vw-1rem))] rounded-xl py-2"
+                >
+                  <div className="border-b px-4 py-3" style={{ borderColor: 'var(--app-border)' }}>
+                    <p className="theme-text-primary text-sm font-semibold">{user?.name}</p>
+                    <p className="theme-text-secondary text-xs">{user?.email}</p>
+                    <span
+                      className="mt-2 inline-block rounded-full px-3 py-1 text-[11px] font-semibold"
+                      style={{
+                        background: 'var(--brand-primary-soft)',
+                        color: 'var(--brand-primary)',
+                      }}
+                    >
+                      {(() => {
                         const r = user?.role?.name || user?.role || 'User';
                         if (r === 'ADMIN') return 'Administrator';
                         if (r === 'SUPER ADMIN') return 'Super Administrator';
                         if (r === 'MANAGER') return 'Manager';
                         if (r === 'USER') return 'User';
                         return r;
-                    })()}
-                  </span>
-                </div>
+                      })()}
+                    </span>
+                  </div>
 
-                <button
-                  onClick={() => {
-                    setShowDropdown(false);
-                    navigate('/dashboard/profile');
-                  }}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 text-gray-600">
-                    <UserOutlined className="text-xs" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Profile</p>
-                    <p className="text-xs text-gray-500">View and edit profile</p>
-                  </div>
-                </button>
+                  <button
+                    onClick={() => {
+                      setShowDropdown(false);
+                      navigate('/dashboard/profile');
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors"
+                  >
+                    <div className="theme-surface-muted theme-text-secondary flex h-8 w-8 items-center justify-center rounded-lg">
+                      <UserOutlined className="text-xs" />
+                    </div>
+                    <div>
+                      <p className="theme-text-primary text-sm font-medium">Profile</p>
+                      <p className="theme-text-secondary text-xs">View and edit profile</p>
+                    </div>
+                  </button>
 
-                <button
-                  onClick={() => {
-                    setShowDropdown(false);
-                    handleLogout();
-                  }}
-                  className="mt-1 flex w-full items-center gap-3 border-t border-gray-100 px-4 py-3 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600">
-                    <LogoutOutlined className="text-xs" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Logout</p>
-                    <p className="text-xs text-gray-500">Sign out of your account</p>
-                  </div>
-                </button>
-              </GsapFloatingPanel>
-            )}
-          </div>
+                  <button
+                    onClick={() => {
+                      setShowDropdown(false);
+                      handleLogout();
+                    }}
+                    className="mt-1 flex w-full items-center gap-3 border-t px-4 py-3 text-left text-sm text-red-600 transition-colors"
+                    style={{ borderColor: 'var(--app-border)' }}
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600">
+                      <LogoutOutlined className="text-xs" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Logout</p>
+                      <p className="theme-text-secondary text-xs">Sign out of your account</p>
+                    </div>
+                  </button>
+                </GsapFloatingPanel>
+              )}
+            </div>
           </div>
         </GsapRevealGroup>
       </div>
 
-      <div className="flex pt-16 h-screen overflow-hidden">
+      <div className="flex h-screen overflow-x-visible overflow-y-hidden pt-16">
+        {isTabletViewport && (
+          <>
+            <div
+              className={`fixed inset-0 z-40 bg-slate-950/35 transition-opacity duration-200 ${
+                tabletSidebarOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+              }`}
+              style={{ top: '4rem' }}
+              onClick={() => setTabletSidebarOpen(false)}
+              aria-hidden="true"
+            />
+            <div
+              className={`fixed inset-y-16 left-0 z-50 w-[17rem] max-w-[86vw] border-r shadow-2xl transition-transform duration-200 lg:hidden ${
+                tabletSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+              }`}
+              style={{
+                borderColor: 'var(--app-border)',
+                background: 'var(--app-bg-elevated)',
+              }}
+            >
+              <Sidebar
+                collapsed={false}
+                onToggleCollapse={() => setTabletSidebarOpen(false)}
+              />
+            </div>
+          </>
+        )}
+
         <div
-          className={`z-40 flex-shrink-0 border-r border-gray-100 bg-slate-50 shadow-sm transition-all duration-200 ${
+          className={`relative z-40 hidden flex-shrink-0 overflow-visible border-r transition-all duration-200 lg:flex ${
             sidebarCollapsed ? 'w-16' : 'w-64'
           }`}
+          style={{
+            borderColor: 'var(--app-border)',
+            background: 'var(--app-bg-elevated)',
+          }}
         >
           <Sidebar
             collapsed={sidebarCollapsed}
@@ -296,11 +431,16 @@ const DashboardLayout = () => {
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
-          <Breadcrumbs />
-          <GsapPageTransition transitionKey={location.pathname} className="min-h-[calc(100vh-7rem)]">
-            <Outlet />
-          </GsapPageTransition>
+        <div
+          className="flex-1 overflow-y-auto p-3 md:p-4 lg:p-5 2xl:p-6"
+          style={{ background: 'var(--app-bg)' }}
+        >
+          <div className="mx-auto w-full max-w-[1680px] xl:max-w-[1540px] 2xl:max-w-[1760px]">
+            <Breadcrumbs />
+            <GsapPageTransition transitionKey={location.pathname} className="min-h-[calc(100vh-7rem)]">
+              <Outlet />
+            </GsapPageTransition>
+          </div>
         </div>
       </div>
     </div>

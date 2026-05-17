@@ -1,5 +1,6 @@
 import RoleModel from "../models/role.model.js";
 import UserModel from "../models/user.model.js";
+import logger from "./logger.js";
 
 export const seedRoles = async () => {
   try {
@@ -14,7 +15,7 @@ export const seedRoles = async () => {
           name: roleName,
           description: `Default ${roleName} role`,
         });
-        console.log(`Created role: ${roleName}`);
+        logger.info({ roleName }, `Created role: ${roleName}`);
       }
       roleDocs[roleName] = role;
     }
@@ -42,7 +43,7 @@ export const seedRoles = async () => {
             { _id: user._id },
             { $set: { role: roleDocs[roleName]._id } },
           );
-          console.log(
+          logger.info(
             `Migrated user ${user.email} to role ${roleName} (ID: ${roleDocs[roleName]._id})`,
           );
         } else {
@@ -51,7 +52,7 @@ export const seedRoles = async () => {
             { _id: user._id },
             { $set: { role: roleDocs["USER"]._id } },
           );
-          console.log(`Migrated user ${user.email} to default USER role`);
+          logger.info(`Migrated user ${user.email} to default USER role`);
         }
       } else if (!user.role) {
         // No role, assign USER
@@ -59,12 +60,12 @@ export const seedRoles = async () => {
           { _id: user._id },
           { $set: { role: roleDocs["USER"]._id } },
         );
-        console.log(`Assigned default USER role to ${user.email}`);
+        logger.info(`Assigned default USER role to ${user.email}`);
       }
     }
 
-    console.log("Role seeding and migration completed.");
+    logger.info("Role seeding and migration completed.");
   } catch (error) {
-    console.error("Error seeding roles:", error);
+    logger.error({ err: error }, "Error seeding roles");
   }
 };

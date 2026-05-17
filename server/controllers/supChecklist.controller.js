@@ -1,4 +1,5 @@
 import SingleUsePlasticChecklistModel from "../models/singleUsePlasticChecklist.model.js";
+import logger from "../utils/logger.js";
 
 export const getSingleUsePlasticChecklistController = async (req, res) => {
     try {
@@ -32,7 +33,7 @@ export const getSingleUsePlasticChecklistController = async (req, res) => {
             hasDoc: !!doc
         });
     } catch (error) {
-        console.error("Error fetching SUP checklist:", error);
+        logger.error({ err: error }, "Error fetching SUP checklist");
         return res.status(500).json({
             success: false,
             message: "Error fetching checklist data"
@@ -88,7 +89,7 @@ export const saveSingleUsePlasticChecklistController = async (req, res) => {
             data: savedRows
         });
     } catch (error) {
-        console.error("Error saving SUP checklist:", error);
+        logger.error({ err: error }, "Error saving SUP checklist");
         return res.status(500).json({
             success: false,
             message: "Error saving checklist data"

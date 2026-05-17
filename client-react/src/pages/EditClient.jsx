@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { API_ENDPOINTS } from '../services/apiEndpoints';
 import DocumentViewerModal from '../components/DocumentViewerModal';
+import { getClientDetailQueryKey } from '../hooks/queries/useClientDetailQuery';
 
 const EditClient = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { id } = useParams();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -785,6 +788,18 @@ const EditClient = () => {
       const response = await api.put(API_ENDPOINTS.CLIENT.UPDATE(id), clientData);
 
       if (response.data.success) {
+        const updatedClient = response.data?.data || { ...client, ...clientData };
+        setClient((prev) => ({
+          ...(prev || {}),
+          ...updatedClient,
+          financialYear: updatedClient.financialYear || clientData.financialYear || prev?.financialYear || '',
+        }));
+        setFormData((prev) => ({
+          ...prev,
+          financialYear: updatedClient.financialYear || clientData.financialYear || prev.financialYear || '',
+        }));
+        queryClient.setQueryData(getClientDetailQueryKey(id), updatedClient);
+        queryClient.invalidateQueries({ queryKey: getClientDetailQueryKey(id) });
         setSuccess('Client updated successfully!');
         setTimeout(() => {
           navigate(`/dashboard/client/${id}`);

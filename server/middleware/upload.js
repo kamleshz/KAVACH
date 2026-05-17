@@ -2,6 +2,7 @@ import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import logger from "../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,18 +13,21 @@ const uploadDir = path.join(process.cwd(), "uploads");
 try {
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
-    console.log(
+    logger.info(
       `[Upload Middleware] Created uploads directory at: ${uploadDir}`,
     );
   } else {
-    console.log(
+    logger.debug(
       `[Upload Middleware] Uploads directory exists at: ${uploadDir}`,
     );
   }
 } catch (error) {
-  console.error(
-    `[Upload Middleware] Failed to check/create uploads directory at ${uploadDir}:`,
-    error,
+  logger.error(
+    {
+      err: error,
+      uploadDir,
+    },
+    `[Upload Middleware] Failed to check/create uploads directory at ${uploadDir}`,
   );
 }
 
@@ -33,11 +37,11 @@ const storage = multer.diskStorage({
     if (!fs.existsSync(uploadDir)) {
       try {
         fs.mkdirSync(uploadDir, { recursive: true });
-        console.log(
+        logger.warn(
           `[Multer] Re-created missing uploads directory at: ${uploadDir}`,
         );
       } catch (err) {
-        console.error(`[Multer] Failed to re-create uploads directory:`, err);
+        logger.error({ err, uploadDir }, `[Multer] Failed to re-create uploads directory`);
         return cb(err);
       }
     }

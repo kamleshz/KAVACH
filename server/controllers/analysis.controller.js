@@ -5,6 +5,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import PdfService from "../services/pdf.service.js";
 import CacheService from "../services/cache.service.js";
 import PlasticAnalysisModel from "../models/plasticAnalysis.model.js";
+import logger from "../utils/logger.js";
 
 const ANALYSIS_CACHE_PREFIX = "analysis:";
 const makeAnalysisCacheKey = (scope, clientId, type, itemId) =>
@@ -39,7 +40,7 @@ export const analyzePlasticPrePost = async (req, res) => {
       fs.unlinkSync(salesFile.path);
       if (purchaseFile) fs.unlinkSync(purchaseFile.path);
     } catch (cleanupErr) {
-      console.error("Error cleaning up input files:", cleanupErr);
+      logger.error({ err: cleanupErr }, "Error cleaning up input files");
     }
 
     // Return the result
@@ -54,7 +55,7 @@ export const analyzePlasticPrePost = async (req, res) => {
       `${ANALYSIS_CACHE_PREFIX}plastic-prepost:${clientId}:${type}:${itemId}`,
     );
   } catch (error) {
-    console.error("Analysis Error:", error);
+    logger.error({ err: error }, "Analysis Error");
     res
       .status(500)
       .json({ message: error.message || "Error processing analysis files" });
@@ -103,7 +104,7 @@ export const getPlasticAnalysisController = async (req, res) => {
     await CacheService.setCache(cacheKey, payload, CacheService.ttl.analytics);
     res.status(200).json(payload);
   } catch (error) {
-    console.error("Get Analysis Error:", error);
+    logger.error({ err: error }, "Get Analysis Error");
     res
       .status(500)
       .json({ message: error.message || "Error fetching analysis data" });
@@ -142,7 +143,7 @@ export const saveSalesAnalysisController = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error("Save Sales Analysis Error:", error);
+    logger.error({ err: error }, "Save Sales Analysis Error");
     res
       .status(500)
       .json({ message: error.message || "Error saving sales analysis" });
@@ -185,7 +186,7 @@ export const getSalesAnalysisController = async (req, res) => {
     await CacheService.setCache(cacheKey, payload, CacheService.ttl.analytics);
     res.status(200).json(payload);
   } catch (error) {
-    console.error("Get Sales Analysis Error:", error);
+    logger.error({ err: error }, "Get Sales Analysis Error");
     res
       .status(500)
       .json({ message: error.message || "Error fetching sales analysis data" });
@@ -216,7 +217,7 @@ export const savePurchaseAnalysisController = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error("Save Purchase Analysis Error:", error);
+    logger.error({ err: error }, "Save Purchase Analysis Error");
     res
       .status(500)
       .json({ message: error.message || "Error saving purchase analysis" });
@@ -259,7 +260,7 @@ export const getPurchaseAnalysisController = async (req, res) => {
     await CacheService.setCache(cacheKey, payload, CacheService.ttl.analytics);
     res.status(200).json(payload);
   } catch (error) {
-    console.error("Get Purchase Analysis Error:", error);
+    logger.error({ err: error }, "Get Purchase Analysis Error");
     res.status(500).json({
       message: error.message || "Error fetching purchase analysis data",
     });
@@ -296,7 +297,9 @@ export const generatePlasticComplianceReportController =
 export const generatePlasticSummaryReportController = queueReport("summary");
 
 export const getReportJobStatusController = asyncHandler(async (req, res) => {
-  const status = await PdfService.getJobStatus(req.params.jobId);
+  const status = await PdfService.getJobStatus(req.params.jobId, {
+    userId: req.userId,
+  });
   if (!status) {
     return res
       .status(404)
@@ -311,8 +314,16 @@ export const getReportJobStatusController = asyncHandler(async (req, res) => {
 
 export const downloadReportByJobIdController = asyncHandler(
   async (req, res) => {
-    const status = await PdfService.getJobStatus(req.params.jobId);
-    if (!status || status.state !== "completed") {
+    const status = await PdfService.getJobStatus(req.params.jobId, {
+      userId: req.userId,
+    });
+    if (!status) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report job not found" });
+    }
+
+    if (status.state !== "completed") {
       return res
         .status(409)
         .json({ success: false, message: "Report is not ready yet" });
@@ -330,6 +341,9 @@ export const downloadReportByJobIdController = asyncHandler(
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${fileName}"`,
       "Content-Length": buffer.length,
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      Pragma: "no-cache",
+      "X-Content-Type-Options": "nosniff",
     });
 
     return res.send(buffer);
@@ -358,7 +372,11 @@ export const listAnalysisSnapshotsController = asyncHandler(
 
 export const listReportsController = asyncHandler(async (req, res) => {
   const { page, limit } = req.pagination;
-  const { data, total } = await PdfService.listReportJobs({ page, limit });
+  const { data, total } = await PdfService.listReportJobs({
+    page,
+    limit,
+    userId: req.userId,
+  });
   return res.status(200).json({
     success: true,
     ...res.paginate({ data, total }),

@@ -104,13 +104,13 @@ const WasteTypeSelection = () => {
   ];
 
   return (
-    <div className="min-h-[80vh] flex flex-col p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl">
-      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between animate-fadeIn w-full mx-auto px-4">
+    <div className="min-h-[80vh] flex flex-col p-4 md:p-5 2xl:p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl">
+      <div className="mb-6 md:mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between animate-fadeIn w-full mx-auto px-2 md:px-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-orange-500">
             Welcome Back
           </p>
-          <h1 className="mt-2 text-2xl md:text-3xl font-bold text-gray-900">
+          <h1 className="mt-2 text-xl md:text-2xl 2xl:text-3xl font-bold text-gray-900">
             {user?.name || 'User'}
           </h1>
         </div>
@@ -122,20 +122,20 @@ const WasteTypeSelection = () => {
         </div>
       </div>
 
-      <div className="w-full mx-auto flex-grow flex flex-col justify-center px-4">
+      <div className="w-full mx-auto flex-grow flex flex-col justify-center px-2 md:px-4">
         {/* Row 1: 3 Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mb-6 md:mb-8">
             {wasteTypes.slice(0, 3).map((type, idx) => (
               <div 
                 key={type.id}
                 onClick={() => handleSelect(type.id)}
-                className={`relative bg-white rounded-xl shadow-lg hover:shadow-xl border-2 ${type.borderColor} ${type.cardBorderColor} transition-all duration-300 cursor-pointer group overflow-hidden animate-slideUp h-[280px] flex flex-col items-center justify-center text-center p-6 w-full transform hover:-translate-y-1`}
+                className={`relative bg-white rounded-xl shadow-lg hover:shadow-xl border-2 ${type.borderColor} ${type.cardBorderColor} transition-all duration-300 cursor-pointer group overflow-hidden animate-slideUp h-[260px] md:h-[280px] flex flex-col items-center justify-center text-center p-5 md:p-6 w-full transform hover:-translate-y-1`}
                 style={{ animationDelay: `${idx * 100}ms` }}
               >
                 <div className={`absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r ${type.gradient} transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left`}></div>
                 <div className="flex flex-col h-full justify-between p-2 w-full">
                     <div className="flex justify-between items-start w-full">
-                       <div className={`w-14 h-14 ${type.iconBg} rounded-2xl flex items-center justify-center transition-all duration-300 shadow-sm group-hover:scale-110`}>
+                       <div className={`w-12 h-12 md:w-14 md:h-14 ${type.iconBg} rounded-2xl flex items-center justify-center transition-all duration-300 shadow-sm group-hover:scale-110`}>
                           <type.icon className={`text-2xl ${type.color}`} />
                        </div>
                        {!['plastic', 'ewaste'].includes(type.id) && (
@@ -146,7 +146,7 @@ const WasteTypeSelection = () => {
                     </div>
                     
                     <div className="text-left mt-4">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-primary-600 transition-colors">{type.title}</h3>
+                        <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-primary-600 transition-colors">{type.title}</h3>
                         <p className="text-sm text-gray-500 leading-relaxed">
                            {type.description}
                         </p>
@@ -170,18 +170,18 @@ const WasteTypeSelection = () => {
 
         {/* Row 2: 2 Cards (Centered) */}
         <div className="flex justify-center">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full lg:w-5/6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 w-full lg:w-5/6">
                 {wasteTypes.slice(3, 5).map((type, idx) => (
                   <div 
                     key={type.id}
                     onClick={() => handleSelect(type.id)}
-                    className={`relative bg-white rounded-xl shadow-lg hover:shadow-xl border-2 ${type.borderColor} ${type.cardBorderColor} transition-all duration-300 cursor-pointer group overflow-hidden animate-slideUp h-[280px] flex flex-col items-center justify-center text-center p-6 w-full transform hover:-translate-y-1`}
+                    className={`relative bg-white rounded-xl shadow-lg hover:shadow-xl border-2 ${type.borderColor} ${type.cardBorderColor} transition-all duration-300 cursor-pointer group overflow-hidden animate-slideUp h-[260px] md:h-[280px] flex flex-col items-center justify-center text-center p-5 md:p-6 w-full transform hover:-translate-y-1`}
                     style={{ animationDelay: `${(idx + 3) * 100}ms` }}
                   >
                 <div className={`absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r ${type.gradient} transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left`}></div>
                 <div className="flex flex-col h-full justify-between p-2 w-full">
                     <div className="flex justify-between items-start w-full">
-                       <div className={`w-14 h-14 ${type.iconBg} rounded-2xl flex items-center justify-center transition-all duration-300 shadow-sm group-hover:scale-110`}>
+                       <div className={`w-12 h-12 md:w-14 md:h-14 ${type.iconBg} rounded-2xl flex items-center justify-center transition-all duration-300 shadow-sm group-hover:scale-110`}>
                           <type.icon className={`text-2xl ${type.color}`} />
                        </div>
                        {!['plastic', 'ewaste'].includes(type.id) && (
@@ -192,7 +192,7 @@ const WasteTypeSelection = () => {
                     </div>
                     
                     <div className="text-left mt-4">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-primary-600 transition-colors">{type.title}</h3>
+                        <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-primary-600 transition-colors">{type.title}</h3>
                         <p className="text-sm text-gray-500 leading-relaxed">
                            {type.description}
                         </p>
