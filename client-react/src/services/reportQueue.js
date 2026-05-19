@@ -20,12 +20,26 @@ export const queueReportAndDownload = async ({
   type,
   itemId,
   filename,
+  queryParams = {},
   pollAttempts = 20,
   pollIntervalMs = 2000,
   onStatus,
 }) => {
+  const params = new URLSearchParams({
+    type,
+    itemId,
+  });
+  Object.entries(queryParams || {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    if (Array.isArray(value)) {
+      if (value.length) params.set(key, value.join(","));
+      return;
+    }
+    params.set(key, String(value));
+  });
+
   const enqueueResponse = await api.get(
-    `${reportEndpoint(clientId)}?type=${type}&itemId=${itemId}`,
+    `${reportEndpoint(clientId)}?${params.toString()}`,
   );
   const jobId = enqueueResponse.data?.data?.jobId;
 

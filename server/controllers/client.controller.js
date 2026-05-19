@@ -725,15 +725,16 @@ export const getAllProductComplianceRowsController = async (req, res) => {
       }
     });
 
-    // Deduplicate by skuCode
+    // Deduplicate by skuCode + componentCode to keep all components per SKU
     const uniqueRows = [];
-    const seenSkus = new Set();
+    const seenKeys = new Set();
 
     allRows.forEach((row) => {
-      // Normalize skuCode for comparison (trim)
       const skuCode = (row.skuCode || "").trim();
-      if (skuCode && !seenSkus.has(skuCode)) {
-        seenSkus.add(skuCode);
+      const componentCode = (row.componentCode || "").trim();
+      const key = `${skuCode}::${componentCode}`;
+      if (skuCode && !seenKeys.has(key)) {
+        seenKeys.add(key);
         uniqueRows.push(row);
       }
     });
@@ -743,6 +744,172 @@ export const getAllProductComplianceRowsController = async (req, res) => {
       error: false,
       success: true,
       data: uniqueRows,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message || "Internal server error",
+      error: true,
+      success: false,
+    });
+  }
+};
+
+const normalizeSupplierComplianceRowsForDoc = (doc) => {
+  const normalizeSystemCode = (value) =>
+    (value || "").toString().replace(/\s+/g, "").toLowerCase();
+  const extractComponentCode = (value) => {
+    const raw = (value || "").toString();
+    if (!raw) return "";
+    const parts = raw
+      .split("|")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    return parts.length >= 2 ? parts[1] : "";
+  };
+
+  const systemCodeMap = new Map();
+  (doc?.rows || []).forEach((row) => {
+    const key = normalizeSystemCode(row?.systemCode);
+    if (!key) return;
+    systemCodeMap.set(key, {
+      componentCode: row?.componentCode || "",
+      componentDescription: row?.componentDescription || "",
+      supplierName: row?.supplierName || "",
+      supplierState: row?.supplierState || "",
+      supplierType: row?.supplierType || "",
+      skuCode: row?.skuCode || "",
+    });
+  });
+  (doc?.componentDetails || []).forEach((row) => {
+    const key = normalizeSystemCode(row?.systemCode);
+    if (!key) return;
+    const existing = systemCodeMap.get(key) || {};
+    systemCodeMap.set(key, {
+      ...existing,
+      componentCode: row?.componentCode || existing.componentCode || "",
+      componentDescription:
+        row?.componentDescription || existing.componentDescription || "",
+      supplierName: row?.supplierName || existing.supplierName || "",
+      skuCode: row?.skuCode || existing.skuCode || "",
+    });
+  });
+
+  return (doc?.supplierCompliance || []).map((row) => {
+    const key = normalizeSystemCode(row?.systemCode);
+    const mapped = systemCodeMap.get(key) || {};
+    const parsedComponentCode = extractComponentCode(row?.systemCode);
+    return {
+      ...(row.toObject?.() || row),
+      skuCode: mapped.skuCode || row?.skuCode || "",
+      componentCode:
+        mapped.componentCode || parsedComponentCode || row?.componentCode || "",
+      componentDescription:
+        mapped.componentDescription || row?.componentDescription || "",
+      supplierName: mapped.supplierName || row?.supplierName || "",
+      supplierState: mapped.supplierState || row?.supplierState || "",
+      supplierType: mapped.supplierType || row?.supplierType || "",
+    };
+  });
+};
+
+export const getAllProductComponentDetailsController = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const docs = await ProductComplianceModel.find({ client: clientId });
+
+    const allRows = docs.flatMap((doc) =>
+      Array.isArray(doc?.componentDetails)
+        ? doc.componentDetails
+            .filter((row) => row && typeof row === "object")
+            .map((row) => row.toObject?.() || row)
+        : [],
+    );
+
+    return res.status(200).json({
+      message: "All component details fetched",
+      error: false,
+      success: true,
+      data: allRows,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message || "Internal server error",
+      error: true,
+      success: false,
+    });
+  }
+};
+
+export const getAllProductSupplierComplianceController = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const docs = await ProductComplianceModel.find({ client: clientId });
+
+    const allRows = docs.flatMap((doc) =>
+      normalizeSupplierComplianceRowsForDoc(doc).filter(
+        (row) => row && typeof row === "object",
+      ),
+    );
+
+    return res.status(200).json({
+      message: "All supplier compliance rows fetched",
+      error: false,
+      success: true,
+      data: allRows,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message || "Internal server error",
+      error: true,
+      success: false,
+    });
+  }
+};
+
+export const getAllRecycledQuantityUsedController = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const docs = await ProductComplianceModel.find({ client: clientId });
+
+    const allRows = docs.flatMap((doc) =>
+      Array.isArray(doc?.recycledQuantityUsed)
+        ? doc.recycledQuantityUsed
+            .filter((row) => row && typeof row === "object")
+            .map((row) => row.toObject?.() || row)
+        : [],
+    );
+
+    return res.status(200).json({
+      message: "All recycled quantity rows fetched",
+      error: false,
+      success: true,
+      data: allRows,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message || "Internal server error",
+      error: true,
+      success: false,
+    });
+  }
+};
+
+export const getAllMonthlyProcurementRowsController = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const docs = await MonthlyProcurementModel.find({ client: clientId });
+
+    const allRows = docs.flatMap((doc) =>
+      serializeMonthlyProcurementRows(doc?.rows || []).filter(
+        (row) => row && typeof row === "object",
+      ),
+    );
+
+    return res.status(200).json({
+      message: "All monthly procurement rows fetched",
+      error: false,
+      success: true,
+      data: allRows,
     });
   } catch (error) {
     return res.status(500).json({
@@ -1189,6 +1356,8 @@ export const saveProductComponentDetailsController = asyncHandler(
         emitter,
         plantName,
       );
+
+      await invalidateComplianceSnapshotCache(clientId, type, itemId);
 
       return res.status(200).json({
         message: "Component details saved",

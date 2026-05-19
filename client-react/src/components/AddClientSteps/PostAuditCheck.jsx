@@ -2856,6 +2856,7 @@ const PostAuditCheck = ({
                               "Category II": 2,
                               "Category III": 3,
                               "Category IV": 4,
+                              "Category V": 5,
                             };
                             rows.sort((a, b) => {
                               const orderA = categoryOrder[a[0]] || 99;

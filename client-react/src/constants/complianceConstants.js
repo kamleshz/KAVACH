@@ -16,6 +16,7 @@ export const CATEGORIES = [
   'Category II',
   'Category III',
   'Category IV',
+  'Category V',
   'Not Applicable'
 ];
 

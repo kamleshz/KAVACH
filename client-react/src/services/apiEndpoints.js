@@ -31,6 +31,14 @@ export const API_ENDPOINTS = {
     PRODUCT_COMPLIANCE: (id) => `/api/client/${id}/product-compliance`,
     ALL_PRODUCT_COMPLIANCE_ROWS: (id) =>
       `/api/client/${id}/all-product-compliance-rows`,
+    ALL_PRODUCT_COMPONENT_DETAILS: (id) =>
+      `/api/client/${id}/all-product-component-details`,
+    ALL_PRODUCT_SUPPLIER_COMPLIANCE: (id) =>
+      `/api/client/${id}/all-product-supplier-compliance`,
+    ALL_RECYCLED_QUANTITY_USED: (id) =>
+      `/api/client/${id}/all-recycled-quantity-used`,
+    ALL_MONTHLY_PROCUREMENT: (id) =>
+      `/api/client/${id}/all-monthly-procurement`,
     PRODUCT_COMPLIANCE_UPLOAD: (id) =>
       `/api/client/${id}/product-compliance/upload-row`,
     PRODUCT_COMPLIANCE_HISTORY: (id) =>

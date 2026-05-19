@@ -42,6 +42,7 @@ const WASTE_CONFIG = {
 };
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
+const ALL_CLIENTS_VIEW = 'all';
 
 const getClientState = (client) =>
   client?.state ||
@@ -212,7 +213,9 @@ const Clients = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
+  const requestedView = searchParams.get('view');
   const requestedWasteType = searchParams.get('wasteType');
+  const isAllClientsView = requestedView === ALL_CLIENTS_VIEW;
   const currentWasteType = Object.values(WASTE_TYPES).includes(requestedWasteType)
     ? requestedWasteType
     : WASTE_TYPES.PLASTIC;
@@ -259,8 +262,9 @@ const Clients = () => {
   };
 
   const wasteTypeClients = useMemo(() => {
+    if (isAllClientsView) return clients;
     return clients.filter(client => (client.wasteType || WASTE_TYPES.PLASTIC) === currentWasteType);
-  }, [clients, currentWasteType]);
+  }, [clients, currentWasteType, isAllClientsView]);
 
   const uniqueEntityTypes = useMemo(() => {
     const types = wasteTypeClients.map(client => client.entityType).filter(Boolean);
@@ -423,8 +427,13 @@ const Clients = () => {
     return `Showing ${start} to ${end} of ${sortedClients.length} clients`;
   }, [currentPageClamped, pageSize, sortedClients.length]);
 
-  const currentWasteConfig = WASTE_CONFIG[currentWasteType] || WASTE_CONFIG[WASTE_TYPES.PLASTIC];
+  const currentWasteConfig = isAllClientsView
+    ? { color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', icon: FaUsers }
+    : WASTE_CONFIG[currentWasteType] || WASTE_CONFIG[WASTE_TYPES.PLASTIC];
   const PortfolioIcon = currentWasteConfig.icon;
+  const portfolioLabel = isAllClientsView ? 'All Client' : currentWasteType;
+  const portfolioSubtitleCount = wasteTypeClients.length;
+  const currentViewKey = isAllClientsView ? ALL_CLIENTS_VIEW : currentWasteType;
   const activeRole =
     typeof user?.role === 'string' ? user.role : user?.role?.name || 'TEAM MEMBER';
   const todayLabel = formatDashboardDate(new Date());
@@ -478,7 +487,7 @@ const Clients = () => {
     <div className="theme-page w-full space-y-4 lg:space-y-5">
       <GsapRevealGroup
         className="theme-page-card overflow-hidden rounded-[28px]"
-        animateKey={`clients-hero-${currentWasteType}`}
+        animateKey={`clients-hero-${currentViewKey}`}
       >
         <div className="flex flex-col gap-4 p-3 md:p-4 lg:p-5 2xl:p-6 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -503,13 +512,13 @@ const Clients = () => {
               </div>
               <div>
                 <h1 className="theme-page-title text-xl md:text-2xl font-bold tracking-tight">
-                  {currentWasteType} <span className="theme-page-brand">Portfolio</span>
+                  {portfolioLabel} <span className="theme-page-brand">Portfolio</span>
                 </h1>
                 <div className="theme-page-text mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                   <span className="theme-page-title font-semibold">{user?.name || 'Team Member'}</span>
                   <span>{activeRole}</span>
                   <span>{todayLabel}</span>
-                  <span>{wasteTypeClients.length} registered clients</span>
+                  <span>{portfolioSubtitleCount} registered clients</span>
                 </div>
               </div>
             </div>
@@ -522,8 +531,8 @@ const Clients = () => {
               </div>
               <div className="mt-2 flex items-end gap-2">
                 <GsapCountUp
-                  value={wasteTypeClients.length}
-                  animateKey={`clients-total-${currentWasteType}`}
+                  value={portfolioSubtitleCount}
+                  animateKey={`clients-total-${currentViewKey}`}
                   className="theme-page-title text-2xl font-bold"
                 />
                 <span className="theme-page-text pb-1 text-xs">clients</span>
@@ -536,7 +545,7 @@ const Clients = () => {
               <div className="mt-2 flex items-end gap-2">
                 <GsapCountUp
                   value={activeAuditsCount}
-                  animateKey={`clients-audits-${currentWasteType}`}
+                  animateKey={`clients-audits-${currentViewKey}`}
                   className="text-2xl font-bold text-emerald-600"
                 />
                 <span className="pb-1 text-xs text-emerald-500">running</span>
@@ -549,7 +558,7 @@ const Clients = () => {
               <div className="mt-2 flex items-end gap-2">
                 <GsapCountUp
                   value={filteredClients.length}
-                  animateKey={`clients-filtered-${currentWasteType}`}
+                  animateKey={`clients-filtered-${currentViewKey}`}
                   className="text-2xl font-bold"
                 />
                 <span className="pb-1 text-xs opacity-80">visible</span>
@@ -561,7 +570,7 @@ const Clients = () => {
 
       <GsapRevealGroup
         className="theme-page-card mb-4 lg:mb-5 rounded-[24px] p-3 md:p-4"
-        animateKey={`clients-filters-${currentWasteType}`}
+        animateKey={`clients-filters-${currentViewKey}`}
       >
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative flex-1 xl:max-w-md">
@@ -602,9 +611,11 @@ const Clients = () => {
             <div className="theme-page-card-muted flex h-11 items-center justify-between rounded-2xl px-4">
               <div className="theme-page-text flex items-center gap-2">
                 <PortfolioIcon className="text-sm" style={{ color: currentWasteConfig.color }} />
-                <span className="text-sm font-semibold">{currentWasteType}</span>
+                <span className="text-sm font-semibold">{portfolioLabel}</span>
               </div>
-              <span className="theme-page-title text-sm font-bold">{filteredStats[currentWasteType] || 0}</span>
+              <span className="theme-page-title text-sm font-bold">
+                {isAllClientsView ? filteredClients.length : filteredStats[currentWasteType] || 0}
+              </span>
             </div>
 
             <button
@@ -625,7 +636,7 @@ const Clients = () => {
 
       <GsapRevealGroup
         className="theme-page-card overflow-hidden rounded-[28px]"
-        animateKey={`clients-table-${currentWasteType}`}
+        animateKey={`clients-table-${currentViewKey}`}
       >
         <div className="px-3 pt-3 md:px-4 md:pt-4" style={{ borderBottom: '1px solid var(--app-border)' }}>
           <div className="flex flex-wrap items-center gap-2">
@@ -638,7 +649,7 @@ const Clients = () => {
               }}
             >
               <PortfolioIcon className="text-sm" style={{ color: currentWasteConfig.color }} />
-              <span>{currentWasteType}</span>
+              <span>{portfolioLabel}</span>
               <span className="rounded-full bg-white/90 px-2 py-0.5 text-xs text-gray-500">
                 {filteredClients.length}
               </span>
@@ -672,7 +683,7 @@ const Clients = () => {
                       </div>
                       <h3 className="mt-4 text-lg font-semibold text-gray-900">No clients found</h3>
                       <p className="mt-1 text-sm text-gray-500">
-                        Try changing the search, entity type, assignee, or waste type filters.
+                        Try changing the search, entity type, or assignee filters.
                       </p>
                       {!searchTerm && typeFilter === 'All' && assigneeFilter === 'All' && (
                         <button
@@ -695,6 +706,16 @@ const Clients = () => {
                   const contactPhone = getContactPhone(client);
                   const state = getClientState(client);
                   const subtitle = getClientSubtitle(client);
+                  const clientWasteType = client.wasteType || WASTE_TYPES.PLASTIC;
+                  const rowWasteConfig =
+                    WASTE_CONFIG[clientWasteType] || WASTE_CONFIG[WASTE_TYPES.PLASTIC];
+                  const RowIcon = isAllClientsView ? rowWasteConfig.icon : PortfolioIcon;
+                  const rowBgColor = isAllClientsView
+                    ? rowWasteConfig.bg
+                    : currentWasteConfig.bg;
+                  const rowIconColor = isAllClientsView
+                    ? rowWasteConfig.color
+                    : currentWasteConfig.color;
 
                   return (
                     <tr key={client._id} className="group transition hover:bg-gray-50/70">
@@ -706,11 +727,11 @@ const Clients = () => {
                         >
                           <div
                             className="flex h-11 w-11 items-center justify-center rounded-2xl"
-                            style={{ backgroundColor: currentWasteConfig.bg }}
+                            style={{ backgroundColor: rowBgColor }}
                           >
-                            <PortfolioIcon
+                            <RowIcon
                               className="text-lg"
-                              style={{ color: currentWasteConfig.color }}
+                              style={{ color: rowIconColor }}
                             />
                           </div>
                           <div>

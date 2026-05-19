@@ -1472,68 +1472,13 @@
 
         <div class="index-page-body">
             <div class="toc-container">
+                {{#each reportIndexSections}}
                 <div class="toc-item">
-                    <span class="toc-number">1.</span>
-                    <a href="#company-info" class="toc-main-link">Company Information</a>
+                    <span class="toc-number">{{add @index 1}}.</span>
+                    <a href="#{{this.anchor}}" class="toc-main-link">{{this.title}}</a>
                     <span class="toc-chevron">&#x203A;</span>
                 </div>
-                <div class="toc-item">
-                    <span class="toc-number">2.</span>
-                    <a href="#summary-data" class="toc-main-link">Summary Data</a>
-                    <span class="toc-chevron">&#x203A;</span>
-                </div>
-                <div class="toc-item">
-                    <span class="toc-number">3.</span>
-                    <a href="#industry-category" class="toc-main-link">Industry Category Wise Details</a>
-                    <span class="toc-chevron">&#x203A;</span>
-                </div>
-                {{#if markingLabelingReportByIndustry.length}}
-                <div class="toc-item">
-                    <span class="toc-number">4.</span>
-                    <a href="#marking-labeling" class="toc-main-link">Marking and Labeling</a>
-                    <span class="toc-chevron">&#x203A;</span>
-                </div>
-                {{/if}}
-                <div class="toc-item">
-                    <span class="toc-number">5.</span>
-                    <a href="#portal-summary-report" class="toc-main-link">Portal Summary Report</a>
-                    <span class="toc-chevron">&#x203A;</span>
-                </div>
-                <div class="toc-item">
-                    <span class="toc-number">6.</span>
-                    <a href="#cost-sku-wise" class="toc-main-link">SKU Wise Summary</a>
-                    <span class="toc-chevron">&#x203A;</span>
-                </div>
-                <div class="toc-item">
-                    <span class="toc-number">7.</span>
-                    <a href="#cost-polymer-wise" class="toc-main-link">Polymer Wise Summary</a>
-                    <span class="toc-chevron">&#x203A;</span>
-                </div>
-                <div class="toc-item">
-                    <span class="toc-number">8.</span>
-                    <a href="#cost-category-wise" class="toc-main-link">Category Wise Summary</a>
-                    <span class="toc-chevron">&#x203A;</span>
-                </div>
-                <div class="toc-item">
-                    <span class="toc-number">9.</span>
-                    <a href="#cost-supplier-wise" class="toc-main-link">Supplier Wise Summary</a>
-                    <span class="toc-chevron">&#x203A;</span>
-                </div>
-                <div class="toc-item">
-                    <span class="toc-number">10.</span>
-                    <a href="#cost-sku-supplier-details" class="toc-main-link">SKU Wise Supplier Details</a>
-                    <span class="toc-chevron">&#x203A;</span>
-                </div>
-                <div class="toc-item">
-                    <span class="toc-number">11.</span>
-                    <a href="#cost-polymer-supplier-details" class="toc-main-link">Polymer Wise Supplier Details</a>
-                    <span class="toc-chevron">&#x203A;</span>
-                </div>
-                <div class="toc-item">
-                    <span class="toc-number">12.</span>
-                    <a href="#cost-category-supplier-details" class="toc-main-link">Category Wise Supplier Details</a>
-                    <span class="toc-chevron">&#x203A;</span>
-                </div>
+                {{/each}}
             </div>
         </div>
         
@@ -1543,6 +1488,7 @@
         </div>
         </div>
     </div>
+    {{#if selectedReportSections.companyInfo}}
     <!-- PAGE 2: COMPANY INFORMATION -->
     <div class="page-break-before report-page" id="company-info">
         <div class="report-header">
@@ -1951,7 +1897,9 @@
         </div>
     </div>
     </div>
+    {{/if}}
 
+    {{#if selectedReportSections.summaryData}}
     <!-- 2. Summary Data -->
     <div class="page-break-before report-page" id="summary-data">
         <div class="report-header">
@@ -2589,7 +2537,9 @@
             <span>Summary Data</span>
         </div>
     </div>
+    {{/if}}
 
+    {{#if selectedReportSections.industryCategory}}
     {{#if industryCategories.length}}
     <div class="page-break-before report-page" id="industry-category">
         <div class="report-header">
@@ -2799,7 +2749,9 @@
         {{/each}}
     {{/each}}
     {{/if}}
+    {{/if}}
 
+    {{#if selectedReportSections.markingLabeling}}
     {{#if markingLabelingReportByIndustry.length}}
     <div class="page-break-before report-page" id="marking-labeling">
         <div class="report-header" style="page-break-after: avoid; break-after: avoid-page;">
@@ -2920,7 +2872,9 @@
         </div>
     </div>
     {{/if}}
+    {{/if}}
 
+    {{#if selectedReportSections.portalSummaryReport}}
     <div class="page-break-before report-page" id="portal-summary-report">
         <div class="report-header">
             {{#if companyLogoBase64}}<img src="{{companyLogoBase64}}" class="header-logo header-logo-left" alt="Company Logo">{{/if}}
@@ -3035,8 +2989,11 @@
             <span>Portal Summary Report</span>
         </div>
     </div>
+    {{/if}}
 
+    {{#if selectedReportSections.hasAnyCostSections}}
     <div class="page-break-before report-page">
+        {{#if selectedReportSections.skuWiseSummary}}
         <div class="section" id="cost-sku-wise">
             <div class="section-title">6. SKU Wise Summary</div>
             {{#if pdfCostAnalysisSections.skuWise.rows.length}}
@@ -3172,8 +3129,10 @@
             <div class="card" style="text-align: center;">No SKU Wise Cost Analysis Data Available</div>
             {{/if}}
         </div>
+        {{/if}}
 
-        {{#if isBrandOwner}}<div class="page-break"></div>{{/if}}
+        {{#if selectedReportSections.polymerWiseSummary}}
+        {{#if isBrandOwner}}{{#if selectedReportSections.breakBeforePolymerWiseSummary}}<div class="page-break"></div>{{/if}}{{/if}}
         <div class="section" id="cost-polymer-wise">
             <div class="section-title">7. Polymer Wise Summary</div>
             {{#if pdfCostAnalysisSections.polymerWise.rows.length}}
@@ -3301,8 +3260,10 @@
             <div class="card" style="text-align: center;">No Polymer Wise Cost Analysis Data Available</div>
             {{/if}}
         </div>
+        {{/if}}
 
-        {{#if isBrandOwner}}<div class="page-break"></div>{{/if}}
+        {{#if selectedReportSections.categoryWiseSummary}}
+        {{#if isBrandOwner}}{{#if selectedReportSections.breakBeforeCategoryWiseSummary}}<div class="page-break"></div>{{/if}}{{/if}}
         <div class="section" id="cost-category-wise">
             <div class="section-title">8. Category Wise Summary</div>
             {{#if pdfCostAnalysisSections.categoryWise.rows.length}}
@@ -3430,8 +3391,10 @@
             <div class="card" style="text-align: center;">No Category Wise Cost Analysis Data Available</div>
             {{/if}}
         </div>
+        {{/if}}
 
-        {{#if isBrandOwner}}<div class="page-break"></div>{{/if}}
+        {{#if selectedReportSections.supplierWiseSummary}}
+        {{#if isBrandOwner}}{{#if selectedReportSections.breakBeforeSupplierWiseSummary}}<div class="page-break"></div>{{/if}}{{/if}}
         <div class="section" id="cost-supplier-wise">
             <div class="section-title">9. Supplier Wise Summary</div>
             {{#if pdfCostAnalysisSections.supplierWise.rows.length}}
@@ -3563,7 +3526,9 @@
             <div class="card" style="text-align: center;">No Supplier Wise Cost Analysis Data Available</div>
             {{/if}}
         </div>
+        {{/if}}
 
+        {{#if selectedReportSections.skuWiseSupplierDetails}}
         <div class="section" id="cost-sku-supplier-details">
             <div class="section-title">10. SKU Wise Supplier Details</div>
             {{#if costAnalysisSkuDetails.length}}
@@ -3650,7 +3615,9 @@
             <div class="card" style="text-align: center;">No SKU Wise Supplier Details Available</div>
             {{/if}}
         </div>
+        {{/if}}
 
+        {{#if selectedReportSections.polymerWiseSupplierDetails}}
         <div class="section" id="cost-polymer-supplier-details">
             <div class="section-title">11. Polymer Wise Supplier Details</div>
             {{#if costAnalysisPolymerReport.length}}
@@ -3733,7 +3700,9 @@
             <div class="card" style="text-align: center;">No Polymer Wise Supplier Details Available</div>
             {{/if}}
         </div>
+        {{/if}}
 
+        {{#if selectedReportSections.categoryWiseSupplierDetails}}
         <div class="section" id="cost-category-supplier-details">
             <div class="section-title">12. Category Wise Supplier Details</div>
             {{#if costAnalysisCategoryReport.length}}
@@ -3816,12 +3785,14 @@
             <div class="card" style="text-align: center;">No Category Wise Supplier Details Available</div>
             {{/if}}
         </div>
+        {{/if}}
 
         <div class="footer" style="position: absolute; bottom: 20px;">
             <span>AnantTattva EPR Kavach System</span>
             <span>Detailed Analysis</span>
         </div>
     </div>
+    {{/if}}
 
 </body>
 </html>

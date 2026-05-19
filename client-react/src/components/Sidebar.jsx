@@ -91,6 +91,9 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
     if (isClientWorkflowRoute && isClientUser && linkedClientId) {
       return `/dashboard/client/${linkedClientId}`;
     }
+    if (location.pathname.startsWith('/dashboard/all-clients')) {
+      return '/dashboard/all-clients';
+    }
     if (location.pathname.startsWith('/dashboard/clients')) {
       return `/dashboard/clients?wasteType=${resolvedWasteType}`;
     }
@@ -138,6 +141,12 @@ const Sidebar = ({ collapsed = false, onToggleCollapse }) => {
           icon: <AppstoreOutlined />,
           label: 'Dashboard',
           onClick: () => navigate('/dashboard'),
+        },
+        {
+          key: '/dashboard/all-clients',
+          icon: <TeamOutlined />,
+          label: 'All Client',
+          onClick: () => navigate('/dashboard/all-clients'),
         },
         {
           key: 'clients',

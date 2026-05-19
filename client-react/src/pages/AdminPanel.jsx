@@ -26,22 +26,42 @@ import { API_ENDPOINTS } from '../services/apiEndpoints';
 import { setUser } from '../store/authSlice';
 import useAuth from '../hooks/useAuth';
 
-const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
-  if (!isOpen || !user) return null;
-
+const UserDetailModal = ({
+  isOpen,
+  onClose,
+  user,
+  onUpdateRole,
+  allRoles,
+  allClients,
+  canEditRole,
+}) => {
+  const currentRoleId = user?.role?._id || user?.role || '';
+  const currentLinkedClientId = user?.linkedClient?._id || user?.linkedClient || '';
   const [isEditingRole, setIsEditingRole] = useState(false);
-  const [selectedRole, setSelectedRole] = useState(user.role?._id || user.role);
+  const [selectedRole, setSelectedRole] = useState(currentRoleId);
+  const [linkedClientId, setLinkedClientId] = useState(currentLinkedClientId);
 
   useEffect(() => {
     if (user) {
-      setSelectedRole(user.role?._id || user.role);
+      setSelectedRole(user.role?._id || user.role || '');
+      setLinkedClientId(user.linkedClient?._id || user.linkedClient || '');
+      setIsEditingRole(false);
     }
   }, [user]);
 
+  const selectedRoleObj = allRoles.find((role) => String(role._id) === String(selectedRole));
+  const showClientPicker = selectedRoleObj?.name === 'CLIENT';
+
   const handleSaveRole = () => {
-    onUpdateRole(user._id, selectedRole);
+    if (showClientPicker && !linkedClientId) {
+      toast.error('Please select a client for CLIENT role');
+      return;
+    }
+    onUpdateRole(user._id, selectedRole, linkedClientId);
     setIsEditingRole(false);
   };
+
+  if (!isOpen || !user) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
@@ -97,7 +117,14 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
                                 <div className="flex items-center gap-1">
                                     <select
                                         value={selectedRole}
-                                        onChange={(e) => setSelectedRole(e.target.value)}
+                                        onChange={(e) => {
+                                          const nextRoleId = e.target.value;
+                                          const nextRole = allRoles.find((role) => String(role._id) === String(nextRoleId));
+                                          setSelectedRole(nextRoleId);
+                                          if (nextRole?.name !== 'CLIENT') {
+                                            setLinkedClientId('');
+                                          }
+                                        }}
                                         className="text-xs border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 py-1 pl-1 pr-6"
                                     >
                                         {allRoles.map(role => (
@@ -112,14 +139,48 @@ const UserDetailModal = ({ isOpen, onClose, user, onUpdateRole, allRoles }) => {
                                     </button>
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsEditingRole(true)}>
+                                <div
+                                  className={`flex items-center gap-2 ${canEditRole ? 'group cursor-pointer' : 'cursor-not-allowed opacity-70'}`}
+                                  onClick={() => {
+                                    if (canEditRole) {
+                                      setIsEditingRole(true);
+                                    }
+                                  }}
+                                  title={canEditRole ? 'Edit role' : 'Only SUPER ADMIN can edit this role'}
+                                >
                                     <span className="font-semibold text-gray-700 text-sm">
                                         {typeof user.role === 'string' ? user.role : user.role?.name || 'USER'}
                                     </span>
-                                    <FaPencilAlt className="text-gray-300 text-xs group-hover:text-indigo-500 transition-colors" />
+                                    {canEditRole && (
+                                      <FaPencilAlt className="text-gray-300 text-xs group-hover:text-indigo-500 transition-colors" />
+                                    )}
                                 </div>
                             )}
                          </div>
+                         {!canEditRole && (
+                           <p className="mt-1 text-[10px] font-medium text-amber-600">
+                             Only SUPER ADMIN can edit this user role
+                           </p>
+                         )}
+                         {isEditingRole && showClientPicker && (
+                           <div className="mt-2">
+                             <select
+                               value={linkedClientId}
+                               onChange={(e) => setLinkedClientId(e.target.value)}
+                               className="w-full text-xs border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 py-1.5 px-2"
+                             >
+                               <option value="">Select Client</option>
+                               {(allClients || []).map((client) => (
+                                 <option key={client._id} value={client._id}>
+                                   {client.clientName}
+                                 </option>
+                               ))}
+                             </select>
+                             <p className="mt-1 text-[10px] text-gray-500">
+                               Required for CLIENT role
+                             </p>
+                           </div>
+                         )}
                      </div>
                      <div className="w-px h-8 bg-gray-200"></div>
                      <div className="flex flex-col items-end">
@@ -432,6 +493,9 @@ const AdminPanel = () => {
   const [openMenuUserId, setOpenMenuUserId] = useState(null);
   const [allRoles, setAllRoles] = useState([]);
   const [selectedRoleFilter, setSelectedRoleFilter] = useState('All');
+  const currentUserRoleName = (typeof user?.role === 'string' ? user.role : user?.role?.name || '').toUpperCase();
+  const canManageSuperAdmin = currentUserRoleName === 'SUPER ADMIN';
+  const assignableRoles = allRoles.filter((role) => canManageSuperAdmin || role.name !== 'SUPER ADMIN');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -475,20 +539,33 @@ const AdminPanel = () => {
     }
   };
 
-  const handleUpdateRole = async (userId, newRoleId) => {
+  const handleUpdateRole = async (userId, newRoleId, linkedClientId) => {
     try {
-      const response = await api.patch(API_ENDPOINTS.USER.UPDATE_ROLE(userId), { roleId: newRoleId });
+      const payload = { roleId: newRoleId };
+      if (linkedClientId) {
+        payload.linkedClientId = linkedClientId;
+      }
+
+      const response = await api.patch(API_ENDPOINTS.USER.UPDATE_ROLE(userId), payload);
       if (response.data.success) {
-        setUsers(prev => prev.map(u => u._id === userId ? { ...u, role: response.data.data.role } : u));
+        setUsers(prev => prev.map(u => u._id === userId ? {
+          ...u,
+          role: response.data.data.role,
+          linkedClient: response.data.data.linkedClient ?? u.linkedClient,
+        } : u));
         
         // Update selectedUser if it's the one being edited
         if (selectedUser && selectedUser._id === userId) {
-            setSelectedUser({ ...selectedUser, role: response.data.data.role });
+            setSelectedUser({
+              ...selectedUser,
+              role: response.data.data.role,
+              linkedClient: response.data.data.linkedClient ?? selectedUser.linkedClient,
+            });
         }
 
         // If updated user is the current logged-in user, update Redux state
         if (user && (user.id === userId || user._id === userId)) {
-            setUser({ ...user, role: response.data.data.role });
+            dispatch(setUser({ ...user, role: response.data.data.role }));
         }
         
         toast.success("Role updated successfully");
@@ -1007,14 +1084,22 @@ const AdminPanel = () => {
         onClose={() => setIsUserModalOpen(false)}
         user={selectedUser}
         onUpdateRole={handleUpdateRole}
-        allRoles={allRoles}
+        allRoles={assignableRoles}
+        allClients={allClients}
+        canEditRole={
+          canManageSuperAdmin ||
+          (typeof selectedUser?.role === 'string'
+            ? selectedUser.role
+            : selectedUser?.role?.name || ''
+          ) !== 'SUPER ADMIN'
+        }
       />
 
       <CreateUserModal
         isOpen={isCreateUserModalOpen}
         onClose={() => setIsCreateUserModalOpen(false)}
         onCreate={handleCreateUser}
-        allRoles={allRoles}
+        allRoles={assignableRoles}
         allClients={allClients}
       />
     </div>

@@ -24,6 +24,16 @@ import DocumentViewerModal from '../../../components/DocumentViewerModal';
 import api from '../../../services/api';
 import { formatNumber } from '../../../utils/numberUtils';
 
+const formatLakhsCurrency = (value) => {
+    if (value === null || value === undefined || value === '') return '-';
+    const numericValue = Number(String(value).replace(/,/g, '').trim());
+    if (!Number.isFinite(numericValue)) return value;
+    return `₹ ${numericValue.toLocaleString('en-IN', {
+        minimumFractionDigits: Number.isInteger(numericValue) ? 0 : 2,
+        maximumFractionDigits: 2,
+    })}`;
+};
+
 const ConsentVerification = ({
     item,
     relatedItems,
@@ -379,7 +389,7 @@ const ConsentVerification = ({
                                     </div>
                                     <div className="bg-white rounded-lg p-4 border border-gray-200">
                                         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total Capital Investment (Lakhs)</div>
-                                        <div className="mt-2 text-sm font-semibold text-gray-900">{row?.totalCapitalInvestmentLakhs ?? '-'}</div>
+                                        <div className="mt-2 text-sm font-semibold text-gray-900">{formatLakhsCurrency(row?.totalCapitalInvestmentLakhs)}</div>
                                     </div>
                                     <div className="bg-white rounded-lg p-4 border border-gray-200">
                                         <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Ground/Bore Well Water Usage</div>

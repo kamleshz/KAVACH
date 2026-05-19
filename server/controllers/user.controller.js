@@ -5,6 +5,59 @@ import asyncHandler from "../utils/asyncHandler.js";
 import bcryptjs from "bcryptjs";
 import { isClientRole, resolveClientLink } from "../utils/accessControl.js";
 
+const getActorAndTargetUsers = async (actorUserId, targetUserId) => {
+  const [actor, target] = await Promise.all([
+    UserModel.findById(actorUserId).populate("role"),
+    UserModel.findById(targetUserId).populate("role"),
+  ]);
+
+  return { actor, target };
+};
+
+const ensureAdminCanManageUser = ({ actor, target, nextRoleName, action }) => {
+  const actorRole = actor?.role?.name;
+  const targetRole = target?.role?.name;
+
+  if (!actor || !actorRole) {
+    return {
+      status: 403,
+      body: {
+        message: "Access denied. Insufficient privileges.",
+        error: true,
+        success: false,
+      },
+    };
+  }
+
+  if (actorRole === "SUPER ADMIN") {
+    return null;
+  }
+
+  if (targetRole === "SUPER ADMIN") {
+    return {
+      status: 403,
+      body: {
+        message: `Only SUPER ADMIN can ${action} a SUPER ADMIN user`,
+        error: true,
+        success: false,
+      },
+    };
+  }
+
+  if (nextRoleName === "SUPER ADMIN") {
+    return {
+      status: 403,
+      body: {
+        message: "Only SUPER ADMIN can assign the SUPER ADMIN role",
+        error: true,
+        success: false,
+      },
+    };
+  }
+
+  return null;
+};
+
 export const createUserController = asyncHandler(async (req, res) => {
   const { firstName, lastName, email, password, role, status, linkedClientId } =
     req.body;
@@ -182,16 +235,26 @@ export const getLoginActivityController = asyncHandler(async (req, res) => {
 
 export const unlockUserController = asyncHandler(async (req, res) => {
   const { userId } = req.params;
-  const user = await UserModel.findById(userId);
-  if (!user) {
+  const { actor, target } = await getActorAndTargetUsers(req.userId, userId);
+  if (!target) {
     return res
       .status(404)
       .json({ message: "User not found", error: true, success: false });
   }
-  user.status = "Active";
-  user.failedLoginAttempts = 0;
-  user.lastFailedLogin = null;
-  await user.save();
+
+  const permissionError = ensureAdminCanManageUser({
+    actor,
+    target,
+    action: "unlock",
+  });
+  if (permissionError) {
+    return res.status(permissionError.status).json(permissionError.body);
+  }
+
+  target.status = "Active";
+  target.failedLoginAttempts = 0;
+  target.lastFailedLogin = null;
+  await target.save();
   return res.status(200).json({
     message: "User unlocked successfully",
     error: false,
@@ -209,11 +272,24 @@ export const updateUserRoleController = asyncHandler(async (req, res) => {
       .json({ message: "Role not found", error: true, success: false });
   }
 
-  const existingUser = await UserModel.findById(userId);
+  const { actor, target: existingUser } = await getActorAndTargetUsers(
+    req.userId,
+    userId,
+  );
   if (!existingUser) {
     return res
       .status(404)
       .json({ message: "User not found", error: true, success: false });
+  }
+
+  const permissionError = ensureAdminCanManageUser({
+    actor,
+    target: existingUser,
+    nextRoleName: role.name,
+    action: "change role of",
+  });
+  if (permissionError) {
+    return res.status(permissionError.status).json(permissionError.body);
   }
 
   const updatePayload = {
@@ -271,6 +347,23 @@ export const updateUserRoleController = asyncHandler(async (req, res) => {
 export const updateUserStatusController = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { status } = req.body;
+  const { actor, target } = await getActorAndTargetUsers(req.userId, userId);
+
+  if (!target) {
+    return res
+      .status(404)
+      .json({ message: "User not found", error: true, success: false });
+  }
+
+  const permissionError = ensureAdminCanManageUser({
+    actor,
+    target,
+    action: "change status of",
+  });
+  if (permissionError) {
+    return res.status(permissionError.status).json(permissionError.body);
+  }
+
   const user = await UserModel.findByIdAndUpdate(
     userId,
     { status },

@@ -25,6 +25,56 @@ import logger from "../../utils/logger.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const reportDebugEnabled = process.env.NODE_ENV !== "production";
+const REPORT_SECTION_DEFINITIONS = [
+  { id: "companyInfo", anchor: "company-info", title: "Company Information" },
+  { id: "summaryData", anchor: "summary-data", title: "Summary Data" },
+  {
+    id: "industryCategory",
+    anchor: "industry-category",
+    title: "Industry Category Wise Details",
+  },
+  {
+    id: "markingLabeling",
+    anchor: "marking-labeling",
+    title: "Marking and Labeling",
+  },
+  {
+    id: "portalSummaryReport",
+    anchor: "portal-summary-report",
+    title: "Portal Summary Report",
+  },
+  { id: "skuWiseSummary", anchor: "cost-sku-wise", title: "SKU Wise Summary" },
+  {
+    id: "polymerWiseSummary",
+    anchor: "cost-polymer-wise",
+    title: "Polymer Wise Summary",
+  },
+  {
+    id: "categoryWiseSummary",
+    anchor: "cost-category-wise",
+    title: "Category Wise Summary",
+  },
+  {
+    id: "supplierWiseSummary",
+    anchor: "cost-supplier-wise",
+    title: "Supplier Wise Summary",
+  },
+  {
+    id: "skuWiseSupplierDetails",
+    anchor: "cost-sku-supplier-details",
+    title: "SKU Wise Supplier Details",
+  },
+  {
+    id: "polymerWiseSupplierDetails",
+    anchor: "cost-polymer-supplier-details",
+    title: "Polymer Wise Supplier Details",
+  },
+  {
+    id: "categoryWiseSupplierDetails",
+    anchor: "cost-category-supplier-details",
+    title: "Category Wise Supplier Details",
+  },
+];
 
 class ReportGeneratorService {
   static getNextFinancialYear(fy) {
@@ -169,11 +219,19 @@ class ReportGeneratorService {
         "2028-29": 10,
       },
       "Cat-IV": {},
+      "Cat-V": {},
     };
 
     const normalizeUrepCategory = (value) => {
       const raw = (value || "").toString().trim().toLowerCase();
       if (!raw) return null;
+      if (
+        raw.includes("cat-v") ||
+        raw.includes("cat v") ||
+        raw.includes("category v") ||
+        /\bv\b/.test(raw)
+      )
+        return "Cat-V";
       if (
         raw.includes("cat-iv") ||
         raw.includes("cat iv") ||
@@ -2446,7 +2504,14 @@ class ReportGeneratorService {
       if (!val) return null;
       const v = String(val).toUpperCase();
 
-      // Priority matching for Roman Numerals (IV > III > II > I) to avoid subset matching
+      // Priority matching for Roman Numerals (V > IV > III > II > I) to avoid subset matching
+      if (
+        v.includes("CAT-V") ||
+        v.includes("CAT V") ||
+        v.includes("CATEGORY V") ||
+        /\bV\b/.test(v)
+      )
+        return "Cat-V";
       if (
         v.includes("IV") ||
         v.includes("CAT-IV") ||
@@ -2493,6 +2558,7 @@ class ReportGeneratorService {
       "Cat-II": { registered: {}, unregistered: {} },
       "Cat-III": { registered: {}, unregistered: {} },
       "Cat-IV": { registered: {}, unregistered: {} },
+      "Cat-V": { registered: {}, unregistered: {} },
     };
     const salesYears = new Set();
 
@@ -2581,6 +2647,7 @@ class ReportGeneratorService {
       "Cat-II": { registered: {}, unregistered: {} },
       "Cat-III": { registered: {}, unregistered: {} },
       "Cat-IV": { registered: {}, unregistered: {} },
+      "Cat-V": { registered: {}, unregistered: {} },
     };
     const purchaseYears = new Set();
 
@@ -2682,6 +2749,13 @@ class ReportGeneratorService {
         if (!val) return null;
         const v = String(val).toUpperCase();
         if (
+          v.includes("CAT-V") ||
+          v.includes("CAT V") ||
+          v.includes("CATEGORY V") ||
+          /\bV\b/.test(v)
+        )
+          return "Cat-V";
+        if (
           v.includes("IV") ||
           v.includes("CAT-IV") ||
           v.includes("CAT IV") ||
@@ -2712,7 +2786,7 @@ class ReportGeneratorService {
         if (/\bI\b/.test(v) || /CAT.*I/.test(v)) return "Cat-I";
         return null;
       };
-      const categories = ["Cat-I", "Cat-II", "Cat-III", "Cat-IV"];
+      const categories = ["Cat-I", "Cat-II", "Cat-III", "Cat-IV", "Cat-V"];
       const yearlyAgg = {};
       categories.forEach((cat) => {
         yearlyAgg[cat] = {};
@@ -3056,9 +3130,68 @@ class ReportGeneratorService {
       logger.warn({ err: e }, "[Report Generation] Could not load logo");
     }
 
+    const requestedSectionIds = Array.isArray(options.sections)
+      ? options.sections
+          .map((section) => String(section || "").trim())
+          .filter(Boolean)
+      : [];
+    const selectedSectionIdSet = new Set(
+      requestedSectionIds.length
+        ? requestedSectionIds
+        : REPORT_SECTION_DEFINITIONS.map((section) => section.id),
+    );
+    const availableSectionIdSet = new Set(
+      REPORT_SECTION_DEFINITIONS.filter((section) => {
+        if (section.id === "markingLabeling") {
+          return Boolean(markingLabelingReportByIndustry.length);
+        }
+        if (section.id === "industryCategory") {
+          return Boolean(industryCategories.length);
+        }
+        return true;
+      }).map((section) => section.id),
+    );
+    const selectedReportSections = REPORT_SECTION_DEFINITIONS.reduce(
+      (accumulator, section) => {
+        accumulator[section.id] =
+          availableSectionIdSet.has(section.id) &&
+          selectedSectionIdSet.has(section.id);
+        return accumulator;
+      },
+      {},
+    );
+    selectedReportSections.hasAnyCostSections = Boolean(
+      selectedReportSections.skuWiseSummary ||
+        selectedReportSections.polymerWiseSummary ||
+        selectedReportSections.categoryWiseSummary ||
+        selectedReportSections.supplierWiseSummary ||
+        selectedReportSections.skuWiseSupplierDetails ||
+        selectedReportSections.polymerWiseSupplierDetails ||
+        selectedReportSections.categoryWiseSupplierDetails,
+    );
+    selectedReportSections.breakBeforePolymerWiseSummary = Boolean(
+      selectedReportSections.skuWiseSummary,
+    );
+    selectedReportSections.breakBeforeCategoryWiseSummary = Boolean(
+      selectedReportSections.skuWiseSummary ||
+        selectedReportSections.polymerWiseSummary,
+    );
+    selectedReportSections.breakBeforeSupplierWiseSummary = Boolean(
+      selectedReportSections.skuWiseSummary ||
+        selectedReportSections.polymerWiseSummary ||
+        selectedReportSections.categoryWiseSummary,
+    );
+    const reportIndexSections = REPORT_SECTION_DEFINITIONS.filter(
+      (section) => selectedReportSections[section.id],
+    ).map((section) => ({
+      ...section,
+    }));
+
     const templateData = {
       companyLogoBase64,
       logoBase64,
+      reportIndexSections,
+      selectedReportSections,
       isProducer,
       isBrandOwner: !isProducer,
       entityType: clientDoc.entityType || "Brand Owner",
@@ -3094,12 +3227,14 @@ class ReportGeneratorService {
           "Cat-II": UREP_TARGET_MATRIX["Cat-II"]?.[fy] || 0,
           "Cat-III": UREP_TARGET_MATRIX["Cat-III"]?.[fy] || 0,
           "Cat-IV": UREP_TARGET_MATRIX["Cat-IV"]?.[fy] || 0,
+          "Cat-V": UREP_TARGET_MATRIX["Cat-V"]?.[fy] || 0,
         };
         const totalTargetPct =
           (urepPctByCat["Cat-I"] || 0) +
           (urepPctByCat["Cat-II"] || 0) +
           (urepPctByCat["Cat-III"] || 0) +
-          (urepPctByCat["Cat-IV"] || 0);
+          (urepPctByCat["Cat-IV"] || 0) +
+          (urepPctByCat["Cat-V"] || 0);
 
         const procurementRows = Array.isArray(procurementDetails)
           ? procurementDetails
@@ -3397,6 +3532,8 @@ class ReportGeneratorService {
                   ? "Category III"
                   : catKey === "Cat-IV"
                     ? "Category IV"
+                    : catKey === "Cat-V"
+                      ? "Category V"
                     : "Not Applicable";
 
           const catAgg = ensureAgg(categoryAgg, catKey, catName);
@@ -3511,6 +3648,8 @@ class ReportGeneratorService {
           { key: "Cat-I", name: "Category I" },
           { key: "Cat-II", name: "Category II" },
           { key: "Cat-III", name: "Category III" },
+          { key: "Cat-IV", name: "Category IV" },
+          { key: "Cat-V", name: "Category V" },
           { key: "OTHER", name: "Not Applicable" },
         ];
         const getCategoryBucket = (key, name) => {
@@ -3529,7 +3668,7 @@ class ReportGeneratorService {
         const categoryWise = categoryOrder
           .map((c) => getCategoryBucket(c.key, c.name))
           .map((bucket) => {
-            const isKnown = ["Cat-I", "Cat-II", "Cat-III", "Cat-IV"].includes(
+            const isKnown = ["Cat-I", "Cat-II", "Cat-III", "Cat-IV", "Cat-V"].includes(
               bucket.key,
             );
             const pct = isKnown ? urepPctByCat[bucket.key] || 0 : 0;

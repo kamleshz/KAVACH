@@ -131,15 +131,23 @@ const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId, entityTy
         { financialYear: '2025-26', category: 'Cat-I', applicableTarget: 30 },
         { financialYear: '2025-26', category: 'Cat-II', applicableTarget: 10 },
         { financialYear: '2025-26', category: 'Cat-III', applicableTarget: 5 },
+        { financialYear: '2025-26', category: 'Cat-IV', applicableTarget: 0 },
+        { financialYear: '2025-26', category: 'Cat-V', applicableTarget: 0 },
         { financialYear: '2026-27', category: 'Cat-I', applicableTarget: 40 },
         { financialYear: '2026-27', category: 'Cat-II', applicableTarget: 10 },
         { financialYear: '2026-27', category: 'Cat-III', applicableTarget: 5 },
+        { financialYear: '2026-27', category: 'Cat-IV', applicableTarget: 0 },
+        { financialYear: '2026-27', category: 'Cat-V', applicableTarget: 0 },
         { financialYear: '2027-28', category: 'Cat-I', applicableTarget: 50 },
         { financialYear: '2027-28', category: 'Cat-II', applicableTarget: 20 },
         { financialYear: '2027-28', category: 'Cat-III', applicableTarget: 10 },
+        { financialYear: '2027-28', category: 'Cat-IV', applicableTarget: 0 },
+        { financialYear: '2027-28', category: 'Cat-V', applicableTarget: 0 },
         { financialYear: '2028-29', category: 'Cat-I', applicableTarget: 60 },
         { financialYear: '2028-29', category: 'Cat-II', applicableTarget: 20 },
-        { financialYear: '2028-29', category: 'Cat-III', applicableTarget: 10 }
+        { financialYear: '2028-29', category: 'Cat-III', applicableTarget: 10 },
+        { financialYear: '2028-29', category: 'Cat-IV', applicableTarget: 0 },
+        { financialYear: '2028-29', category: 'Cat-V', applicableTarget: 0 }
     ]), []);
 
     const purchaseByYearCategory = React.useMemo(() => {
@@ -158,7 +166,7 @@ const Analysis = ({ isStepReadOnly, handleNext, clientId, type, itemId, entityTy
         const savedRows = summary?.brand_owner_recycled_content_table?.rows;
         if (Array.isArray(savedRows) && savedRows.length) {
             const yearsInMatrix = ['2025-26', '2026-27', '2027-28', '2028-29'];
-            const categoryOrder = ['Cat-I', 'Cat-II', 'Cat-III'];
+            const categoryOrder = ['Cat-I', 'Cat-II', 'Cat-III', 'Cat-IV', 'Cat-V'];
             const normalized = savedRows
                 .map((row, idx) => ({
                     key: row.key || `${row.financialYear}-${row.category}-${idx}`,

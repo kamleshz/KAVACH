@@ -37,6 +37,7 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
     const romanFromNumberish = (cat) => {
         const s = (cat || '').toString().toUpperCase();
         // Map numeric variants to Roman
+        if (/\b(V|5)\b/.test(s) || /CAT[\s\-]*5/.test(s) || /CATEGORY[\s\-]*5/.test(s)) return 'Cat-V';
         if (/\b(IV|4)\b/.test(s) || /CAT[\s\-]*4/.test(s) || /CATEGORY[\s\-]*4/.test(s)) return 'Cat-IV';
         if (/\b(III|3)\b/.test(s) || /CAT[\s\-]*3/.test(s) || /CATEGORY[\s\-]*3/.test(s)) return 'Cat-III';
         if (/\b(II|2)\b/.test(s) || /CAT[\s\-]*2/.test(s) || /CATEGORY[\s\-]*2/.test(s)) return 'Cat-II';
@@ -50,7 +51,7 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
         setFinancialYears(years);
 
         // 2. Initialize Aggregation Structure
-        const categories = ['Cat-I', 'Cat-II', 'Cat-III', 'Cat-IV'];
+        const categories = ['Cat-I', 'Cat-II', 'Cat-III', 'Cat-IV', 'Cat-V'];
         const aggregation = {};
         categories.forEach(cat => {
             aggregation[cat] = {
@@ -92,7 +93,8 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
                  matchedCat = romanFromNumberish(cat);
                  if (!matchedCat) {
                     // Priority matching for Roman Numerals (IV > III > II > I)
-                    if (cat.includes("CAT-IV") || cat.includes("CAT IV") || cat.includes("CATEGORY IV") || /\bIV\b/.test(cat)) matchedCat = "Cat-IV";
+                    if (cat.includes("CAT-V") || cat.includes("CAT V") || cat.includes("CATEGORY V") || /\bV\b/.test(cat)) matchedCat = "Cat-V";
+                    else if (cat.includes("CAT-IV") || cat.includes("CAT IV") || cat.includes("CATEGORY IV") || /\bIV\b/.test(cat)) matchedCat = "Cat-IV";
                     else if (cat.includes("CAT-III") || cat.includes("CAT III") || cat.includes("CATEGORY III") || /\bIII\b/.test(cat)) matchedCat = "Cat-III";
                     else if (cat.includes("CAT-II") || cat.includes("CAT II") || cat.includes("CATEGORY II") || /\bII\b/.test(cat)) matchedCat = "Cat-II";
                     // Check for Cat I variations, including "Cat I (Containers...)"
@@ -453,13 +455,8 @@ const PurchaseAnalysis = ({ clientId, type, itemId, readOnly = false }) => {
 
         // Filter data for this category
         const categoryData = rawRows.filter(row => {
-            const cat = row.plasticCategory || '';
-            // Simple match logic same as aggregation
-            if (record.key === 'Cat-I') return cat.includes('Cat-I') && !cat.includes('Cat-II') && !cat.includes('Cat-III') && !cat.includes('Cat-IV');
-            if (record.key === 'Cat-II') return cat.includes('Cat-II') && !cat.includes('Cat-III');
-            if (record.key === 'Cat-III') return cat.includes('Cat-III');
-            if (record.key === 'Cat-IV') return cat.includes('Cat-IV');
-            return cat === record.key;
+            const matchedCategory = romanFromNumberish(row.plasticCategory || '');
+            return matchedCategory === record.key;
         });
 
         const hasValue = (v) => v !== undefined && v !== null && String(v).trim() !== '';

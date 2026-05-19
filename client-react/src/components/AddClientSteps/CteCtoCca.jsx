@@ -7,6 +7,24 @@ import DocumentViewerModal from '../DocumentViewerModal';
 import PropTypes from 'prop-types';
 import { calculateCapacityMetrics, formatNumber } from '../../utils/numberUtils';
 
+const formatLakhsCurrency = (value) => {
+    if (value === null || value === undefined || value === '') return '';
+    const numericValue = Number(String(value).replace(/,/g, '').trim());
+    if (!Number.isFinite(numericValue)) return String(value);
+    return numericValue.toLocaleString('en-IN', {
+        minimumFractionDigits: Number.isInteger(numericValue) ? 0 : 2,
+        maximumFractionDigits: 2,
+    });
+};
+
+const sanitizeLakhsCurrencyInput = (value) => {
+    const cleaned = String(value || '').replace(/[^\d.]/g, '');
+    const [wholePart, ...decimalParts] = cleaned.split('.');
+    return decimalParts.length
+        ? `${wholePart}.${decimalParts.join('')}`
+        : wholePart;
+};
+
 const CteCtoCca = ({
     cteDetailRows,
     handleCteDetailChange,
@@ -1203,16 +1221,28 @@ const CteCtoCca = ({
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
-                                                    Total Capital Investment in Laks
+                                                    Total Capital Investment in Lakhs
                                                 </label>
-                                                <input
-                                                    type="number"
-                                                    value={row.totalCapitalInvestmentLakhs || ''}
-                                                    onChange={(e) => handleCtoAdditionalDetailChange(idx, 'totalCapitalInvestmentLakhs', e.target.value)}
-                                                    disabled={isViewMode}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow disabled:bg-gray-100 disabled:text-gray-600"
-                                                    placeholder="Enter amount"
-                                                />
+                                                <div className="relative">
+                                                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-500">
+                                                        ₹
+                                                    </span>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        value={formatLakhsCurrency(row.totalCapitalInvestmentLakhs)}
+                                                        onChange={(e) =>
+                                                            handleCtoAdditionalDetailChange(
+                                                                idx,
+                                                                'totalCapitalInvestmentLakhs',
+                                                                sanitizeLakhsCurrencyInput(e.target.value),
+                                                            )
+                                                        }
+                                                        disabled={isViewMode}
+                                                        className="w-full rounded-lg border border-gray-300 py-2 pl-8 pr-3 text-sm transition-shadow focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-600"
+                                                        placeholder="Enter amount in lakhs"
+                                                    />
+                                                </div>
                                             </div>
 
                                             <div>

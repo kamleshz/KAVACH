@@ -7,6 +7,10 @@ import {
     saveProductComplianceController,
     getProductComplianceController,
     getAllProductComplianceRowsController,
+    getAllProductComponentDetailsController,
+    getAllProductSupplierComplianceController,
+    getAllRecycledQuantityUsedController,
+    getAllMonthlyProcurementRowsController,
     uploadProductComplianceRowController,
     saveProductComponentDetailsController,
     getProductComponentDetailsController,
@@ -131,6 +135,10 @@ router.put('/:clientId/product-compliance', auth, restrictClientScope, requireIn
 router.post('/:clientId/product-compliance-row-save', auth, restrictClientScope, requireInternalUser, validate(productComplianceSaveSchema), saveProductComplianceController);
 router.get('/:clientId/product-compliance', auth, restrictClientScope, getProductComplianceController);
 router.get('/:clientId/all-product-compliance-rows', auth, restrictClientScope, getAllProductComplianceRowsController);
+router.get('/:clientId/all-product-component-details', auth, restrictClientScope, getAllProductComponentDetailsController);
+router.get('/:clientId/all-product-supplier-compliance', auth, restrictClientScope, getAllProductSupplierComplianceController);
+router.get('/:clientId/all-recycled-quantity-used', auth, restrictClientScope, getAllRecycledQuantityUsedController);
+router.get('/:clientId/all-monthly-procurement', auth, restrictClientScope, getAllMonthlyProcurementRowsController);
 router.post('/:clientId/product-compliance/upload-row', auth, restrictClientScope, requireInternalUser, (req, res, next) => {
     upload.fields([
         { name: 'productImage', maxCount: 1 },

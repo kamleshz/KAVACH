@@ -142,13 +142,21 @@ class PlasticAnalysisService {
       "Cat-II": { pre: 0, post: 0, exp: 0 },
       "Cat-III": { pre: 0, post: 0, exp: 0 },
       "Cat-IV": { pre: 0, post: 0, exp: 0 },
+      "Cat-V": { pre: 0, post: 0, exp: 0 },
     };
 
     const normalizeSalesCategory = (val) => {
       if (!val) return null;
       const v = String(val).toUpperCase();
 
-      // Priority matching for Roman Numerals (IV > III > II > I)
+      // Priority matching for Roman Numerals (V > IV > III > II > I)
+      if (
+        v.includes("CAT-V") ||
+        v.includes("CAT V") ||
+        v.includes("CATEGORY V") ||
+        /\bV\b/.test(v)
+      )
+        return "Cat-V";
       if (
         v.includes("IV") ||
         v.includes("CAT-IV") ||
@@ -275,6 +283,7 @@ class PlasticAnalysisService {
         "2028-29": 10,
       },
       "Cat-IV": {},
+      "Cat-V": {},
     };
 
     // We need at least 3 years to generate 2 target tables as requested
@@ -757,6 +766,8 @@ class PlasticAnalysisService {
           "2028-29": 20,
         },
         "Cat-III": { "2025-26": 5, "2026-27": 5, "2027-28": 10, "2028-29": 10 },
+        "Cat-IV": { "2025-26": 0, "2026-27": 0, "2027-28": 0, "2028-29": 0 },
+        "Cat-V": { "2025-26": 0, "2026-27": 0, "2027-28": 0, "2028-29": 0 },
       };
 
       const categories = Object.keys(targets);

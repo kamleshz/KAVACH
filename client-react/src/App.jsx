@@ -21,6 +21,7 @@ import { ThemeProvider } from './context/ThemeContext';
 // Lazy load heavy components
 const DashboardHome = lazy(() => import('./pages/DashboardHome'));
 const Clients = lazy(() => import('./pages/Clients'));
+const AllClients = lazy(() => import('./pages/AllClients'));
 const ClientDetail = lazy(() => import('./pages/ClientDetail'));
 const AddClient = lazy(() => import('./pages/AddClient'));
 const ClientTypeSelection = lazy(() => import('./pages/ClientTypeSelection'));
@@ -118,6 +119,7 @@ function App() {
               }
             >
             <Route index element={<DashboardIndexRedirect />} />
+            <Route path="all-clients" element={<AllClients />} />
             <Route path="clients" element={<Clients />} />
             <Route path="client-connect" element={<ClientConnect />} />
             <Route path="client-connect/:id" element={<ClientConnectDetail />} />

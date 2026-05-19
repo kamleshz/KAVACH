@@ -18,6 +18,7 @@ const StateWiseSummarySection = ({
   safeNumber,
   formatWithCommas,
   renderAnimatedSummaryValue,
+  formatCurrency,
   summarySupplierRows,
   producerClientConnectSkuData,
   industrySkuSummaryData,
@@ -364,7 +365,7 @@ const StateWiseSummarySection = ({
       key: "recycledAmount",
       width: 160,
       align: "right",
-      render: (value) => formatWithCommas(value, 2),
+      render: (value) => formatCurrency(value, 3),
     },
     {
       title: "Virgin Amount",
@@ -372,7 +373,7 @@ const StateWiseSummarySection = ({
       key: "virginAmount",
       width: 160,
       align: "right",
-      render: (value) => formatWithCommas(value, 2),
+      render: (value) => formatCurrency(value, 3),
     },
   ];
 
@@ -725,13 +726,13 @@ const StateWiseSummarySection = ({
                     <div className="rounded bg-slate-50 px-1.5 py-1">
                       <div className="text-gray-500">Recycled Amount</div>
                       <div className="font-bold text-emerald-700">
-                        {formatWithCommas(hoveredStateMapDetails.recycledAmount, 2)}
+                        {formatCurrency(hoveredStateMapDetails.recycledAmount, 3)}
                       </div>
                     </div>
                     <div className="col-span-2 rounded bg-slate-50 px-1.5 py-1">
                       <div className="text-gray-500">Virgin Amount</div>
                       <div className="font-bold text-blue-700">
-                        {formatWithCommas(hoveredStateMapDetails.virginAmount, 2)}
+                        {formatCurrency(hoveredStateMapDetails.virginAmount, 3)}
                       </div>
                     </div>
                     {showPlantLocationMarkers &&
@@ -1043,11 +1044,11 @@ const StateWiseSummarySection = ({
                   </div>
                   <div>
                     <div className="text-gray-500">Recycled Amount</div>
-                    <div className="font-bold text-emerald-700">{formatWithCommas(stateRow.recycledAmount, 2)}</div>
+                    <div className="font-bold text-emerald-700">{formatCurrency(stateRow.recycledAmount, 3)}</div>
                   </div>
                   <div>
                     <div className="text-gray-500">Virgin Amount</div>
-                    <div className="font-bold text-blue-700">{formatWithCommas(stateRow.virginAmount, 2)}</div>
+                    <div className="font-bold text-blue-700">{formatCurrency(stateRow.virginAmount, 3)}</div>
                   </div>
                 </div>
                 <div className="mt-2.5 flex justify-between text-xs text-gray-500 border-t border-gray-100 pt-2">

@@ -183,7 +183,7 @@ const ClientSummarySection = ({
               </div>
               <div className="mt-2 text-2xl font-bold">
                 {renderAnimatedSummaryValue(targetQty, {
-                  digits: 2,
+                  digits: 3,
                   className: "text-2xl font-bold",
                 })}
               </div>
@@ -197,7 +197,7 @@ const ClientSummarySection = ({
               </div>
               <div className="mt-2 text-2xl font-bold">
                 {renderAnimatedSummaryValue(virginTargetQty, {
-                  digits: 2,
+                  digits: 3,
                   className: "text-2xl font-bold",
                 })}
               </div>
@@ -212,6 +212,7 @@ const ClientSummarySection = ({
               <div className="mt-2 text-2xl font-bold">
                 {renderAnimatedSummaryValue(totalRecycledAmount, {
                   digits: 3,
+                  prefix: "₹ ",
                   className: "text-2xl font-bold",
                 })}
               </div>
@@ -226,6 +227,7 @@ const ClientSummarySection = ({
               <div className="mt-2 text-2xl font-bold">
                 {renderAnimatedSummaryValue(totalVirginAmount, {
                   digits: 3,
+                  prefix: "₹ ",
                   className: "text-2xl font-bold",
                 })}
               </div>
@@ -243,7 +245,7 @@ const ClientSummarySection = ({
                     Recycled Achieved (MT)
                   </div>
                   {renderAnimatedSummaryValue(totalRecycledQty, {
-                    digits: 2,
+                    digits: 3,
                     className: "mt-2 text-3xl font-bold text-green-700",
                   })}
                 </div>
@@ -263,7 +265,7 @@ const ClientSummarySection = ({
                       <FaArrowDown className="text-red-600" />
                     )}
                     {renderAnimatedSummaryValue(Math.abs(recycledShortfall), {
-                      digits: 2,
+                      digits: 3,
                       className: "",
                     })}
                   </div>
@@ -282,7 +284,7 @@ const ClientSummarySection = ({
                 <span>
                   Achieved: {formatWithCommas(recycledAchievedPct, 1)}%
                 </span>
-                <span>Target: {formatWithCommas(targetQty, 2)} MT</span>
+                <span>Target: {formatWithCommas(targetQty, 3)} MT</span>
               </div>
             </div>
 
@@ -296,7 +298,7 @@ const ClientSummarySection = ({
                     Virgin Achieved (MT)
                   </div>
                   {renderAnimatedSummaryValue(totalVirginQty, {
-                    digits: 2,
+                    digits: 3,
                     className: "mt-2 text-3xl font-bold text-emerald-700",
                   })}
                 </div>
@@ -316,7 +318,7 @@ const ClientSummarySection = ({
                       <FaArrowDown className="text-red-600" />
                     )}
                     {renderAnimatedSummaryValue(Math.abs(virginShortfall), {
-                      digits: 2,
+                      digits: 3,
                       className: "",
                     })}
                   </div>
@@ -335,7 +337,7 @@ const ClientSummarySection = ({
                 <span>
                   Achieved: {formatWithCommas(virginAchievedPct, 1)}%
                 </span>
-                <span>Target: {formatWithCommas(virginTargetQty, 2)} MT</span>
+                <span>Target: {formatWithCommas(virginTargetQty, 3)} MT</span>
               </div>
             </div>
           </div>
@@ -466,6 +468,7 @@ const ClientSummarySection = ({
                       </div>
                       {renderAnimatedSummaryValue(item.recycledAmount, {
                         digits: 3,
+                        prefix: "₹ ",
                         className: "mt-1 text-base font-bold text-emerald-700",
                       })}
                     </div>
@@ -475,6 +478,7 @@ const ClientSummarySection = ({
                       </div>
                       {renderAnimatedSummaryValue(item.virginAmount, {
                         digits: 3,
+                        prefix: "₹ ",
                         className: "mt-1 text-base font-bold text-indigo-700",
                       })}
                     </div>

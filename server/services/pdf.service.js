@@ -7,10 +7,26 @@ import logger from "../utils/logger.js";
 const REPORT_META_PREFIX = "report:meta:";
 const REPORT_BUFFER_PREFIX = "report:buffer:";
 const REPORT_LOOKUP_PREFIX = "report:lookup:";
-const REPORT_CACHE_VERSION = "2026-05-15-index-fit-and-no-left-box-v48";
+const REPORT_CACHE_VERSION = "2026-05-18-client-connect-custom-report-v49";
+const createSectionsCacheToken = (sections = []) => {
+  const normalized = [...new Set((sections || []).filter(Boolean))]
+    .map((section) => String(section).trim())
+    .filter(Boolean)
+    .sort();
+  return normalized.length ? normalized.join("|") : "all";
+};
 
-const createReportCacheKey = ({ reportType, clientId, type, itemId, userId }) =>
-  `${REPORT_LOOKUP_PREFIX}${REPORT_CACHE_VERSION}:${reportType}:${clientId}:${type}:${itemId}:${userId || "anonymous"}`;
+const createReportCacheKey = ({
+  reportType,
+  clientId,
+  type,
+  itemId,
+  userId,
+  sections,
+}) =>
+  `${REPORT_LOOKUP_PREFIX}${REPORT_CACHE_VERSION}:${reportType}:${clientId}:${type}:${itemId}:${createSectionsCacheToken(
+    sections,
+  )}:${userId || "anonymous"}`;
 
 const createMetaKey = (jobId) => `${REPORT_META_PREFIX}${jobId}`;
 const createBufferKey = (jobId) => `${REPORT_BUFFER_PREFIX}${jobId}`;
@@ -22,12 +38,20 @@ const canAccessReportJob = (meta, userId) => {
 };
 
 class PdfService {
-  static async enqueueReport({ reportType, clientId, type, itemId, userId }) {
+  static async enqueueReport({
+    reportType,
+    clientId,
+    type,
+    itemId,
+    sections,
+    userId,
+  }) {
     const reportCacheKey = createReportCacheKey({
       reportType,
       clientId,
       type,
       itemId,
+      sections,
       userId,
     });
     const cachedMeta = await CacheService.getCache(reportCacheKey);
@@ -50,6 +74,7 @@ class PdfService {
         clientId,
         type,
         itemId,
+        sections,
         userId,
       });
       const jobId = randomUUID();
@@ -59,6 +84,7 @@ class PdfService {
         clientId,
         type,
         itemId,
+        sections,
         userId,
         buffer,
       });
@@ -71,6 +97,7 @@ class PdfService {
         clientId,
         type,
         itemId,
+        sections,
         userId,
       });
 
@@ -81,6 +108,7 @@ class PdfService {
         clientId,
         type,
         itemId,
+        sections,
         userId,
         createdAt: new Date().toISOString(),
       };
@@ -115,6 +143,7 @@ class PdfService {
         clientId,
         type,
         itemId,
+        sections,
         userId,
       });
       const jobId = randomUUID();
@@ -124,6 +153,7 @@ class PdfService {
         clientId,
         type,
         itemId,
+        sections,
         userId,
         buffer,
       });
@@ -136,6 +166,7 @@ class PdfService {
     clientId,
     type,
     itemId,
+    sections,
     userId,
   }) {
     if (reportType === "summary") {
@@ -152,6 +183,7 @@ class PdfService {
       type,
       itemId,
       userId,
+      { sections },
     );
   }
 
@@ -161,6 +193,7 @@ class PdfService {
     clientId,
     type,
     itemId,
+    sections,
     userId,
     buffer,
   }) {
@@ -172,6 +205,7 @@ class PdfService {
       clientId,
       type,
       itemId,
+      sections,
       userId,
       completedAt: new Date().toISOString(),
       downloadUrl: `/api/reports/download/${jobId}`,
@@ -189,7 +223,14 @@ class PdfService {
         CacheService.ttl.reports,
       ),
       CacheService.setCache(
-        createReportCacheKey({ reportType, clientId, type, itemId, userId }),
+        createReportCacheKey({
+          reportType,
+          clientId,
+          type,
+          itemId,
+          sections,
+          userId,
+        }),
         { jobId },
         CacheService.ttl.reports,
       ),

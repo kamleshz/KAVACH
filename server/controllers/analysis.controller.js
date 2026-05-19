@@ -10,6 +10,13 @@ import logger from "../utils/logger.js";
 const ANALYSIS_CACHE_PREFIX = "analysis:";
 const makeAnalysisCacheKey = (scope, clientId, type, itemId) =>
   `${ANALYSIS_CACHE_PREFIX}${scope}:${clientId}:${type}:${itemId}`;
+const parseReportSections = (rawSections) => {
+  if (!rawSections) return undefined;
+  return String(rawSections)
+    .split(",")
+    .map((section) => section.trim())
+    .filter(Boolean);
+};
 
 export const analyzePlasticPrePost = async (req, res) => {
   try {
@@ -270,13 +277,15 @@ export const getPurchaseAnalysisController = async (req, res) => {
 const queueReport = (reportType) =>
   asyncHandler(async (req, res) => {
     const { clientId } = req.params;
-    const { type, itemId } = req.query;
+    const { type, itemId, sections: rawSections } = req.query;
+    const sections = parseReportSections(rawSections);
 
     const result = await PdfService.enqueueReport({
       reportType,
       clientId,
       type,
       itemId,
+      sections,
       userId: req.userId,
     });
 

@@ -9,8 +9,8 @@ router.post('/create', auth, superAdmin, createUserController);
 router.get('/all', auth, admin, paginationMiddleware(), getAllUsersController);
 router.get('/roles', auth, admin, getAllRolesController);
 router.get('/login-activity', auth, admin, getLoginActivityController);
-router.patch('/:userId/unlock', auth, superAdmin, unlockUserController);
-router.patch('/:userId/role', auth, superAdmin, updateUserRoleController);
-router.patch('/:userId/status', auth, superAdmin, updateUserStatusController);
+router.patch('/:userId/unlock', auth, admin, unlockUserController);
+router.patch('/:userId/role', auth, admin, updateUserRoleController);
+router.patch('/:userId/status', auth, admin, updateUserStatusController);
 
 export default router;

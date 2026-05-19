@@ -48,7 +48,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
         setFinancialYears(years);
 
         // 2. Initialize Aggregation Structure
-        const categories = ['Cat-I', 'Cat-II', 'Cat-III', 'Cat-IV'];
+        const categories = ['Cat-I', 'Cat-II', 'Cat-III', 'Cat-IV', 'Cat-V'];
         const aggregation = {};
         categories.forEach(cat => {
             aggregation[cat] = {
@@ -73,7 +73,8 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             let matchedCat = null;
             if (cat) {
                  // Priority matching for Roman Numerals (IV > III > II > I)
-                 if (cat.includes("IV") || cat.includes("CAT-IV") || cat.includes("CAT IV") || cat.includes("CATEGORY IV")) matchedCat = "Cat-IV";
+                 if (cat.includes("CAT-V") || cat.includes("CAT V") || cat.includes("CATEGORY V") || /\bV\b/.test(cat)) matchedCat = "Cat-V";
+                 else if (cat.includes("IV") || cat.includes("CAT-IV") || cat.includes("CAT IV") || cat.includes("CATEGORY IV")) matchedCat = "Cat-IV";
                  else if (cat.includes("III") || cat.includes("CAT-III") || cat.includes("CAT III") || cat.includes("CATEGORY III")) matchedCat = "Cat-III";
                  else if (cat.includes("II") || cat.includes("CAT-II") || cat.includes("CAT II") || cat.includes("CATEGORY II")) matchedCat = "Cat-II";
                  
@@ -175,6 +176,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
     const normalizeSalesCategory = (val) => {
         if (!val) return null;
         const v = String(val).toUpperCase();
+        if (v.includes("CAT-V") || v.includes("CAT V") || v.includes("CATEGORY V") || /\bV\b/.test(v)) return "Cat-V";
         if (v.includes("IV") || v.includes("CAT-IV") || v.includes("CAT IV") || v.includes("CATEGORY IV")) return "Cat-IV";
         if (v.includes("III") || v.includes("CAT-III") || v.includes("CAT III") || v.includes("CATEGORY III")) return "Cat-III";
         if (v.includes("II") || v.includes("CAT-II") || v.includes("CAT II") || v.includes("CATEGORY II")) return "Cat-II";
@@ -192,7 +194,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
     };
 
     const calculateProducerTargetsFromSales = (rows, years) => {
-        const categories = ['Cat-I', 'Cat-II', 'Cat-III', 'Cat-IV'];
+        const categories = ['Cat-I', 'Cat-II', 'Cat-III', 'Cat-IV', 'Cat-V'];
         const UREP_TARGET_MATRIX = {
             'Cat-I': {
                 '2025-26': 30,
@@ -213,6 +215,7 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
                 '2028-29': 10,
             },
             'Cat-IV': {},
+            'Cat-V': {},
         };
         const salesAgg = {};
         const preConsumerAgg = {};
@@ -708,7 +711,8 @@ const SalesAnalysis = ({ clientId, type, itemId, readOnly = false, entityType, s
             
             let matchedCat = null;
             if (cat) {
-                 if (cat.includes("IV") || cat.includes("CAT-IV") || cat.includes("CAT IV") || cat.includes("CATEGORY IV")) matchedCat = "Cat-IV";
+                 if (cat.includes("CAT-V") || cat.includes("CAT V") || cat.includes("CATEGORY V") || /\bV\b/.test(cat)) matchedCat = "Cat-V";
+                 else if (cat.includes("IV") || cat.includes("CAT-IV") || cat.includes("CAT IV") || cat.includes("CATEGORY IV")) matchedCat = "Cat-IV";
                  else if (cat.includes("III") || cat.includes("CAT-III") || cat.includes("CAT III") || cat.includes("CATEGORY III")) matchedCat = "Cat-III";
                  else if (cat.includes("II") || cat.includes("CAT-II") || cat.includes("CAT II") || cat.includes("CATEGORY II")) matchedCat = "Cat-II";
                  else if (cat.includes("CAT-I") || cat.includes("CAT I") || cat.includes("CATEGORY I") || (cat.includes("I") && cat.includes("CONTAINER"))) matchedCat = "Cat-I";

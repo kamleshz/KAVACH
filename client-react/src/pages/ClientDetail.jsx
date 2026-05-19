@@ -104,6 +104,16 @@ import { createSupplierCtoTableColumns } from "../features/clientDetail/utils/su
 
 import { ClientProvider } from "../context/ClientContext";
 
+const formatLakhsCurrency = (value) => {
+  if (value === null || value === undefined || value === "") return "-";
+  const numericValue = Number(String(value).replace(/,/g, "").trim());
+  if (!Number.isFinite(numericValue)) return value;
+  return `₹ ${numericValue.toLocaleString("en-IN", {
+    minimumFractionDigits: Number.isInteger(numericValue) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
+
 const ClientDetail = ({
   clientId,
   initialClientData = null,
@@ -219,17 +229,25 @@ const ClientDetail = ({
       maximumFractionDigits: digits,
     });
 
+  const formatCurrency = (value, digits = 3) =>
+    `₹ ${formatWithCommas(value, digits)}`;
+
   const renderAnimatedSummaryValue = (
     value,
-    { digits = 0, className = "text-2xl font-bold", suffix = "" } = {},
+    {
+      digits = 0,
+      className = "text-2xl font-bold",
+      suffix = "",
+      prefix = "",
+    } = {},
   ) => (
     <GsapCountUp
       value={safeNumber(value)}
       duration={0.85}
-      animateKey={`summary-${digits}-${suffix}-${value}`}
+      animateKey={`summary-${digits}-${prefix}-${suffix}-${value}`}
       className={className}
       formatter={(currentValue) =>
-        `${formatWithCommas(currentValue, digits)}${suffix}`
+        `${prefix}${formatWithCommas(currentValue, digits)}${suffix}`
       }
     />
   );
@@ -2583,7 +2601,9 @@ const ClientDetail = ({
                                       Total Capital Investment (Lakhs)
                                     </div>
                                     <div className="mt-2 text-sm font-semibold text-gray-900">
-                                      {row.totalCapitalInvestmentLakhs ?? "-"}
+                                      {formatLakhsCurrency(
+                                        row.totalCapitalInvestmentLakhs,
+                                      )}
                                     </div>
                                   </div>
                                   <div className="bg-white rounded-lg p-4 border border-gray-200">
@@ -5372,12 +5392,12 @@ const ClientDetail = ({
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={6} align="center">
                   <span className="font-semibold text-emerald-700">
-                    {formatWithCommas(breakdownTotals.recycledAmount, 3)}
+                    {formatCurrency(breakdownTotals.recycledAmount, 3)}
                   </span>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={7} align="center">
                   <span className="font-semibold text-indigo-700">
-                    {formatWithCommas(breakdownTotals.virginAmount, 3)}
+                    {formatCurrency(breakdownTotals.virginAmount, 3)}
                   </span>
                 </Table.Summary.Cell>
               </Table.Summary.Row>
@@ -5632,7 +5652,7 @@ const ClientDetail = ({
         key: "monthlyPurchaseMt",
         align: "center",
         width: 170,
-        render: (value) => formatWithCommas(value, 2),
+        render: (value) => formatWithCommas(value, 3),
       },
       {
         title: headerCell(
@@ -5644,7 +5664,7 @@ const ClientDetail = ({
         key: "recycledTargetMt",
         align: "center",
         width: 170,
-        render: (value) => formatWithCommas(value, 2),
+        render: (value) => formatWithCommas(value, 3),
       },
       {
         title: headerCell(
@@ -5658,7 +5678,7 @@ const ClientDetail = ({
         width: 180,
         render: (value) => (
           <span className="font-semibold text-green-700">
-            {formatWithCommas(value, 2)}
+            {formatWithCommas(value, 3)}
           </span>
         ),
       },
@@ -5681,7 +5701,7 @@ const ClientDetail = ({
             ) : (
               <FaArrowDown className="text-red-600" />
             )}
-            {formatWithCommas(Math.abs(safeNumber(value)), 2)}
+            {formatWithCommas(Math.abs(safeNumber(value)), 3)}
           </span>
         ),
       },
@@ -5695,7 +5715,7 @@ const ClientDetail = ({
         key: "virginTargetMt",
         align: "center",
         width: 180,
-        render: (value) => formatWithCommas(value, 2),
+        render: (value) => formatWithCommas(value, 3),
       },
       {
         title: headerCell(
@@ -5709,7 +5729,7 @@ const ClientDetail = ({
         width: 170,
         render: (value) => (
           <span className="font-semibold text-emerald-700">
-            {formatWithCommas(value, 2)}
+            {formatWithCommas(value, 3)}
           </span>
         ),
       },
@@ -5737,7 +5757,7 @@ const ClientDetail = ({
               ) : (
                 <FaArrowDown className="text-red-600" />
               )}
-              {formatWithCommas(Math.abs(virginValue), 2)}
+              {formatWithCommas(Math.abs(virginValue), 3)}
             </span>
           );
         },
@@ -5958,7 +5978,7 @@ const ClientDetail = ({
         key: "monthlyPurchaseMt",
         align: "center",
         width: 160,
-        render: (value) => formatWithCommas(value, 2),
+        render: (value) => formatWithCommas(value, 3),
       },
       {
         title: "Recycled Target Qty",
@@ -5966,7 +5986,7 @@ const ClientDetail = ({
         key: "recycledTargetMt",
         align: "center",
         width: 160,
-        render: (value) => formatWithCommas(value, 2),
+        render: (value) => formatWithCommas(value, 3),
       },
       {
         title: "Recycled Achieved (MT)",
@@ -5976,7 +5996,7 @@ const ClientDetail = ({
         width: 170,
         render: (value) => (
           <span className="font-semibold text-green-700">
-            {formatWithCommas(value, 2)}
+            {formatWithCommas(value, 3)}
           </span>
         ),
       },
@@ -5995,7 +6015,7 @@ const ClientDetail = ({
             ) : (
               <FaArrowDown className="text-red-600" />
             )}
-            {formatWithCommas(Math.abs(safeNumber(value)), 2)}
+            {formatWithCommas(Math.abs(safeNumber(value)), 3)}
           </span>
         ),
       },
@@ -6005,7 +6025,7 @@ const ClientDetail = ({
         key: "virginTargetMt",
         align: "center",
         width: 170,
-        render: (value) => formatWithCommas(value, 2),
+        render: (value) => formatWithCommas(value, 3),
       },
       {
         title: "Virgin Achieved (MT)",
@@ -6015,7 +6035,7 @@ const ClientDetail = ({
         width: 160,
         render: (value) => (
           <span className="font-semibold text-emerald-700">
-            {formatWithCommas(value, 2)}
+            {formatWithCommas(value, 3)}
           </span>
         ),
       },
@@ -6034,7 +6054,7 @@ const ClientDetail = ({
             ) : (
               <FaArrowDown className="text-red-600" />
             )}
-            {formatWithCommas(Math.abs(safeNumber(value)), 2)}
+            {formatWithCommas(Math.abs(safeNumber(value)), 3)}
           </span>
         ),
       },
@@ -6109,7 +6129,7 @@ const ClientDetail = ({
         key: "monthlyPurchaseMt",
         align: "center",
         width: 160,
-        render: (value) => formatWithCommas(value, 2),
+        render: (value) => formatWithCommas(value, 3),
       },
       {
         title: headerCell(
@@ -6120,7 +6140,7 @@ const ClientDetail = ({
         key: "recycledTargetMt",
         align: "center",
         width: 160,
-        render: (value) => formatWithCommas(value, 2),
+        render: (value) => formatWithCommas(value, 3),
       },
       {
         title: headerCell(
@@ -6134,7 +6154,7 @@ const ClientDetail = ({
         width: 170,
         render: (value) => (
           <span className="font-semibold text-green-700">
-            {formatWithCommas(value, 2)}
+            {formatWithCommas(value, 3)}
           </span>
         ),
       },
@@ -6157,7 +6177,7 @@ const ClientDetail = ({
             ) : (
               <FaArrowDown className="text-red-600" />
             )}
-            {formatWithCommas(Math.abs(safeNumber(value)), 2)}
+            {formatWithCommas(Math.abs(safeNumber(value)), 3)}
           </span>
         ),
       },
@@ -6171,7 +6191,7 @@ const ClientDetail = ({
         key: "virginTargetMt",
         align: "center",
         width: 170,
-        render: (value) => formatWithCommas(value, 2),
+        render: (value) => formatWithCommas(value, 3),
       },
       {
         title: headerCell(
@@ -6185,7 +6205,7 @@ const ClientDetail = ({
         width: 160,
         render: (value) => (
           <span className="font-semibold text-emerald-700">
-            {formatWithCommas(value, 2)}
+            {formatWithCommas(value, 3)}
           </span>
         ),
       },
@@ -6213,7 +6233,7 @@ const ClientDetail = ({
               ) : (
                 <FaArrowDown className="text-red-600" />
               )}
-              {formatWithCommas(Math.abs(virginValue), 2)}
+              {formatWithCommas(Math.abs(virginValue), 3)}
             </span>
           );
         },
@@ -6310,7 +6330,7 @@ const ClientDetail = ({
             ) : (
               <FaArrowDown className="text-red-600" />
             )}
-            {formatWithCommas(Math.abs(numericValue), 2)}
+            {formatWithCommas(Math.abs(numericValue), 3)}
           </span>
         );
       };
@@ -6327,17 +6347,17 @@ const ClientDetail = ({
           </Table.Summary.Cell>
           <Table.Summary.Cell index={2} align="center">
             <span className="font-semibold text-gray-900">
-              {formatWithCommas(totals.monthlyPurchaseMt, 2)}
+              {formatWithCommas(totals.monthlyPurchaseMt, 3)}
             </span>
           </Table.Summary.Cell>
           <Table.Summary.Cell index={3} align="center">
             <span className="font-semibold text-gray-900">
-              {formatWithCommas(totals.recycledTargetMt, 2)}
+              {formatWithCommas(totals.recycledTargetMt, 3)}
             </span>
           </Table.Summary.Cell>
           <Table.Summary.Cell index={4} align="center">
             <span className="font-semibold text-green-700">
-              {formatWithCommas(totals.recycledAchievedMt, 2)}
+              {formatWithCommas(totals.recycledAchievedMt, 3)}
             </span>
           </Table.Summary.Cell>
           <Table.Summary.Cell index={5} align="center">
@@ -6345,12 +6365,12 @@ const ClientDetail = ({
           </Table.Summary.Cell>
           <Table.Summary.Cell index={6} align="center">
             <span className="font-semibold text-gray-900">
-              {formatWithCommas(totals.virginTargetMt, 2)}
+              {formatWithCommas(totals.virginTargetMt, 3)}
             </span>
           </Table.Summary.Cell>
           <Table.Summary.Cell index={7} align="center">
             <span className="font-semibold text-emerald-700">
-              {formatWithCommas(totals.virginAchievedMt, 2)}
+              {formatWithCommas(totals.virginAchievedMt, 3)}
             </span>
           </Table.Summary.Cell>
           <Table.Summary.Cell index={8} align="center">
@@ -6496,7 +6516,7 @@ const ClientDetail = ({
                 </div>
                 <div className="mt-2 text-2xl font-bold">
                   {renderAnimatedSummaryValue(targetQty, {
-                    digits: 2,
+                    digits: 3,
                     className: "text-2xl font-bold",
                   })}
                 </div>
@@ -6510,7 +6530,7 @@ const ClientDetail = ({
                 </div>
                 <div className="mt-2 text-2xl font-bold">
                   {renderAnimatedSummaryValue(virginTargetQty, {
-                    digits: 2,
+                    digits: 3,
                     className: "text-2xl font-bold",
                   })}
                 </div>
@@ -6525,6 +6545,7 @@ const ClientDetail = ({
                 <div className="mt-2 text-2xl font-bold">
                   {renderAnimatedSummaryValue(totalRecycledAmount, {
                     digits: 3,
+                    prefix: "₹ ",
                     className: "text-2xl font-bold",
                   })}
                 </div>
@@ -6539,6 +6560,7 @@ const ClientDetail = ({
                 <div className="mt-2 text-2xl font-bold">
                   {renderAnimatedSummaryValue(totalVirginAmount, {
                     digits: 3,
+                    prefix: "₹ ",
                     className: "text-2xl font-bold",
                   })}
                 </div>
@@ -6557,7 +6579,7 @@ const ClientDetail = ({
                       Recycled Achieved (MT)
                     </div>
                     {renderAnimatedSummaryValue(totalRecycledQty, {
-                      digits: 2,
+                      digits: 3,
                       className: "mt-2 text-3xl font-bold text-green-700",
                     })}
                   </div>
@@ -6577,7 +6599,7 @@ const ClientDetail = ({
                         <FaArrowDown className="text-red-600" />
                       )}
                       {renderAnimatedSummaryValue(Math.abs(recycledShortfall), {
-                        digits: 2,
+                        digits: 3,
                         className: "",
                       })}
                     </div>
@@ -6596,7 +6618,7 @@ const ClientDetail = ({
                   <span>
                     Achieved: {formatWithCommas(recycledAchievedPct, 1)}%
                   </span>
-                  <span>Target: {formatWithCommas(targetQty, 2)} MT</span>
+                  <span>Target: {formatWithCommas(targetQty, 3)} MT</span>
                 </div>
               </div>
 
@@ -6611,7 +6633,7 @@ const ClientDetail = ({
                       Virgin Achieved (MT)
                     </div>
                     {renderAnimatedSummaryValue(totalVirginQty, {
-                      digits: 2,
+                      digits: 3,
                       className: "mt-2 text-3xl font-bold text-emerald-700",
                     })}
                   </div>
@@ -6631,7 +6653,7 @@ const ClientDetail = ({
                         <FaArrowDown className="text-red-600" />
                       )}
                       {renderAnimatedSummaryValue(Math.abs(virginShortfall), {
-                        digits: 2,
+                        digits: 3,
                         className: "",
                       })}
                     </div>
@@ -6650,7 +6672,7 @@ const ClientDetail = ({
                   <span>
                     Achieved: {formatWithCommas(virginAchievedPct, 1)}%
                   </span>
-                  <span>Target: {formatWithCommas(virginTargetQty, 2)} MT</span>
+                  <span>Target: {formatWithCommas(virginTargetQty, 3)} MT</span>
                 </div>
               </div>
             </div>
@@ -6784,6 +6806,7 @@ const ClientDetail = ({
                         </div>
                         {renderAnimatedSummaryValue(item.recycledAmount, {
                           digits: 3,
+                          prefix: "₹ ",
                           className: "mt-1 text-base font-bold text-emerald-700",
                         })}
                       </div>
@@ -6793,6 +6816,7 @@ const ClientDetail = ({
                         </div>
                         {renderAnimatedSummaryValue(item.virginAmount, {
                           digits: 3,
+                          prefix: "₹ ",
                           className: "mt-1 text-base font-bold text-indigo-700",
                         })}
                       </div>
@@ -8059,6 +8083,7 @@ const ClientDetail = ({
                         normalizeStateName={normalizeStateName}
                         safeNumber={safeNumber}
                         formatWithCommas={formatWithCommas}
+                        formatCurrency={formatCurrency}
                         renderAnimatedSummaryValue={renderAnimatedSummaryValue}
                         summarySupplierRows={summarySupplierRows}
                         producerClientConnectSkuData={producerClientConnectSkuData}

@@ -14,12 +14,13 @@ if (!connection) {
 const worker = new Worker(
   pdfQueueName,
   async (job) => {
-    const { reportType, clientId, type, itemId, userId } = job.data;
+    const { reportType, clientId, type, itemId, sections, userId } = job.data;
     const buffer = await PdfService.generateReportBuffer({
       reportType,
       clientId,
       type,
       itemId,
+      sections,
       userId,
     });
 
@@ -29,6 +30,7 @@ const worker = new Worker(
       clientId,
       type,
       itemId,
+      sections,
       userId,
       buffer,
     });
